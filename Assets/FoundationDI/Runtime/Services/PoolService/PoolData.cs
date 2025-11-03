@@ -4,53 +4,56 @@ using UnityEngine.AddressableAssets;
 using UnityEngine.Pool;
 using UnityEngine.ResourceManagement.AsyncOperations;
 
-public class PoolData
+namespace DarkNaku.FoundationDI
 {
-    private IObjectPool<IPoolItem> _pool;
-    private AsyncOperationHandle<GameObject> _handle;
-    private HashSet<IPoolItem> _items;
-
-    public PoolData(IObjectPool<IPoolItem> pool, AsyncOperationHandle<GameObject> handle)
+    public class PoolData
     {
-        _pool = pool;
-        _handle = handle;
-        _items = new HashSet<IPoolItem>();
-    }
+        private IObjectPool<IPoolItem> _pool;
+        private AsyncOperationHandle<GameObject> _handle;
+        private HashSet<IPoolItem> _items;
 
-    public IPoolItem Get()
-    {
-        var item =  _pool.Get();
+        public PoolData(IObjectPool<IPoolItem> pool, AsyncOperationHandle<GameObject> handle)
+        {
+            _pool = pool;
+            _handle = handle;
+            _items = new HashSet<IPoolItem>();
+        }
 
-        item.PD = this;
+        public IPoolItem Get()
+        {
+            var item = _pool.Get();
 
-        _items.Add(item);
+            item.PD = this;
 
-        return item;
-    }
+            _items.Add(item);
 
-    public void Release(IPoolItem item)
-    {
-        _pool.Release(item);
+            return item;
+        }
 
-        _items.Remove(item);
-    }
-
-    public void Clear()
-    {
-        foreach (var item in _items)
+        public void Release(IPoolItem item)
         {
             _pool.Release(item);
+
+            _items.Remove(item);
         }
 
-        if (_handle.IsValid())
+        public void Clear()
         {
-            Addressables.Release(_handle);
+            foreach (var item in _items)
+            {
+                _pool.Release(item);
+            }
+
+            if (_handle.IsValid())
+            {
+                Addressables.Release(_handle);
+            }
+
+            _items.Clear();
+            _items = null;
+
+            _pool.Clear();
+            _pool = null;
         }
-        
-        _items.Clear();
-        _items = null;
-        
-        _pool.Clear();
-        _pool = null;
     }
 }
