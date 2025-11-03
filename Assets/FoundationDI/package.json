@@ -1,0 +1,15 @@
+{
+  "name": "com.darknaku.foundationdi",
+  "displayName": "FoundationDI",
+  "version": "0.0.1",
+  "unity": "2018.3",
+  "author": "DarkNaku",
+  "description": "DarkNaku's DI Foundation Package.",
+  "dependencies": {
+    "com.unity.addressables.android": "1.0.7"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DarkNaku/FoundationDI.git"
+  }
+}
