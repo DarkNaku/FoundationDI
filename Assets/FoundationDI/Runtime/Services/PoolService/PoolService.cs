@@ -8,12 +8,24 @@ using Object = UnityEngine.Object;
 
 namespace DarkNaku.FoundationDI
 {
-    public class PoolService : IDisposable
+    public interface IPoolService : IDisposable {
+        GameObject Get(string key, Transform parent = null);
+        T Get<T>(string key, Transform parent = null) where T : class;
+        void Release(GameObject item, float delay = 0f);
+    }
+    
+    public class PoolService : IPoolService
     {
         private readonly Dictionary<string, PoolData> _table = new();
         private readonly Transform _root = new GameObject("[PoolService]").transform;
+        
+        public PoolService()
+        {
+            _table = new();
+            _root = new GameObject("[PoolService]").transform;
+        }
 
-        public IPoolItem Get(string key, Transform parent = null)
+        public GameObject Get(string key, Transform parent = null)
         {
             if (!_table.TryGetValue(key, out var data))
             {
@@ -26,13 +38,13 @@ namespace DarkNaku.FoundationDI
 
             item.GO.transform.SetParent(parent == null ? _root : parent);
 
-            return item;
+            return item.GO;
 
         }
 
         public T Get<T>(string key, Transform parent = null) where T : class
         {
-            return Get(key, parent)?.GO.GetComponent<T>();
+            return Get(key, parent)?.GetComponent<T>();
         }
 
         public void Release(GameObject item, float delay = 0f)
