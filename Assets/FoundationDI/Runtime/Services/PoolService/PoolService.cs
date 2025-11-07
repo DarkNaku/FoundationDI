@@ -16,13 +16,18 @@ namespace DarkNaku.FoundationDI
     
     public class PoolService : IPoolService
     {
-        private readonly Dictionary<string, PoolData> _table = new();
-        private readonly Transform _root = new GameObject("[PoolService]").transform;
+        private readonly Dictionary<string, PoolData> _table;
+        private readonly Transform _root;
         
         public PoolService()
         {
             _table = new();
-            _root = new GameObject("[PoolService]").transform;
+            
+            var root = new GameObject("[PoolService]");
+            
+            _root = root.transform;
+            
+            Object.DontDestroyOnLoad(root);
         }
 
         public GameObject Get(string key, Transform parent = null)
@@ -56,6 +61,8 @@ namespace DarkNaku.FoundationDI
 
         public void Dispose()
         {
+            Object.Destroy(_root.gameObject);
+            
             foreach (var data in _table.Values)
             {
                 data.Clear();
