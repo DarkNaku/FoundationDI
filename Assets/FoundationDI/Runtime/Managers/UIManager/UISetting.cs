@@ -13,7 +13,21 @@ namespace FoundationDI
         
         public string Name => _name;
         public UIView Prefab => _prefab;
-        public Type PresenterType => Type.GetType($"{_presenterName}");
+
+        public Type PresenterType
+        {
+            get
+            {
+                foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+                {
+                    var type = asm.GetType(_presenterName);
+                    
+                    if (type != null) return type;
+                }
+                
+                return null;
+            }
+        }
     }
     
     public interface IUISetting
