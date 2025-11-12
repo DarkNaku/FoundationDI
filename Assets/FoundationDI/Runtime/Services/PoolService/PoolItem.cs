@@ -18,7 +18,14 @@ namespace DarkNaku.FoundationDI
 
     public class PoolItem : MonoBehaviour, IPoolItem
     {
-        public GameObject GO => gameObject;
+        public GameObject GO
+        {
+            get
+            {
+                // MonoBehaviour가 파괴되지 않았을 때만 gameObject 반환
+                return this != null ? gameObject : null;
+            }
+        }
 
         public PoolData PD { get; set; }
 
