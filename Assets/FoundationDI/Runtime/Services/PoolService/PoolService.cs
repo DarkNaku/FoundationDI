@@ -159,9 +159,14 @@ namespace DarkNaku.FoundationDI
 
         private void OnDestroyItem(IPoolItem item)
         {
+            if (item == null) return;
+
             item.OnDestroyItem();
 
-            Object.Destroy(item.GO);
+            if (item.GO != null)
+            {
+                Object.Destroy(item.GO);
+            }
         }
     }
 }
