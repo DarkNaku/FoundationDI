@@ -69,8 +69,11 @@ namespace DarkNaku.FoundationDI
 
             _table.Clear();
 
-            // 모든 pool이 정리된 후 root GameObject 파괴
-            Object.Destroy(_root.gameObject);
+            // 모든 pool이 정리된 후 root GameObject 파괴 (null check 추가)
+            if (_root != null)
+            {
+                Object.Destroy(_root.gameObject);
+            }
 
             Resources.UnloadUnusedAssets();
         }
