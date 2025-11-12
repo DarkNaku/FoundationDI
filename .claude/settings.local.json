@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cat:*)",
+      "Bash(tree:*)",
+      "Bash(powershell -NoProfile -Command \"Get-ChildItem -Path ''Assets/FoundationDI'' -Recurse -Directory | Sort-Object FullName | ForEach-Object { Write-Host $_FullName }\")"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
