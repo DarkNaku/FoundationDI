@@ -33,6 +33,9 @@ namespace DarkNaku.FoundationDI
 
         public virtual void OnReleaseItem()
         {
+            // this가 파괴되지 않았는지 먼저 확인
+            if (this == null) return;
+
             // GameObject가 파괴되었을 수 있으니 체크
             if (gameObject != null)
             {
@@ -58,7 +61,17 @@ namespace DarkNaku.FoundationDI
 
         private async UniTask ReleaseAsync(float delay)
         {
-            await UniTask.Delay(TimeSpan.FromSeconds(delay));
+            try
+            {
+                await UniTask.Delay(TimeSpan.FromSeconds(delay), cancellationToken: this.GetCancellationTokenOnDestroy());
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+
+            // this와 PD가 모두 존재하는지 확인
+            if (this == null || PD == null) return;
 
             PD.Release(this);
         }
