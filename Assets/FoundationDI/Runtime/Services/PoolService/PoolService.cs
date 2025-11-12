@@ -61,14 +61,16 @@ namespace DarkNaku.FoundationDI
 
         public void Dispose()
         {
-            Object.Destroy(_root.gameObject);
-            
+            // Pool items 정리 (GameObject 파괴 전에 수행)
             foreach (var data in _table.Values)
             {
                 data.Clear();
             }
 
             _table.Clear();
+
+            // 모든 pool이 정리된 후 root GameObject 파괴
+            Object.Destroy(_root.gameObject);
 
             Resources.UnloadUnusedAssets();
         }

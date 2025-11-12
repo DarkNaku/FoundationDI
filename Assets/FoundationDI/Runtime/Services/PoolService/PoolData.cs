@@ -39,9 +39,14 @@ namespace DarkNaku.FoundationDI
 
         public void Clear()
         {
+            // Pool items 정리 시 null check 추가
             foreach (var item in _items)
             {
-                _pool.Release(item);
+                // GameObject가 이미 파괴되었을 수 있으니 체크
+                if (item?.GO != null)
+                {
+                    _pool.Release(item);
+                }
             }
 
             if (_handle.IsValid())

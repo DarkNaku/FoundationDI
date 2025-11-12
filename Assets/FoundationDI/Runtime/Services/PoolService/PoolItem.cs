@@ -33,7 +33,11 @@ namespace DarkNaku.FoundationDI
 
         public virtual void OnReleaseItem()
         {
-            gameObject.SetActive(false);
+            // GameObject가 파괴되었을 수 있으니 체크
+            if (gameObject != null)
+            {
+                gameObject.SetActive(false);
+            }
         }
 
         public virtual void OnDestroyItem()
