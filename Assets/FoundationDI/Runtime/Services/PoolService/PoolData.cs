@@ -43,7 +43,7 @@ namespace DarkNaku.FoundationDI
             foreach (var item in _items)
             {
                 // GameObject가 이미 파괴되었을 수 있으니 체크
-                if (item?.GO != null)
+                if (item != null)
                 {
                     _pool.Release(item);
                 }
