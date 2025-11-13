@@ -6,7 +6,7 @@ using MessagePipe;
 using VContainer;
 
 
-namespace FoundationDI
+namespace DarkNaku.FoundationDI
 {
     public interface IMessageService
     {
