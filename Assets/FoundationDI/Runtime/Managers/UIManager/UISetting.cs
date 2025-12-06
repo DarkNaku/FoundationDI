@@ -8,6 +8,7 @@ namespace FoundationDI
     public class UIEntry
     {
         [SerializeField] private string _name;
+        [SerializeField] private string _namespace;
         [SerializeField] private string _presenterName;
         [SerializeField] private UIView _prefab;
         
@@ -20,7 +21,7 @@ namespace FoundationDI
             {
                 foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
                 {
-                    var type = asm.GetType(_presenterName);
+                    var type = asm.GetType(string.IsNullOrEmpty(_namespace) ? _presenterName : $"{_namespace}.{_presenterName}");
                     
                     if (type != null) return type;
                 }
