@@ -2,6 +2,7 @@ using System;
 using System.Runtime.CompilerServices;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
+using DarkNaku.FoundationDI;
 
 namespace FoundationDI
 {
@@ -15,8 +16,8 @@ namespace FoundationDI
         U OnBeforeHide<U>(System.Action<U> onBeforeHide) where U : class, IUIPresenter;
         U OnAfterHide<U>(System.Action<U> onAfterHide) where U : class, IUIPresenter;
     }
-    
-    public abstract class UIPresenter<T> : IUIPresenter where T : class, IUIView
+
+    public abstract class UIPresenter<T> : IUIPresenter where T : UIView
     {
         public bool InputEnabled
         {
@@ -39,19 +40,19 @@ namespace FoundationDI
         public void Initialize()
         {
             OnInitialize();
-            View.Initialize();
+            View.OnInitializeView();
         }
-        
+
         public async UniTask Show()
         {
             OnEnter();
-            await View.Show();
+            await View.PlayShow(default);
         }
 
         public async UniTask Hide()
         {
             _onBeforeHide?.Invoke(this);
-            await View.Hide();
+            await View.PlayHide(default);
             OnExit();
             _onAfterHide?.Invoke(this);
             
