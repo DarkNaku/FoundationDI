@@ -19,6 +19,8 @@ namespace PrimeTween {
     internal class PrimeTweenInstaller : ScriptableObject {
         [SerializeField] internal SceneAsset demoScene;
         [SerializeField] internal SceneAsset demoSceneUrp;
+        [SerializeField] internal SceneAsset demoScenePro;
+        [SerializeField] internal SceneAsset demoSceneProUrp;
         [SerializeField] internal Color uninstallButtonColor;
 
         [ContextMenu(nameof(ResetReviewRequest))] void ResetReviewRequest() => ReviewRequest.ResetReviewRequest();
@@ -83,22 +85,33 @@ namespace PrimeTween {
             }
 
             Space(8);
+            var rpAsset = GraphicsSettings.
+                #if UNITY_2019_3_OR_NEWER
+                defaultRenderPipeline;
+                #else
+                renderPipelineAsset;
+                #endif
+            bool isUrp = rpAsset != null && rpAsset.GetType().Name.Contains("Universal");
             if (Button("Open Demo", boldButtonStyle)) {
-                var rpAsset = GraphicsSettings.
-                    #if UNITY_2019_3_OR_NEWER
-                    defaultRenderPipeline;
-                    #else
-                    renderPipelineAsset;
-                    #endif
-                bool isUrp = rpAsset != null && rpAsset.GetType().Name.Contains("Universal");
                 var demoScene = isUrp ? installer.demoSceneUrp : installer.demoScene;
                 if (demoScene == null) {
                     Debug.LogError("Please re-import the plugin from Asset Store and import the 'Demo' folder.\n");
                     return;
                 }
-                var path = AssetDatabase.GetAssetPath(demoScene);
+                string path = AssetDatabase.GetAssetPath(demoScene);
                 EditorSceneManager.OpenScene(path);
             }
+            #if PRIME_TWEEN_PRO
+            if (Button("Open Demo (Pro)", boldButtonStyle)) {
+                var demoScene = isUrp ? installer.demoSceneProUrp : installer.demoScenePro;
+                if (demoScene == null) {
+                    Debug.LogError("Please re-import the plugin from Asset Store and import the 'Demo' folder.\n");
+                    return;
+                }
+                string path = AssetDatabase.GetAssetPath(demoScene);
+                EditorSceneManager.OpenScene(path);
+            }
+            #endif
             #if UNITY_2019_4_OR_NEWER
             if (Button("Import Basic Examples")) {
                 EditorUtility.DisplayDialog(pluginName, $"Please select the '{pluginName}' package in 'Package Manager', then press the 'Samples/Import' button at the bottom of the plugin's description.", "Ok");
@@ -208,7 +221,7 @@ DefaultImporter:
             };
         }
 
-        internal const string version = "1.3.5";
+        internal const string version = "1.4.8";
     }
 
     internal static class FixedUpdateParameterMigration {

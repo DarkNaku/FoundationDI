@@ -14,4 +14,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   demoScene: {fileID: 102900000, guid: 13170347bc506405f88d3a87bd0982b3, type: 3}
   demoSceneUrp: {fileID: 102900000, guid: 15054139658a5445689224c71f805b10, type: 3}
+  demoScenePro: {fileID: 102900000, guid: e8086c8f95dba534ca9bf16d3ce9ef31, type: 3}
+  demoSceneProUrp: {fileID: 102900000, guid: 2992e8ebf85ed47489b777c4d27b9952, type: 3}
   uninstallButtonColor: {r: 1, g: 0.23113209, b: 0.2762581, a: 1}
