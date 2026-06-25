@@ -115,6 +115,23 @@ public class ResourceServiceTest
         provider.Received(1).Release("b");
     });
 
+    [UnityTest]
+    public IEnumerator 로드_진행중_재호출시_provider를_중복_호출하지_않는다() => UniTask.ToCoroutine(async () =>
+    {
+        var asset = new GameObject("asset");
+        var source = new UniTaskCompletionSource<GameObject>();
+        var provider = Substitute.For<IResourceProvider>();
+        provider.LoadAsync<GameObject>("key").Returns(source.Task);
+        var sut = new ResourceService(provider);
+
+        var t1 = sut.LoadAsync<GameObject>("key");   // 로드 시작 (in-flight)
+        var t2 = sut.LoadAsync<GameObject>("key");   // 진행 중 task 재사용해야 함
+        source.TrySetResult(asset);
+        await UniTask.WhenAll(t1, t2);
+
+        _ = provider.Received(1).LoadAsync<GameObject>("key");
+    });
+
     [Test]
     public void 동기_Load도_동일한_참조_카운팅을_따른다()
     {

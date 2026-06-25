@@ -22,6 +22,7 @@ namespace DarkNaku.FoundationDI
 
         private readonly IResourceProvider _provider;
         private readonly Dictionary<string, Entry> _cache = new();
+        private readonly Dictionary<string, UniTaskCompletionSource<Object>> _loading = new();
 
         public ResourceService() : this(new AddressableResourceProvider())
         {
@@ -40,9 +41,29 @@ namespace DarkNaku.FoundationDI
                 return entry.Asset as T;
             }
 
+            if (!_loading.TryGetValue(key, out var tcs))
+            {
+                tcs = new UniTaskCompletionSource<Object>();
+                _loading[key] = tcs;
+                LoadAndCacheAsync<T>(key, tcs).Forget();
+            }
+
+            var asset = await tcs.Task;
+            _loading.Remove(key);
+            _cache[key].RefCount++;
+            return asset as T;
+        }
+
+        private async UniTaskVoid LoadAndCacheAsync<T>(string key, UniTaskCompletionSource<Object> tcs) where T : Object
+        {
             var asset = await _provider.LoadAsync<T>(key);
-            _cache[key] = new Entry { Asset = asset, RefCount = 1 };
-            return asset;
+
+            if (!_cache.ContainsKey(key))
+            {
+                _cache[key] = new Entry { Asset = asset, RefCount = 0 };
+            }
+
+            tcs.TrySetResult(asset);
         }
 
         public T Load<T>(string key) where T : Object
