@@ -17,15 +17,16 @@ namespace DarkNaku.FoundationDI
         private readonly PopupController _popups = new();
         private readonly OverlayController _overlays = new();
         private readonly Dictionary<Type, UIPresenterBase> _active = new();
-        private readonly UIRoot _root;
+        private UIRoot _root;
         private bool _disposed;
 
         internal UIManager(UIManagerSettings settings, UIInstanceFactory factory)
         {
             _settings = settings;
             _factory = factory;
-            _root = new UIRoot();
         }
+
+        private UIRoot Root => _root ??= new UIRoot();
 
         public T Page<T>() where T : UIPresenterBase
             => Acquire<T>(inst => _queue.Enqueue(ct => ShowPageAsync(inst, ct)));
@@ -59,11 +60,11 @@ namespace DarkNaku.FoundationDI
             await UniTask.Yield(PlayerLoopTiming.Update, ct);   // 체인 등록 보장
             if (_pages.Active != null && _pages.Active != inst)
             {
-                await HideCoreAsync(_pages.Active, _root.PageLayer, ct);
+                await HideCoreAsync(_pages.Active, Root.PageLayer, ct);
                 _pages.Clear();
             }
             _pages.SetActive(inst);
-            AttachTo(inst, _root.PageLayer);
+            AttachTo(inst, Root.PageLayer);
             await ShowCoreAsync(inst, ct);
         }
 
@@ -71,7 +72,7 @@ namespace DarkNaku.FoundationDI
         {
             await UniTask.Yield(PlayerLoopTiming.Update, ct);
             _popups.Push(inst);
-            AttachTo(inst, _root.PopupLayer);
+            AttachTo(inst, Root.PopupLayer);
             UpdatePopupModal();
             await ShowCoreAsync(inst, ct);
         }
@@ -81,7 +82,7 @@ namespace DarkNaku.FoundationDI
             await UniTask.Yield(PlayerLoopTiming.Update, ct);
             var above = (inst as IOverlayPlacement)?.Above ?? true;
             _overlays.Register(inst, above);
-            AttachTo(inst, above ? _root.AboveOverlayLayer : _root.BelowOverlayLayer);
+            AttachTo(inst, above ? Root.AboveOverlayLayer : Root.BelowOverlayLayer);
             await ShowCoreAsync(inst, ct);
         }
 
@@ -139,9 +140,9 @@ namespace DarkNaku.FoundationDI
 
         private Transform LayerOf(UIPresenterBase e)
         {
-            if (_pages.Active == e) return _root.PageLayer;
-            if (_popups.All.Contains(e)) return _root.PopupLayer;
-            return _overlays.IsAbove(e) ? _root.AboveOverlayLayer : _root.BelowOverlayLayer;
+            if (_pages.Active == e) return Root.PageLayer;
+            if (_popups.All.Contains(e)) return Root.PopupLayer;
+            return _overlays.IsAbove(e) ? Root.AboveOverlayLayer : Root.BelowOverlayLayer;
         }
 
         public void Dispose()
@@ -149,7 +150,7 @@ namespace DarkNaku.FoundationDI
             if (_disposed) return;
             _disposed = true;
             _queue.CancelAndClear();
-            if (_root.CanvasObject != null) UnityEngine.Object.Destroy(_root.CanvasObject);
+            if (_root != null && _root.CanvasObject != null) UnityEngine.Object.Destroy(_root.CanvasObject);
         }
     }
 
