@@ -2,9 +2,10 @@ using System;
 
 namespace DarkNaku.FoundationDI
 {
-    public abstract class UIOverlayPresenter<TView> : UIPresenterBase<TView> where TView : UIView
+    public abstract class UIOverlayPresenter<TView> : UIPresenterBase<TView>, IOverlayPlacement where TView : UIView
     {
         protected internal virtual bool Above => true;
+        bool IOverlayPlacement.Above => Above;
 
         public UIOverlayPresenter<TView> OnShown(Action<UIOverlayPresenter<TView>> cb)
         { Subscribe(LifecycleEvent.Shown, p => cb((UIOverlayPresenter<TView>)p)); return this; }
