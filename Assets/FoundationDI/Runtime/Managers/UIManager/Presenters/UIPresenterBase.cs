@@ -34,6 +34,7 @@ namespace DarkNaku.FoundationDI
         }
 
         internal void FireForTest(LifecycleEvent ev) => Fire(ev);   // 테스트 보조
+        internal UIView ViewBaseForTest => ViewBase;               // 테스트 보조
 
         internal void SetTransitionOverride(IUITransition t) => TransitionOverride = t;
 
