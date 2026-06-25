@@ -57,6 +57,7 @@ namespace DarkNaku.FoundationDI
 
             if (entry.RefCount <= 0)
             {
+                _cache.Remove(key);
                 _provider.Release(key);
             }
         }

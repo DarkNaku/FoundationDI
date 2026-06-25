@@ -66,4 +66,19 @@ public class ResourceServiceTest
 
         provider.Received(1).Release("key");
     });
+
+    [UnityTest]
+    public IEnumerator 해제된_키를_다시_로드하면_provider를_재호출한다() => UniTask.ToCoroutine(async () =>
+    {
+        var asset = new GameObject("asset");
+        var provider = Substitute.For<IResourceProvider>();
+        provider.LoadAsync<GameObject>("key").Returns(UniTask.FromResult(asset));
+        var sut = new ResourceService(provider);
+
+        await sut.LoadAsync<GameObject>("key");   // RefCount = 1
+        sut.Release("key");                        // RefCount = 0, 해제
+        await sut.LoadAsync<GameObject>("key");    // 재로드
+
+        _ = provider.Received(2).LoadAsync<GameObject>("key");
+    });
 }
