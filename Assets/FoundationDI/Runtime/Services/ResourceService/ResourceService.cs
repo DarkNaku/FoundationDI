@@ -52,7 +52,8 @@ namespace DarkNaku.FoundationDI
 
         public void Release(string key)
         {
-            throw new NotImplementedException();
+            var entry = _cache[key];
+            entry.RefCount--;
         }
 
         public void Dispose()

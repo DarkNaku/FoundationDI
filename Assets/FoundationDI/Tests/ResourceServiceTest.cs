@@ -37,4 +37,19 @@ public class ResourceServiceTest
         Assert.AreEqual(first, second);
         _ = provider.Received(1).LoadAsync<GameObject>("key");
     });
+
+    [UnityTest]
+    public IEnumerator Release시_참조가_남아있으면_provider_Release를_호출하지_않는다() => UniTask.ToCoroutine(async () =>
+    {
+        var asset = new GameObject("asset");
+        var provider = Substitute.For<IResourceProvider>();
+        provider.LoadAsync<GameObject>("key").Returns(UniTask.FromResult(asset));
+        var sut = new ResourceService(provider);
+
+        await sut.LoadAsync<GameObject>("key");
+        await sut.LoadAsync<GameObject>("key");   // RefCount = 2
+        sut.Release("key");                        // RefCount = 1
+
+        provider.DidNotReceive().Release("key");
+    });
 }
