@@ -96,4 +96,22 @@ public class ResourceServiceTest
         Assert.DoesNotThrow(() => sut.Release("key"));   // 추가 Release는 무시
         provider.Received(1).Release("key");
     });
+
+    [UnityTest]
+    public IEnumerator Dispose시_남은_모든_키의_핸들을_해제한다() => UniTask.ToCoroutine(async () =>
+    {
+        var assetA = new GameObject("assetA");
+        var assetB = new GameObject("assetB");
+        var provider = Substitute.For<IResourceProvider>();
+        provider.LoadAsync<GameObject>("a").Returns(UniTask.FromResult(assetA));
+        provider.LoadAsync<GameObject>("b").Returns(UniTask.FromResult(assetB));
+        var sut = new ResourceService(provider);
+
+        await sut.LoadAsync<GameObject>("a");
+        await sut.LoadAsync<GameObject>("b");
+        sut.Dispose();
+
+        provider.Received(1).Release("a");
+        provider.Received(1).Release("b");
+    });
 }

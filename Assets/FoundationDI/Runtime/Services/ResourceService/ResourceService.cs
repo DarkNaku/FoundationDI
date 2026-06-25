@@ -65,6 +65,12 @@ namespace DarkNaku.FoundationDI
 
         public void Dispose()
         {
+            foreach (var key in new List<string>(_cache.Keys))
+            {
+                _provider.Release(key);
+            }
+
+            _cache.Clear();
         }
     }
 }
