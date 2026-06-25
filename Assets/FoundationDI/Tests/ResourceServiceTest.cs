@@ -21,4 +21,20 @@ public class ResourceServiceTest
         Assert.AreEqual(asset, result);
         _ = provider.Received(1).LoadAsync<GameObject>("key");
     });
+
+    [UnityTest]
+    public IEnumerator 같은_키_재로드시_provider를_다시_호출하지_않고_캐시에서_반환한다() => UniTask.ToCoroutine(async () =>
+    {
+        var asset = new GameObject("asset");
+        var provider = Substitute.For<IResourceProvider>();
+        provider.LoadAsync<GameObject>("key").Returns(UniTask.FromResult(asset));
+        var sut = new ResourceService(provider);
+
+        var first = await sut.LoadAsync<GameObject>("key");
+        var second = await sut.LoadAsync<GameObject>("key");
+
+        Assert.AreEqual(asset, second);
+        Assert.AreEqual(first, second);
+        _ = provider.Received(1).LoadAsync<GameObject>("key");
+    });
 }

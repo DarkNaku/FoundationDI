@@ -34,7 +34,15 @@ namespace DarkNaku.FoundationDI
 
         public async UniTask<T> LoadAsync<T>(string key) where T : Object
         {
-            return await _provider.LoadAsync<T>(key);
+            if (_cache.TryGetValue(key, out var entry))
+            {
+                entry.RefCount++;
+                return entry.Asset as T;
+            }
+
+            var asset = await _provider.LoadAsync<T>(key);
+            _cache[key] = new Entry { Asset = asset, RefCount = 1 };
+            return asset;
         }
 
         public T Load<T>(string key) where T : Object
