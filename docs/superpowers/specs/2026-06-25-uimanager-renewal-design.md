@@ -45,34 +45,33 @@ API 스타일은 [DarkNaku/UIManager](https://github.com/DarkNaku/UIManager)(UI 
 
 ## 3. 공개 API
 
-```csharp
-// 페이지: 교체형
-uiManager.Page<MainMenuPresenter>().Show();
+> **자동-show 동작**: `Page<T>()` / `Popup<T>()` / `Overlay<T>()` 호출 즉시 Show가 `ShowQueue`에 enqueue된다. `.Show()` 별도 호출은 불필요하며 존재하지 않는다. 빌더 콜백(`.With()` / `.OnShown()` / `.WithTransition()`)은 반환된 인스턴스에 **동기 체인으로 즉시** 호출해야 하며(같은 프레임 내), 실제 Show 전환은 한 프레임 뒤 큐에서 실행된다.
 
-// 타입 안전 파라미터 + 빌더 콜백
+```csharp
+// 페이지: 교체형 (호출 즉시 ShowQueue에 등록됨)
+uiManager.Page<MainMenuPresenter>();
+
+// 타입 안전 파라미터 + 빌더 콜백 (동기 체인, 같은 프레임 내 완료)
 uiManager.Page<CharacterDetailPresenter>()
     .With(new CharacterDetailParams { Id = 123 })
-    .OnShown(p => analytics.Track("CharDetail"))
-    .Show();
+    .OnShown(p => analytics.Track("CharDetail"));
 
 // 팝업: 스택 + 모달 dim, 결과 받기
 var confirm = uiManager.Popup<ConfirmPresenter>()
     .With(new ConfirmParams { Message = "삭제할까요?" });
 confirm.OnAfterHide(p => { if (p.Result) Delete(); });
-confirm.Show();
 
 // 오버레이: 상시 HUD
-uiManager.Overlay<CurrencyHudPresenter>().Show();
+uiManager.Overlay<CurrencyHudPresenter>();
 
 // 트랜지션 per-show 오버라이드
 uiManager.Popup<SettingsPresenter>()
-    .WithTransition(slideFromBottom)   // IUITransition 에셋
-    .Show();
+    .WithTransition(slideFromBottom);   // IUITransition 에셋
 ```
 
 - `Page<T>()`는 `where T : UIPagePresenter`로 제약되어 **모드와 진입점이 컴파일 타임에 일치**한다.
-- 팩토리는 인스턴스를 **즉시 반환**(Root 부착 + `OnInitialize` 완료)하고, 실제 Show 전환은 `ShowQueue`에 enqueue된다.
-- 반환된 인스턴스에 `.With()`/`.OnShown()` 등을 동기 체인으로 호출해 Show 직전에 파라미터·구독자를 등록한다.
+- 팩토리는 인스턴스를 **즉시 반환**(캐시 조회 또는 신규 생성)하고, Show 전환은 `ShowQueue`에 자동 enqueue된다.
+- 반환된 인스턴스에 `.With()`/`.OnShown()` 등을 동기 체인으로 호출해 Show 직전(같은 프레임)에 파라미터·구독자를 등록한다. Show는 한 프레임 뒤 큐에서 실행된다.
 
 ## 4. 컴포넌트 구조
 
@@ -143,9 +142,9 @@ uiManager.Popup<SettingsPresenter>()
 
 ## 5. 데이터 흐름 (한 번의 Show)
 
-1. `Page<T>()` 호출 → `InstanceCache.TryGet`; 없으면 `UIInstanceFactory.Create` → `OnInitialize` → 인스턴스 반환
-2. 호출자가 동기 체인으로 `.With()`/`.OnShown()` 등록
-3. 같은 프레임 끝에 enqueue된 Show 작업이 `ShowQueue`에서 실행:
+1. `Page<T>()` 호출 → `InstanceCache.TryGet`; 없으면 `UIInstanceFactory.Create` → `OnInitialize` → 인스턴스 반환. **동시에 Show가 `ShowQueue`에 자동 enqueue됨** (`.Show()` 별도 호출 불필요)
+2. 호출자가 같은 프레임 내 동기 체인으로 `.With()`/`.OnShown()` 등 등록 (큐 실행 전이므로 안전)
+3. 다음 프레임에 enqueue된 Show 작업이 `ShowQueue`에서 실행:
    - 한 프레임 yield(체인 등록 보장) → 이전 page Hide(Page 모드) → 해당 레이어에 Root 부착
    - `OnBeforeShow` → 해석된 트랜지션 `PlayShow` → `OnShow` → `OnAfterShow`
    - 각 단계에서 구독자 발화

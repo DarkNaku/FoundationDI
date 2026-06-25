@@ -13,6 +13,11 @@ public class UIManagerFlowTests
     [UIPrefab("UI/Sample")]
     public class P : UIPagePresenter<V> { public bool Shown; protected internal override void OnShow() => Shown = true; }
 
+    // 재Show 테스트용: OnShow 호출 횟수를 추적
+    public class ReshowV : UIView { }
+    [UIPrefab("UI/ReshowSample")]
+    public class ReshowP : UIPagePresenter<ReshowV> { public int ShowCount; protected internal override void OnShow() => ShowCount++; }
+
     public class PopupV : UIView { }
     [UIPrefab("UI/SamplePopup")]
     public class PopupP : UIPopupPresenter<PopupV> { public bool Shown; protected internal override void OnShow() => Shown = true; }
@@ -24,6 +29,7 @@ public class UIManagerFlowTests
     private GameObject _prefab;
     private GameObject _popupPrefab;
     private GameObject _overlayPrefab;
+    private GameObject _reshowPrefab;
 
     [SetUp] public void Setup()
     {
@@ -35,6 +41,9 @@ public class UIManagerFlowTests
 
         _overlayPrefab = new GameObject("overlayPrefab", typeof(RectTransform));
         _overlayPrefab.AddComponent<OverlayV>();
+
+        _reshowPrefab = new GameObject("reshowPrefab", typeof(RectTransform));
+        _reshowPrefab.AddComponent<ReshowV>();
     }
 
     [TearDown] public void Teardown()
@@ -42,6 +51,7 @@ public class UIManagerFlowTests
         Object.DestroyImmediate(_prefab);
         Object.DestroyImmediate(_popupPrefab);
         Object.DestroyImmediate(_overlayPrefab);
+        Object.DestroyImmediate(_reshowPrefab);
     }
 
     [UnityTest]
@@ -94,6 +104,39 @@ public class UIManagerFlowTests
 
         await UniTask.WaitUntil(() => p.Shown);
         Assert.IsTrue(p.Shown);
+
+        manager.Dispose();
+    });
+
+    // FIX C1 가드: Hide 후 재Show 시 GameObject가 다시 활성화되고 OnShow가 재호출된다
+    [UnityTest]
+    public IEnumerator 재Show시_GameObject가_다시_활성화된다() => UniTask.ToCoroutine(async () =>
+    {
+        var loader = Substitute.For<IUIAssetLoader>();
+        loader.Load("UI/ReshowSample").Returns(_reshowPrefab);
+        var resolver = Substitute.For<IObjectResolver>();
+        var settings = ScriptableObject.CreateInstance<UIManagerSettings>();
+        var factory = new UIInstanceFactory(resolver, loader);
+
+        var manager = new UIManager(settings, factory);
+
+        // 1차 Show
+        var p = manager.Page<ReshowP>();
+        await UniTask.WaitUntil(() => p.ShowCount >= 1);
+        Assert.AreEqual(1, p.ShowCount, "1차 Show: OnShow 1회 호출");
+        Assert.IsTrue(p.ViewBaseForTest.gameObject.activeSelf, "1차 Show 후 GameObject 활성");
+
+        // Hide (ShowQueue를 통해 비동기)
+        p.Hide();
+        await UniTask.WaitUntil(() => !p.ViewBaseForTest.gameObject.activeSelf);
+        Assert.IsFalse(p.ViewBaseForTest.gameObject.activeSelf, "Hide 후 GameObject 비활성");
+
+        // 2차 재Show — 캐시에서 꺼낸 인스턴스여야 하고 GameObject가 다시 활성화되어야 함
+        var p2 = manager.Page<ReshowP>();
+        Assert.AreSame(p, p2, "캐시 재사용: 동일 인스턴스");
+        await UniTask.WaitUntil(() => p2.ShowCount >= 2);
+        Assert.AreEqual(2, p2.ShowCount, "재Show: OnShow 2회 호출");
+        Assert.IsTrue(p2.ViewBaseForTest.gameObject.activeSelf, "재Show 후 GameObject 다시 활성");
 
         manager.Dispose();
     });

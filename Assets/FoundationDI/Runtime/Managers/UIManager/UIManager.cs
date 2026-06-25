@@ -91,6 +91,7 @@ namespace DarkNaku.FoundationDI
 
         private async UniTask ShowCoreAsync(UIPresenterBase inst, CancellationToken ct)
         {
+            inst.ViewBase.gameObject.SetActive(true); // FIX C1: 캐시 재사용 시 비활성 GameObject 복구
             if (inst.TransitionOverride != null) inst.ViewBase.ShowTransition = inst.TransitionOverride;
             inst.OnBeforeShow(); inst.Fire(UIPresenterBase.LifecycleEvent.BeforeShown);
             await inst.ViewBase.PlayShow(ct);
@@ -150,6 +151,23 @@ namespace DarkNaku.FoundationDI
             if (_disposed) return;
             _disposed = true;
             _queue.CancelAndClear();
+            // FIX I1: 활성/캐시 presenter에 OnDestroyElement + Destroyed 이벤트 발화 (spec §6)
+            foreach (var e in _active.Values)
+            {
+                e.OnDestroyElement();
+                e.Fire(UIPresenterBase.LifecycleEvent.Destroyed);
+            }
+            foreach (var e in _cache.AllInstances)
+            {
+                var p = (UIPresenterBase)e;
+                p.OnDestroyElement();
+                p.Fire(UIPresenterBase.LifecycleEvent.Destroyed);
+            }
+            _active.Clear();
+            _cache.Clear();
+            _pages.Clear();
+            _popups.Clear();
+            _overlays.Clear();
             if (_root != null && _root.CanvasObject != null) UnityEngine.Object.Destroy(_root.CanvasObject);
         }
     }
