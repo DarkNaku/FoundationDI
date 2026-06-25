@@ -54,6 +54,11 @@ namespace DarkNaku.FoundationDI
         {
             var entry = _cache[key];
             entry.RefCount--;
+
+            if (entry.RefCount <= 0)
+            {
+                _provider.Release(key);
+            }
         }
 
         public void Dispose()

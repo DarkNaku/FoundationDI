@@ -52,4 +52,18 @@ public class ResourceServiceTest
 
         provider.DidNotReceive().Release("key");
     });
+
+    [UnityTest]
+    public IEnumerator 참조가_0이_되면_provider_Release를_호출한다() => UniTask.ToCoroutine(async () =>
+    {
+        var asset = new GameObject("asset");
+        var provider = Substitute.For<IResourceProvider>();
+        provider.LoadAsync<GameObject>("key").Returns(UniTask.FromResult(asset));
+        var sut = new ResourceService(provider);
+
+        await sut.LoadAsync<GameObject>("key");   // RefCount = 1
+        sut.Release("key");                        // RefCount = 0
+
+        provider.Received(1).Release("key");
+    });
 }
