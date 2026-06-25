@@ -47,7 +47,15 @@ namespace DarkNaku.FoundationDI
 
         public T Load<T>(string key) where T : Object
         {
-            throw new NotImplementedException();
+            if (_cache.TryGetValue(key, out var entry))
+            {
+                entry.RefCount++;
+                return entry.Asset as T;
+            }
+
+            var asset = _provider.Load<T>(key);
+            _cache[key] = new Entry { Asset = asset, RefCount = 1 };
+            return asset;
         }
 
         public void Release(string key)

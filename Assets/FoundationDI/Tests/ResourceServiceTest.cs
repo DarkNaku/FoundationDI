@@ -114,4 +114,23 @@ public class ResourceServiceTest
         provider.Received(1).Release("a");
         provider.Received(1).Release("b");
     });
+
+    [Test]
+    public void 동기_Load도_동일한_참조_카운팅을_따른다()
+    {
+        var asset = new GameObject("asset");
+        var provider = Substitute.For<IResourceProvider>();
+        provider.Load<GameObject>("key").Returns(asset);
+        var sut = new ResourceService(provider);
+
+        var first = sut.Load<GameObject>("key");
+        var second = sut.Load<GameObject>("key");   // RefCount = 2, 캐시 히트
+        sut.Release("key");                          // RefCount = 1
+        sut.Release("key");                          // RefCount = 0, 해제
+
+        Assert.AreEqual(asset, first);
+        Assert.AreEqual(first, second);
+        provider.Received(1).Load<GameObject>("key");
+        provider.Received(1).Release("key");
+    }
 }
