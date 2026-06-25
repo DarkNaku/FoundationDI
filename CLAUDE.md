@@ -45,14 +45,21 @@ NuGet 의존성은 **NuGetForUnity**(`Assets/NuGet/`)가 `Assets/packages.config
 모든 런타임 코드는 단일 asmdef `FoundationDI`(`Runtime/FoundationDI.asmdef`)에 들어간다.
 
 - **MessageService** (`Services/MessageService.cs`): MessagePipe 래퍼. `IObjectResolver`로 `IPublisher<T>`/`ISubscriber<T>`를 지연 해석해 `ConcurrentDictionary`에 캐싱. 동기/비동기(UniTask) pub-sub 제공.
-- **UIManager** (`Managers/UIManager/`): 페이지(단일 `_currentPage`)와 팝업 스택(`_popups`)을 관리. MVP 패턴 — `UIView`(MonoBehaviour) + `UIPresenter` + `IUISetting`(prefab/presenter 타입 매핑). `UIManager.CreateUI()`가 `Activator.CreateInstance(presenterType, this, view)`로 프레젠터를 만들고 `_container.Inject()`로 의존성을 주입한다. 모든 전환은 UniTask 비동기.
+- **UIManager** (`Managers/UIManager/`): uGUI 기반 UI 시스템. 네임스페이스 `DarkNaku.FoundationDI`.
+  - **빌더 API**: `uiManager.Page<TPresenter>()` / `Popup<TPresenter>()` / `Overlay<TPresenter>()` → 인스턴스 즉시 반환 → `.With(params)` / `.OnShown(...)` / `.WithTransition(...)` / `.Show()` 체이닝.
+  - **표시 모드**: Presenter 타입으로 컴파일 타임 고정 — `UIPagePresenter<TView>`(단일 교체) / `UIPopupPresenter<TView>`(LIFO 스택) / `UIOverlayPresenter<TView>`(Above/Below 상주). View 공통 기반 `UIView : MonoBehaviour`.
+  - **`ShowQueue`**: 모든 Show/Hide 전환을 단일 큐로 순차 직렬화 → race 조건 제거.
+  - **prefab 매핑**: `[UIPrefab("키")]` 속성을 Presenter 타입에 부착. `IUIAssetLoader`(기본 `ResourcesUILoader`, 옵션 `AddressablesUILoader`)로 로드.
+  - **`InstanceCache`**: Hide 후 인스턴스를 타입 키로 보관·재사용. 다음 Show 시 `OnInitialize` 생략.
+  - **트랜지션**: `IUITransition` 추상화 + 기본 3종(`FadeTransitionAsset`/`ScaleTransitionAsset`/`SlideTransitionAsset`) ScriptableObject. 트윈 라이브러리 비의존 — UniTask 자체 보간(`AnimationCurve` 인스펙터 커스터마이즈). 폴백 `NoopTransition`(즉시). 해석 우선순위: 빌더 오버라이드 > `UIView` 인스펙터 > Noop.
+  - **DI 등록**: `builder.RegisterUIManager(settings)` 확장 메서드(루트 `LifetimeScope` 에서 호출). Presenter/View는 `_container.Inject()`로 의존성 주입.
 - **PoolService** (`Services/PoolService/`): 키 기반 GameObject 오브젝트 풀. `Resources.Load` 우선, 실패 시 Addressables fallback으로 프리팹을 로드(`Load()`). `ObjectPool<IPoolItem>` 기반이며 `PoolData`가 풀+Addressables 핸들을, `PoolItem`(MonoBehaviour)이 풀 항목 생명주기 콜백(`OnGetItem`/`OnReleaseItem` 등)과 지연 반환(`Release(delay)`)을 담당. **현재 `plan.md`의 활성 개선 대상**(crash/thread-safety/null-safety).
 - **SoundService** (`Services/SoundService/`): SFX/BGM 재생, `PlayerPrefs` 볼륨 영속화, R3 `Observable.EveryUpdate(PostLateUpdate)`로 프레임당 중복 SFX 방지. 클립 로드도 Resources→Addressables fallback.
 
 공통 패턴: 각 서비스는 `Resources.Load<T>()`를 먼저 시도하고 실패 시 `Addressables.LoadAssetAsync<T>().WaitForCompletion()`으로 폴백한 뒤 핸들을 보관해 두었다가 dispose 시 해제한다.
 
-### 네임스페이스 주의
-런타임 코드는 두 네임스페이스로 나뉘어 있다: 서비스 계층은 `DarkNaku.FoundationDI`, UIManager 계열은 `FoundationDI`. 새 코드를 추가할 때 같은 디렉터리의 기존 파일이 쓰는 네임스페이스를 따른다.
+### 네임스페이스
+런타임 코드는 `DarkNaku.FoundationDI` 단일 네임스페이스로 통일한다(UIManager 리뉴얼로 구 `FoundationDI` 네임스페이스는 제거됨). 새 코드를 추가할 때 같은 디렉터리의 기존 파일이 쓰는 네임스페이스를 따른다.
 
 ### 기타 의존성
 PrimeTween(트위닝, tgz로 로컬 설치), Director(DarkNaku의 씬/플로우 라이브러리), Input System, URP 2D가 구성되어 있다.

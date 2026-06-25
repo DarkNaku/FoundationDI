@@ -1,7 +1,7 @@
 # UIManager 리뉴얼 설계
 
 - **날짜**: 2026-06-25
-- **상태**: 설계 승인 대기
+- **상태**: 구현 완료 (2026-06-25)
 - **대상**: `Assets/FoundationDI/Runtime/Managers/UIManager/` 전면 재설계
 
 ## 1. 배경 & 목표
@@ -199,3 +199,9 @@ Assets/FoundationDI/Runtime/Managers/UIManager/
 
 - `IUIAssetLoader`의 Resources→Addressables 폴백 로직을 `PoolService`·`SoundService`와 공통화할지는 별도 작업으로 분리 (이번 스코프 외)
 - Addressables 핸들 해제 시점(`Release`) 정책은 구현 단계에서 확정
+
+### 이번 구현 범위에서 빠진 계획 갭 (후속 작업 대상)
+
+1. **Popup dim 시각 배경 미구현**: 설계의 `CreatePopupModalWrapper`(어두운 반투명 배경 오버레이) 생성 로직이 구현되지 않았다. 현재 `UIPopupPresenter`는 최상단 팝업 외 입력 차단(`InputEnabled` 토글)만 동작한다. dim 배경의 시각적 연출이 필요하면 별도 task로 추가 구현한다.
+
+2. **트랜지션 우선순위 3단계 미적용**: 설계 §4.5의 4단계 우선순위 중 3번 단계("`UIManagerSettings`의 모드별 기본 트랜지션")가 미적용 상태다. 현재 해석 순서는 빌더 `.WithTransition()` 오버라이드 > `UIView` 인스펙터 `_showTransition`/`_hideTransition` > `NoopTransition` 3단계로만 동작한다. `UIManagerSettings`에 모드별 기본 트랜지션을 추가하고 이를 3번 우선순위로 삽입하는 작업이 필요하다.
