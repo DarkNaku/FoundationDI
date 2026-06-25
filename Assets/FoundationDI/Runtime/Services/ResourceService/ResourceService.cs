@@ -52,7 +52,8 @@ namespace DarkNaku.FoundationDI
 
         public void Release(string key)
         {
-            var entry = _cache[key];
+            if (!_cache.TryGetValue(key, out var entry)) return;
+
             entry.RefCount--;
 
             if (entry.RefCount <= 0)

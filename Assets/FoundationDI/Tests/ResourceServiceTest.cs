@@ -81,4 +81,19 @@ public class ResourceServiceTest
 
         _ = provider.Received(2).LoadAsync<GameObject>("key");
     });
+
+    [UnityTest]
+    public IEnumerator 보유_참조보다_많이_Release하면_안전하게_무시한다() => UniTask.ToCoroutine(async () =>
+    {
+        var asset = new GameObject("asset");
+        var provider = Substitute.For<IResourceProvider>();
+        provider.LoadAsync<GameObject>("key").Returns(UniTask.FromResult(asset));
+        var sut = new ResourceService(provider);
+
+        await sut.LoadAsync<GameObject>("key");   // RefCount = 1
+        sut.Release("key");                        // 0, 제거됨
+
+        Assert.DoesNotThrow(() => sut.Release("key"));   // 추가 Release는 무시
+        provider.Received(1).Release("key");
+    });
 }
