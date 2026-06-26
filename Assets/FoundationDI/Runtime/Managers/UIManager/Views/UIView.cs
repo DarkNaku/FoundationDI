@@ -24,16 +24,17 @@ namespace DarkNaku.FoundationDI
             set { if (Raycaster != null) Raycaster.enabled = value; }
         }
 
-        // 우선순위: per-show 오버라이드 > 인스펙터 에셋 > Noop
+        // 우선순위: per-show 오버라이드 > 인스펙터 에셋 > settings 모드 기본값 > Noop
         public IUITransition ShowTransition { get; set; }
         public IUITransition HideTransition { get; set; }
+        public IUITransition DefaultTransition { get; set; }
 
         public virtual void OnInitializeView() { }
 
         public UniTask PlayShow(CancellationToken ct)
-            => (ShowTransition ?? _showTransition ?? (IUITransition)Noop).PlayShow(RectTransform, ct);
+            => (ShowTransition ?? _showTransition ?? DefaultTransition ?? (IUITransition)Noop).PlayShow(RectTransform, ct);
 
         public UniTask PlayHide(CancellationToken ct)
-            => (HideTransition ?? _hideTransition ?? (IUITransition)Noop).PlayHide(RectTransform, ct);
+            => (HideTransition ?? _hideTransition ?? DefaultTransition ?? (IUITransition)Noop).PlayHide(RectTransform, ct);
     }
 }

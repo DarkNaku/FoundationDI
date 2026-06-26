@@ -1,4 +1,5 @@
 using System;
+using UnityEngine;
 
 namespace DarkNaku.FoundationDI
 {
@@ -13,6 +14,10 @@ namespace DarkNaku.FoundationDI
         public UIPopupPresenter<TView> WithTransition(IUITransition t) { SetTransitionOverride(t); return this; }
 
         public UIPopupPresenter<TView> With<TParams>(TParams p)
-        { if (this is IConfigurable<TParams> c) c.Configure(p); return this; }
+        {
+            if (this is IConfigurable<TParams> c) c.Configure(p);
+            else Debug.LogWarning($"[UIManager] {GetType().Name}이(가) IConfigurable<{typeof(TParams).Name}>를 구현하지 않아 With(...)가 무시됩니다.");
+            return this;
+        }
     }
 }
