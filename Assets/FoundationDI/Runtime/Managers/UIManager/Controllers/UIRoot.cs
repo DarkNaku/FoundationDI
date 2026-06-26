@@ -18,19 +18,22 @@ namespace DarkNaku.FoundationDI
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             Object.DontDestroyOnLoad(GO);
 
-            PageLayer = CreateLayer("Page");
-            BelowOverlayLayer = CreateLayer("BelowOverlay");
-            PopupLayer = CreateLayer("Popup");
-            AboveOverlayLayer = CreateLayer("AboveOverlay");
+            // 생성 순서 = sibling 순서 = 렌더 순서(아래→위). Overlay는 Popup 기준 Above/Below로 분리된다.
+            PageLayer = CreateLayer("[Page]");
+            BelowOverlayLayer = CreateLayer("[BelowOverlay]");
+            PopupLayer = CreateLayer("[Popup]");
+            AboveOverlayLayer = CreateLayer("[AboveOverlay]");
         }
 
         private Transform CreateLayer(string name)
         {
             var go = new GameObject(name, typeof(RectTransform));
             var rt = (RectTransform)go.transform;
+
             rt.SetParent(GO.transform, false);
             rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
             rt.offsetMin = Vector2.zero; rt.offsetMax = Vector2.zero;
+
             return rt;
         }
     }

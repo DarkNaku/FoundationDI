@@ -38,11 +38,16 @@ namespace DarkNaku.FoundationDI
                         await next(_cts.Token); 
                     }
                     catch (OperationCanceledException) { }
-                    catch (Exception ex) { Debug.LogException(ex); }
+                    catch (Exception e) 
+                    { 
+                        Debug.LogException(e); 
+                    }
                 }
             }
-
-            finally { _processing = false; }
+            finally 
+            { 
+                _processing = false; 
+            }
         }
 
         public void CancelAndClear()

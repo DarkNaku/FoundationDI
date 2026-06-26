@@ -2,8 +2,8 @@
 
 uGUI 기반 UI 표시/전환 시스템입니다. Presenter 타입으로 표시 모드(Page/Popup/Overlay)를 컴파일 타임에 고정하고, 모든 Show/Hide 전환을 단일 큐로 순차 직렬화합니다. 프리팹 로딩은 공용 [`IResourceService`](../../Services/ResourceService/README.md)(Addressables)에 위임합니다.
 
-- **3가지 표시 모드** — Page(단일 교체), Popup(LIFO 스택·모달), Overlay(상주, Above/Below)
-- **빌더 체인** — `Page<T>()` 즉시 인스턴스 반환 + Show 자동 enqueue → 같은 프레임 `.With()/.OnShown()/.WithTransition()` 동기 체인
+- **3가지 표시 모드** — Page(단일 교체), Popup(LIFO 스택·모달), Overlay(상주, Popup 기준 Above/Below)
+- **빌더 체인** — `Page<T>()` 즉시 인스턴스 반환 + Show 자동 enqueue → 같은 프레임 `.With()/.OnAfterShow()/.WithTransition()` 동기 체인
 - **전환 직렬화** — `OperationQueue`로 모든 전환을 순차 처리(race 제거)
 - **인스턴스 캐시** — Hide된 인스턴스를 타입별 재사용(다음 Show 시 `OnInitialize` 생략)
 - **트랜지션 추상화** — `IUITransition` + 기본 3종(Fade/Scale/Slide) ScriptableObject, 폴백 Noop
@@ -63,7 +63,7 @@ public class Example
     public void Open()
     {
         _ui.Page<TitlePresenter>()
-           .OnShown(p => Debug.Log("표시 완료"));
+           .OnAfterShow(p => Debug.Log("표시 완료"));
 
         _ui.Popup<ConfirmPresenter>()
            .With(new ConfirmParams("정말 삭제할까요?"))   // IConfigurable<TParams> 필요
@@ -116,15 +116,15 @@ public class ConfirmPresenter : UIPopupPresenter<ConfirmView>, IConfigurable<Con
 | --- | --- |
 | `UIPagePresenter<TView>` | 단일 교체(Page) |
 | `UIPopupPresenter<TView>` | LIFO 스택(Popup) |
-| `UIOverlayPresenter<TView>` | 상주(Overlay). `protected internal virtual bool Above => true` 오버라이드로 Above/Below 선택 |
+| `UIOverlayPresenter<TView>` | 상주(Overlay). `protected internal virtual bool Above => true` 오버라이드로 Popup 기준 Above/Below 선택 |
 
 공통 빌더 메서드(모두 자기 자신 반환 → 체인 가능):
 
 | 메서드 | 설명 |
 | --- | --- |
 | `With<TParams>(TParams p)` | Presenter가 `IConfigurable<TParams>`면 `Configure(p)` 호출 |
-| `OnShown(Action<...> cb)` | AfterShow 라이프사이클에 콜백 등록 |
-| `OnAfterHidden(Action<...> cb)` | AfterHide 라이프사이클에 콜백 등록 |
+| `OnAfterShow(Action<...> cb)` | AfterShow 라이프사이클에 콜백 등록 |
+| `OnAfterHide(Action<...> cb)` | AfterHide 라이프사이클에 콜백 등록 |
 | `WithTransition(IUITransition t)` | 이번 표시에 한해 트랜지션 오버라이드 |
 
 `UIPresenterBase<TView>`는 `protected TView View` 접근자를 제공한다.
@@ -169,11 +169,11 @@ public class ConfirmPresenter : UIPopupPresenter<ConfirmView>, IConfigurable<Con
 
 - **Page** — 단일 활성. 새 Page를 표시하면 이전 Page를 Hide하고 교체한다.
 - **Popup** — LIFO 스택. 여러 개가 쌓이며, **최상단만 입력 활성**(`InputEnabled`)이고 하위는 입력 차단(모달).
-- **Overlay** — 상주형. `Above`(기본 true)면 위 레이어, false면 아래 레이어에 배치된다.
+- **Overlay** — 상주형. `Above`(기본 true)면 Popup 위 레이어, false면 Popup 아래 레이어에 배치된다. 레이어 렌더 순서(아래→위)는 `Page → BelowOverlay → Popup → AboveOverlay`.
 
 ### 표시 흐름과 OperationQueue
 
-- `Page/Popup/Overlay<T>()`는 인스턴스를 **즉시 동기 반환**하고 실제 표시는 `OperationQueue`에 enqueue된다. 따라서 같은 프레임에 빌더 체인(`.With/.OnShown/.WithTransition`)을 동기로 구성할 수 있다.
+- `Page/Popup/Overlay<T>()`는 인스턴스를 **즉시 동기 반환**하고 실제 표시는 `OperationQueue`에 enqueue된다. 따라서 같은 프레임에 빌더 체인(`.With/.OnAfterShow/.WithTransition`)을 동기로 구성할 수 있다.
 - 모든 Show/Hide 전환은 `OperationQueue`로 **순차 직렬화**되어 동시 전환의 race를 방지한다.
 - 같은 타입이 **이미 활성**이면 중복 요청은 경고 후 무시되고 기존 인스턴스를 반환한다.
 

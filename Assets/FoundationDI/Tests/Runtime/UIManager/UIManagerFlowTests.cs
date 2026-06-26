@@ -124,19 +124,19 @@ public class UIManagerFlowTests
         var p = manager.Page<ReshowP>();
         await UniTask.WaitUntil(() => p.ShowCount >= 1);
         Assert.AreEqual(1, p.ShowCount, "1차 Show: OnAfterShow 1회 호출");
-        Assert.IsTrue(p.ViewBaseForTest.gameObject.activeSelf, "1차 Show 후 GameObject 활성");
+        Assert.IsTrue(p.ViewBase.gameObject.activeSelf, "1차 Show 후 GameObject 활성");
 
         // Hide (OperationQueue를 통해 비동기)
         p.Hide();
-        await UniTask.WaitUntil(() => !p.ViewBaseForTest.gameObject.activeSelf);
-        Assert.IsFalse(p.ViewBaseForTest.gameObject.activeSelf, "Hide 후 GameObject 비활성");
+        await UniTask.WaitUntil(() => !p.ViewBase.gameObject.activeSelf);
+        Assert.IsFalse(p.ViewBase.gameObject.activeSelf, "Hide 후 GameObject 비활성");
 
         // 2차 재Show — 캐시에서 꺼낸 인스턴스여야 하고 GameObject가 다시 활성화되어야 함
         var p2 = manager.Page<ReshowP>();
         Assert.AreSame(p, p2, "캐시 재사용: 동일 인스턴스");
         await UniTask.WaitUntil(() => p2.ShowCount >= 2);
         Assert.AreEqual(2, p2.ShowCount, "재Show: OnAfterShow 2회 호출");
-        Assert.IsTrue(p2.ViewBaseForTest.gameObject.activeSelf, "재Show 후 GameObject 다시 활성");
+        Assert.IsTrue(p2.ViewBase.gameObject.activeSelf, "재Show 후 GameObject 다시 활성");
 
         manager.Dispose();
     });

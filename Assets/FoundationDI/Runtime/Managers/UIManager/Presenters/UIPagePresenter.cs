@@ -5,10 +5,10 @@ namespace DarkNaku.FoundationDI
 {
     public abstract class UIPagePresenter<TView> : UIPresenterBase<TView> where TView : UIView
     {
-        public UIPagePresenter<TView> OnShown(Action<UIPagePresenter<TView>> cb)
+        public new UIPagePresenter<TView> OnAfterShow(Action<UIPagePresenter<TView>> cb)
         { Subscribe(LifecycleEvent.AfterShow, p => cb((UIPagePresenter<TView>)p)); return this; }
 
-        public UIPagePresenter<TView> OnAfterHidden(Action<UIPagePresenter<TView>> cb)
+        public new UIPagePresenter<TView> OnAfterHide(Action<UIPagePresenter<TView>> cb)
         { Subscribe(LifecycleEvent.AfterHide, p => cb((UIPagePresenter<TView>)p)); return this; }
 
         public UIPagePresenter<TView> WithTransition(IUITransition t) { SetTransitionOverride(t); return this; }

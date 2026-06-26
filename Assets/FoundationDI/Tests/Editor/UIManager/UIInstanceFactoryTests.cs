@@ -26,7 +26,7 @@ public class UIInstanceFactoryTests
         var presenter = factory.Create(typeof(P), host);
 
         Assert.IsInstanceOf<P>(presenter);
-        Assert.IsNotNull(((P)presenter).ViewBaseForTest);   // Bind 확인용 internal 노출
+        Assert.IsNotNull(((P)presenter).ViewBase);   // Bind 확인용 internal 노출
 
         Object.DestroyImmediate(prefab);
     }

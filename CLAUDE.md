@@ -47,7 +47,7 @@ NuGet 의존성은 **NuGetForUnity**(`Assets/NuGet/`)가 `Assets/packages.config
 - **MessageService** (`Services/MessageService.cs`): MessagePipe 래퍼. `IObjectResolver`로 `IPublisher<T>`/`ISubscriber<T>`를 지연 해석해 `ConcurrentDictionary`에 캐싱. 동기/비동기(UniTask) pub-sub 제공.
 - **UIManager** (`Managers/UIManager/`): uGUI 기반 UI 시스템. 네임스페이스 `DarkNaku.FoundationDI`.
   - **빌더 API**: `uiManager.Page<TPresenter>()` / `Popup<TPresenter>()` / `Overlay<TPresenter>()` → 인스턴스 즉시 반환 + Show 자동 enqueue (`.Show()` 별도 호출 불필요) → 같은 프레임 내 `.With(params)` / `.OnShown(...)` / `.WithTransition(...)` 동기 체인.
-  - **표시 모드**: Presenter 타입으로 컴파일 타임 고정 — `UIPagePresenter<TView>`(단일 교체) / `UIPopupPresenter<TView>`(LIFO 스택) / `UIOverlayPresenter<TView>`(Above/Below 상주). View 공통 기반 `UIView : MonoBehaviour`.
+  - **표시 모드**: Presenter 타입으로 컴파일 타임 고정 — `UIPagePresenter<TView>`(단일 교체) / `UIPopupPresenter<TView>`(LIFO 스택) / `UIOverlayPresenter<TView>`(Popup 기준 Above/Below 상주). View 공통 기반 `UIView : MonoBehaviour`.
   - **`ShowQueue`**: 모든 Show/Hide 전환을 단일 큐로 순차 직렬화 → race 조건 제거.
   - **prefab 매핑**: `[UIPrefab("키")]` 속성을 Presenter 타입에 부착. `IUIAssetLoader`(기본 `ResourcesUILoader`, 옵션 `AddressablesUILoader`)로 로드.
   - **`InstanceCache`**: Hide 후 인스턴스를 타입 키로 보관·재사용. 다음 Show 시 `OnInitialize` 생략.
