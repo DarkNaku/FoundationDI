@@ -15,8 +15,8 @@ public class NoopTransitionTests
         var rt = go.GetComponent<RectTransform>();
         IUITransition noop = new NoopTransition();
 
-        await noop.PlayShow(rt, CancellationToken.None);
-        await noop.PlayHide(rt, CancellationToken.None);
+        await noop.ShowAsync(rt, CancellationToken.None);
+        await noop.HideAsync(rt, CancellationToken.None);
 
         Assert.Pass();
         Object.DestroyImmediate(go);

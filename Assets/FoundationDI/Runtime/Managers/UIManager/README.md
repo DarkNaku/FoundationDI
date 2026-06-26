@@ -152,7 +152,7 @@ public class ConfirmPresenter : UIPopupPresenter<ConfirmView>, IConfigurable<Con
 
 - `[UIPrefab("키")]` — Presenter 클래스에 부착. 프리팹 로드 키(Addressables 주소).
 - `IConfigurable<TParams>` — Presenter에 구현 시 `.With(params)`로 `Configure(params)` 수신.
-- `IUITransition` — `UniTask PlayShow(RectTransform, CancellationToken)` / `PlayHide(...)`.
+- `IUITransition` — `UniTask ShowAsync(RectTransform, CancellationToken)` / `HideAsync(...)`.
   - 기본 구현(ScriptableObject): `FadeTransitionAsset`, `ScaleTransitionAsset`, `SlideTransitionAsset`. 폴백: `NoopTransition`(즉시).
 
 ### DI / 설정
@@ -184,7 +184,7 @@ public class ConfirmPresenter : UIPopupPresenter<ConfirmView>, IConfigurable<Con
 
 ### 트랜지션 우선순위
 
-`WithTransition(...)`(이번 표시 오버라이드 = `Transition`) > `UIView` 인스펙터 에셋(`_transition`) > 모드 기본값(`DefaultTransition`) > `NoopTransition`(즉시). 하나의 `IUITransition`이 `PlayShow`/`PlayHide` 한 쌍을 정의하므로 show/hide 슬롯은 분리하지 않는다.
+`WithTransition(...)`(이번 표시 오버라이드 = `Transition`) > `UIView` 인스펙터 에셋(`_transition`) > 모드 기본값(`DefaultTransition`) > `NoopTransition`(즉시). 하나의 `IUITransition`이 `ShowAsync`/`HideAsync` 한 쌍을 정의하므로 show/hide 슬롯은 분리하지 않는다.
 
 ### 프리팹 로딩
 

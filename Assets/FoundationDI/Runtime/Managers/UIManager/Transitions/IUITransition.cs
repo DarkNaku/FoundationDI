@@ -6,7 +6,7 @@ namespace DarkNaku.FoundationDI
 {
     public interface IUITransition
     {
-        UniTask PlayShow(RectTransform target, CancellationToken ct);
-        UniTask PlayHide(RectTransform target, CancellationToken ct);
+        UniTask ShowAsync(RectTransform target, CancellationToken ct);
+        UniTask HideAsync(RectTransform target, CancellationToken ct);
     }
 }

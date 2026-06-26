@@ -11,8 +11,8 @@ namespace DarkNaku.FoundationDI
         [SerializeField] protected AnimationCurve _ease = AnimationCurve.EaseInOut(0, 0, 1, 1);
         [SerializeField] protected bool _unscaledTime = true;
 
-        public abstract UniTask PlayShow(RectTransform target, CancellationToken ct);
-        public abstract UniTask PlayHide(RectTransform target, CancellationToken ct);
+        public abstract UniTask ShowAsync(RectTransform target, CancellationToken ct);
+        public abstract UniTask HideAsync(RectTransform target, CancellationToken ct);
 
         // 트윈 라이브러리 없이 매 프레임 보간
         protected async UniTask Animate(Action<float> apply, CancellationToken ct)

@@ -6,7 +6,7 @@ namespace DarkNaku.FoundationDI
 {
     public sealed class NoopTransition : IUITransition
     {
-        public UniTask PlayShow(RectTransform target, CancellationToken ct) => UniTask.CompletedTask;
-        public UniTask PlayHide(RectTransform target, CancellationToken ct) => UniTask.CompletedTask;
+        public UniTask ShowAsync(RectTransform target, CancellationToken ct) => UniTask.CompletedTask;
+        public UniTask HideAsync(RectTransform target, CancellationToken ct) => UniTask.CompletedTask;
     }
 }

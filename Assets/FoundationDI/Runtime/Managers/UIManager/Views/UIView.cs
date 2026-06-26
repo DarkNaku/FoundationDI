@@ -24,7 +24,7 @@ namespace DarkNaku.FoundationDI
         }
 
         // 해석 우선순위: per-show 오버라이드(Transition) > 인스펙터 에셋(_transition) > settings 모드 기본값(DefaultTransition) > Noop
-        // 하나의 IUITransition이 PlayShow/PlayHide 한 쌍을 정의하므로 show/hide 슬롯을 분리하지 않는다.
+        // 하나의 IUITransition이 ShowAsync/HideAsync 한 쌍을 정의하므로 show/hide 슬롯을 분리하지 않는다.
         public IUITransition Transition { get; set; }
         public IUITransition DefaultTransition { get; set; }
 
@@ -32,7 +32,7 @@ namespace DarkNaku.FoundationDI
 
         public virtual void OnInitializeView() { }
 
-        public UniTask PlayShow(CancellationToken ct) => Resolve().PlayShow(RectTransform, ct);
-        public UniTask PlayHide(CancellationToken ct) => Resolve().PlayHide(RectTransform, ct);
+        public UniTask PlayShow(CancellationToken ct) => Resolve().ShowAsync(RectTransform, ct);
+        public UniTask PlayHide(CancellationToken ct) => Resolve().HideAsync(RectTransform, ct);
     }
 }
