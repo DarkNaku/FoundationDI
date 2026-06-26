@@ -44,6 +44,7 @@ namespace DarkNaku.FoundationDI
 
             _pages.SetCurrent(presenter);
             AttachTo(presenter, Root.PageLayer);
+            RefreshInputBlocking();
 
             await ShowAsync(presenter, _settings?.DefaultPageTransition, ct);
         }
@@ -54,6 +55,7 @@ namespace DarkNaku.FoundationDI
             var above = (presenter as IOverlayPlacement)?.Above ?? true;
             _overlays.Register(presenter, above);
             AttachTo(presenter, above ? Root.AboveOverlayLayer : Root.BelowOverlayLayer);
+            RefreshInputBlocking();
             await ShowAsync(presenter, _settings?.DefaultOverlayTransition, ct);
         }
 
@@ -62,7 +64,7 @@ namespace DarkNaku.FoundationDI
             await UniTask.Yield(PlayerLoopTiming.Update, ct);
             _popups.Add(presenter);
             AttachTo(presenter, Root.PopupLayer);
-            UpdatePopupModal();
+            RefreshInputBlocking();
             await ShowAsync(presenter, _settings?.DefaultPopupTransition, ct);
         }
 
@@ -117,10 +119,34 @@ namespace DarkNaku.FoundationDI
             presenter.ViewBase.gameObject.SetActive(false);
         }
 
-        private void UpdatePopupModal()
+        private void RefreshInputBlocking()
         {
-            for (int i = 0; i < _popups.All.Count; i++)
-                _popups.All[i].ViewBase.InputEnabled = (i == _popups.All.Count - 1);
+            // 모달 기준선: 현재는 "활성 팝업이 1개 이상이면 모달". 향후 더 위에 뜨는 모달을 추가하면
+            // 이 기준선을 그 요소의 렌더 순서로 일반화한다.
+            bool hasModal = _popups.All.Count > 0;
+
+            if (_pages.Current != null)
+            {
+                _pages.Current.ViewBase.InputEnabled = !hasModal;
+            }
+
+            var below = _overlays.Below;
+            for (int i = 0; i < below.Count; i++)
+            {
+                below[i].ViewBase.InputEnabled = !hasModal;
+            }
+
+            var above = _overlays.Above;
+            for (int i = 0; i < above.Count; i++)
+            {
+                above[i].ViewBase.InputEnabled = true;
+            }
+
+            var popups = _popups.All;
+            for (int i = 0; i < popups.Count; i++)
+            {
+                popups[i].ViewBase.InputEnabled = (i == popups.Count - 1);
+            }
         }
 
         void IUIElementHost.RequestHide(UIPresenterBase e) => _queue.Enqueue(ct => HandleHideAsync(e, ct));
@@ -133,8 +159,9 @@ namespace DarkNaku.FoundationDI
             var layer = LayerOf(e);
             await HideAsync(e, layer, ct);
             if (_pages.Current == e) _pages.Clear();
-            _popups.Remove(e); UpdatePopupModal();
+            _popups.Remove(e);
             _overlays.Unregister(e);
+            RefreshInputBlocking();
         }
 
         private Transform LayerOf(UIPresenterBase e)

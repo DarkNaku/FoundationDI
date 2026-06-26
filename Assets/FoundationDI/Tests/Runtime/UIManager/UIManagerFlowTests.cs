@@ -140,4 +140,49 @@ public class UIManagerFlowTests
 
         manager.Dispose();
     });
+
+    [UnityTest]
+    public IEnumerator 팝업_표시시_하위_Page_입력이_차단되고_팝업은_활성이다() => UniTask.ToCoroutine(async () =>
+    {
+        var resource = Substitute.For<IResourceService>();
+        resource.Load<GameObject>("UI/Sample").Returns(_prefab);
+        resource.Load<GameObject>("UI/SamplePopup").Returns(_popupPrefab);
+        var resolver = Substitute.For<IObjectResolver>();
+        var settings = ScriptableObject.CreateInstance<UIManagerSettings>();
+        var factory = new UIInstanceFactory(resolver, resource);
+        var manager = new UIManager(settings, factory);
+
+        var page = manager.Page<P>();
+        await UniTask.WaitUntil(() => page.Shown);
+        Assert.IsTrue(page.ViewBase.InputEnabled, "팝업 없을 때 Page 입력 활성");
+
+        var popup = manager.Popup<PopupP>();
+        await UniTask.WaitUntil(() => popup.Shown);
+        Assert.IsFalse(page.ViewBase.InputEnabled, "팝업 표시 시 Page 입력 차단");
+        Assert.IsTrue(popup.ViewBase.InputEnabled, "최상단 팝업은 입력 활성");
+
+        manager.Dispose();
+    });
+
+    [UnityTest]
+    public IEnumerator 팝업_표시중_AboveOverlay_입력은_유지된다() => UniTask.ToCoroutine(async () =>
+    {
+        var resource = Substitute.For<IResourceService>();
+        resource.Load<GameObject>("UI/SampleOverlay").Returns(_overlayPrefab);
+        resource.Load<GameObject>("UI/SamplePopup").Returns(_popupPrefab);
+        var resolver = Substitute.For<IObjectResolver>();
+        var settings = ScriptableObject.CreateInstance<UIManagerSettings>();
+        var factory = new UIInstanceFactory(resolver, resource);
+        var manager = new UIManager(settings, factory);
+
+        var overlay = manager.Overlay<OverlayP>();
+        await UniTask.WaitUntil(() => overlay.Shown);
+
+        var popup = manager.Popup<PopupP>();
+        await UniTask.WaitUntil(() => popup.Shown);
+
+        Assert.IsTrue(overlay.ViewBase.InputEnabled, "AboveOverlay는 모달 팝업 중에도 입력 유지");
+
+        manager.Dispose();
+    });
 }
