@@ -57,11 +57,11 @@ public class UIManagerFlowTests
     [UnityTest]
     public IEnumerator Page_호출시_OnShow까지_도달한다() => UniTask.ToCoroutine(async () =>
     {
-        var loader = Substitute.For<IUIAssetLoader>();
-        loader.Load("UI/Sample").Returns(_prefab);
+        var resource = Substitute.For<IResourceService>();
+        resource.Load<GameObject>("UI/Sample").Returns(_prefab);
         var resolver = Substitute.For<IObjectResolver>();
         var settings = ScriptableObject.CreateInstance<UIManagerSettings>();
-        var factory = new UIInstanceFactory(resolver, loader);
+        var factory = new UIInstanceFactory(resolver, resource);
 
         var manager = new UIManager(settings, factory);
         var p = manager.Page<P>();
@@ -75,11 +75,11 @@ public class UIManagerFlowTests
     [UnityTest]
     public IEnumerator Popup_호출시_스택_Top이_된다() => UniTask.ToCoroutine(async () =>
     {
-        var loader = Substitute.For<IUIAssetLoader>();
-        loader.Load("UI/SamplePopup").Returns(_popupPrefab);
+        var resource = Substitute.For<IResourceService>();
+        resource.Load<GameObject>("UI/SamplePopup").Returns(_popupPrefab);
         var resolver = Substitute.For<IObjectResolver>();
         var settings = ScriptableObject.CreateInstance<UIManagerSettings>();
-        var factory = new UIInstanceFactory(resolver, loader);
+        var factory = new UIInstanceFactory(resolver, resource);
 
         var manager = new UIManager(settings, factory);
         var p = manager.Popup<PopupP>();
@@ -93,11 +93,11 @@ public class UIManagerFlowTests
     [UnityTest]
     public IEnumerator Overlay_호출시_OnShow까지_도달한다() => UniTask.ToCoroutine(async () =>
     {
-        var loader = Substitute.For<IUIAssetLoader>();
-        loader.Load("UI/SampleOverlay").Returns(_overlayPrefab);
+        var resource = Substitute.For<IResourceService>();
+        resource.Load<GameObject>("UI/SampleOverlay").Returns(_overlayPrefab);
         var resolver = Substitute.For<IObjectResolver>();
         var settings = ScriptableObject.CreateInstance<UIManagerSettings>();
-        var factory = new UIInstanceFactory(resolver, loader);
+        var factory = new UIInstanceFactory(resolver, resource);
 
         var manager = new UIManager(settings, factory);
         var p = manager.Overlay<OverlayP>();
@@ -112,11 +112,11 @@ public class UIManagerFlowTests
     [UnityTest]
     public IEnumerator 재Show시_GameObject가_다시_활성화된다() => UniTask.ToCoroutine(async () =>
     {
-        var loader = Substitute.For<IUIAssetLoader>();
-        loader.Load("UI/ReshowSample").Returns(_reshowPrefab);
+        var resource = Substitute.For<IResourceService>();
+        resource.Load<GameObject>("UI/ReshowSample").Returns(_reshowPrefab);
         var resolver = Substitute.For<IObjectResolver>();
         var settings = ScriptableObject.CreateInstance<UIManagerSettings>();
-        var factory = new UIInstanceFactory(resolver, loader);
+        var factory = new UIInstanceFactory(resolver, resource);
 
         var manager = new UIManager(settings, factory);
 

@@ -7,18 +7,18 @@ namespace DarkNaku.FoundationDI
     internal sealed class UIInstanceFactory
     {
         private readonly IObjectResolver _resolver;
-        private readonly IUIAssetLoader _loader;
+        private readonly IResourceService _resource;
 
-        public UIInstanceFactory(IObjectResolver resolver, IUIAssetLoader loader)
+        public UIInstanceFactory(IObjectResolver resolver, IResourceService resource)
         {
             _resolver = resolver;
-            _loader = loader;
+            _resource = resource;
         }
 
         public UIPresenterBase Create(Type presenterType, IUIElementHost host)
         {
             var key = UIPrefabKeyResolver.Resolve(presenterType);
-            var prefab = _loader.Load(key);
+            var prefab = _resource.Load<GameObject>(key);
 
             var go = UnityEngine.Object.Instantiate(prefab);
             var view = go.GetComponent<UIView>();

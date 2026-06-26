@@ -9,6 +9,7 @@ public class RootLifetimeScope : LifetimeScope
 
     protected override void Configure(IContainerBuilder builder)
     {
+        builder.Register<IResourceService>(_ => new ResourceService(), Lifetime.Singleton);
         builder.RegisterUIManager(_uiSettings);
     }
 }
