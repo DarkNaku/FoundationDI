@@ -143,7 +143,7 @@ public class ConfirmPresenter : UIPopupPresenter<ConfirmView>, IConfigurable<Con
 | 멤버 | 설명 |
 | --- | --- |
 | `RectTransform RectTransform` | 캐싱된 RectTransform |
-| `bool InputEnabled` | GraphicRaycaster 활성/비활성(모달 입력 차단에 사용) |
+| `bool InputEnabled` | CanvasGroup.interactable 활성/비활성(모달 입력 차단에 사용) |
 | `IUITransition ShowTransition` / `HideTransition` | per-show 트랜지션(코드 설정용) |
 | `virtual void OnInitializeView()` | 인스턴스 최초 생성 시 1회 호출 |
 | 인스펙터 `_showTransition` / `_hideTransition` | 기본 트랜지션 에셋 슬롯 |
@@ -168,7 +168,7 @@ public class ConfirmPresenter : UIPopupPresenter<ConfirmView>, IConfigurable<Con
 ### 표시 모드
 
 - **Page** — 단일 활성. 새 Page를 표시하면 이전 Page를 Hide하고 교체한다.
-- **Popup** — LIFO 스택. 여러 개가 쌓이며, **최상단만 입력 활성**(`InputEnabled`)이고 하위는 입력 차단(모달).
+- **Popup** — LIFO 스택. 여러 개가 쌓이며, **최상단 팝업만 입력 활성**이고 하위 팝업·Page·BelowOverlay는 입력 차단(모달). AboveOverlay는 팝업 표시 중에도 입력을 유지한다. 입력 차단은 `CanvasGroup.interactable` 토글이며, 클릭 흡수/통과(`blocksRaycasts`/`raycastTarget`)는 프리팹 책임이다.
 - **Overlay** — 상주형. `Above`(기본 true)면 Popup 위 레이어, false면 Popup 아래 레이어에 배치된다. 레이어 렌더 순서(아래→위)는 `Page → BelowOverlay → Popup → AboveOverlay`.
 
 ### 표시 흐름과 OperationQueue
