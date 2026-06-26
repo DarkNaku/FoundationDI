@@ -96,20 +96,20 @@ namespace DarkNaku.FoundationDI
             presenter.ViewBase.ShowTransition = presenter.TransitionOverride;
             presenter.ViewBase.HideTransition = presenter.TransitionOverride;
             presenter.ViewBase.DefaultTransition = defaultTransition;
-            presenter.OnBeforeShow(); 
-            presenter.Fire(UIPresenterBase.LifecycleEvent.BeforeShown);
+            presenter.OnBeforeShow();
+            presenter.Fire(UIPresenterBase.LifecycleEvent.BeforeShow);
             await presenter.ViewBase.PlayShow(ct);
             presenter.OnAfterShow();
-            presenter.Fire(UIPresenterBase.LifecycleEvent.AfterShown);
+            presenter.Fire(UIPresenterBase.LifecycleEvent.AfterShow);
         }
 
         private async UniTask HideAsync(UIPresenterBase presenter, Transform layer, CancellationToken ct)
         {
-            presenter.OnBeforeHide(); presenter.Fire(UIPresenterBase.LifecycleEvent.BeforeHidden);
+            presenter.OnBeforeHide(); presenter.Fire(UIPresenterBase.LifecycleEvent.BeforeHide);
             await presenter.ViewBase.PlayHide(ct);
             presenter.ViewBase.RectTransform.SetParent(null, false);
             presenter.OnAfterHide();
-            presenter.Fire(UIPresenterBase.LifecycleEvent.AfterHidden);
+            presenter.Fire(UIPresenterBase.LifecycleEvent.AfterHide);
 
             _active.Remove(presenter.GetType());
             presenter.ResetTransient();

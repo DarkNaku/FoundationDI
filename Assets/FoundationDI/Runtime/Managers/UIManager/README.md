@@ -123,8 +123,8 @@ public class ConfirmPresenter : UIPopupPresenter<ConfirmView>, IConfigurable<Con
 | 메서드 | 설명 |
 | --- | --- |
 | `With<TParams>(TParams p)` | Presenter가 `IConfigurable<TParams>`면 `Configure(p)` 호출 |
-| `OnShown(Action<...> cb)` | AfterShown 라이프사이클에 콜백 등록 |
-| `OnAfterHidden(Action<...> cb)` | AfterHidden 라이프사이클에 콜백 등록 |
+| `OnShown(Action<...> cb)` | AfterShow 라이프사이클에 콜백 등록 |
+| `OnAfterHidden(Action<...> cb)` | AfterHide 라이프사이클에 콜백 등록 |
 | `WithTransition(IUITransition t)` | 이번 표시에 한해 트랜지션 오버라이드 |
 
 `UIPresenterBase<TView>`는 `protected TView View` 접근자를 제공한다.

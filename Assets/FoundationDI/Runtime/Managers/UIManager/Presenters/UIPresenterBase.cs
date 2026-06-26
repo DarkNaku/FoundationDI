@@ -6,7 +6,7 @@ namespace DarkNaku.FoundationDI
 {
     public abstract class UIPresenterBase
     {
-        public enum LifecycleEvent { BeforeShown, AfterShown, BeforeHidden, AfterHidden, Destroyed }
+        public enum LifecycleEvent { BeforeShow, AfterShow, BeforeHide, AfterHide, Destroyed }
 
         internal UIView ViewBase { get; private set; }
         internal IUIElementHost Host { get; private set; }

@@ -9,10 +9,10 @@ namespace DarkNaku.FoundationDI
         bool IOverlayPlacement.Above => Above;
 
         public UIOverlayPresenter<TView> OnShown(Action<UIOverlayPresenter<TView>> cb)
-        { Subscribe(LifecycleEvent.AfterShown, p => cb((UIOverlayPresenter<TView>)p)); return this; }
+        { Subscribe(LifecycleEvent.AfterShow, p => cb((UIOverlayPresenter<TView>)p)); return this; }
 
         public UIOverlayPresenter<TView> OnAfterHidden(Action<UIOverlayPresenter<TView>> cb)
-        { Subscribe(LifecycleEvent.AfterHidden, p => cb((UIOverlayPresenter<TView>)p)); return this; }
+        { Subscribe(LifecycleEvent.AfterHide, p => cb((UIOverlayPresenter<TView>)p)); return this; }
 
         public UIOverlayPresenter<TView> WithTransition(IUITransition t) { SetTransitionOverride(t); return this; }
 
