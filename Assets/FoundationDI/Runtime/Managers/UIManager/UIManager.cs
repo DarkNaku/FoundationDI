@@ -58,12 +58,12 @@ namespace DarkNaku.FoundationDI
         private async UniTask ShowPageAsync(UIPresenterBase inst, CancellationToken ct)
         {
             await UniTask.Yield(PlayerLoopTiming.Update, ct);   // 체인 등록 보장
-            if (_pages.Active != null && _pages.Active != inst)
+            if (_pages.Current != null && _pages.Current != inst)
             {
-                await HideCoreAsync(_pages.Active, Root.PageLayer, ct);
+                await HideCoreAsync(_pages.Current, Root.PageLayer, ct);
                 _pages.Clear();
             }
-            _pages.SetActive(inst);
+            _pages.SetCurrent(inst);
             AttachTo(inst, Root.PageLayer);
             await ShowCoreAsync(inst, ct);
         }
@@ -71,7 +71,7 @@ namespace DarkNaku.FoundationDI
         private async UniTask ShowPopupAsync(UIPresenterBase inst, CancellationToken ct)
         {
             await UniTask.Yield(PlayerLoopTiming.Update, ct);
-            _popups.Push(inst);
+            _popups.Add(inst);
             AttachTo(inst, Root.PopupLayer);
             UpdatePopupModal();
             await ShowCoreAsync(inst, ct);
@@ -125,14 +125,14 @@ namespace DarkNaku.FoundationDI
         {
             var layer = LayerOf(e);
             await HideCoreAsync(e, layer, ct);
-            if (_pages.Active == e) _pages.Clear();
+            if (_pages.Current == e) _pages.Clear();
             _popups.Remove(e); UpdatePopupModal();
             _overlays.Unregister(e);
         }
 
         private Transform LayerOf(UIPresenterBase e)
         {
-            if (_pages.Active == e) return Root.PageLayer;
+            if (_pages.Current == e) return Root.PageLayer;
             if (_popups.All.Contains(e)) return Root.PopupLayer;
             return _overlays.IsAbove(e) ? Root.AboveOverlayLayer : Root.BelowOverlayLayer;
         }
@@ -159,7 +159,7 @@ namespace DarkNaku.FoundationDI
             _pages.Clear();
             _popups.Clear();
             _overlays.Clear();
-            if (_root != null && _root.CanvasObject != null) UnityEngine.Object.Destroy(_root.CanvasObject);
+            if (_root != null && _root.GO != null) UnityEngine.Object.Destroy(_root.GO);
         }
     }
 

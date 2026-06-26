@@ -10,11 +10,13 @@ namespace DarkNaku.FoundationDI
         public bool TryGet(Type type, out object instance)
         {
             instance = null;
+
             if (_table.TryGetValue(type, out var stack) && stack.Count > 0)
             {
                 instance = stack.Pop();
                 return true;
             }
+
             return false;
         }
 
@@ -25,6 +27,7 @@ namespace DarkNaku.FoundationDI
                 stack = new Stack<object>();
                 _table[type] = stack;
             }
+
             stack.Push(instance);
         }
 

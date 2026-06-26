@@ -12,6 +12,6 @@ public class UIRootTests
         Assert.IsNotNull(root.PopupLayer);
         Assert.IsNotNull(root.AboveOverlayLayer);
         Assert.IsNotNull(root.BelowOverlayLayer);
-        Object.DestroyImmediate(root.CanvasObject);
+        Object.DestroyImmediate(root.GO);
     }
 }

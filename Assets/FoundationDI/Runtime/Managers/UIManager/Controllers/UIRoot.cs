@@ -5,18 +5,18 @@ namespace DarkNaku.FoundationDI
 {
     internal sealed class UIRoot
     {
-        public GameObject CanvasObject { get; }
-        public Transform BelowOverlayLayer { get; }
+        public GameObject GO { get; }
         public Transform PageLayer { get; }
+        public Transform BelowOverlayLayer { get; }
         public Transform PopupLayer { get; }
         public Transform AboveOverlayLayer { get; }
 
         public UIRoot()
         {
-            CanvasObject = new GameObject("[UIManager]", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
-            var canvas = CanvasObject.GetComponent<Canvas>();
+            GO = new GameObject("[UIManager]", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+            var canvas = GO.GetComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            Object.DontDestroyOnLoad(CanvasObject);
+            Object.DontDestroyOnLoad(GO);
 
             BelowOverlayLayer = CreateLayer("BelowOverlay");
             PageLayer = CreateLayer("Page");
@@ -28,7 +28,7 @@ namespace DarkNaku.FoundationDI
         {
             var go = new GameObject(name, typeof(RectTransform));
             var rt = (RectTransform)go.transform;
-            rt.SetParent(CanvasObject.transform, false);
+            rt.SetParent(GO.transform, false);
             rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
             rt.offsetMin = Vector2.zero; rt.offsetMax = Vector2.zero;
             return rt;
