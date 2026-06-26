@@ -32,10 +32,7 @@ namespace DarkNaku.FoundationDI
             apply(1f);
         }
 
-        protected static CanvasGroup EnsureCanvasGroup(RectTransform target)
-        {
-            var cg = target.GetComponent<CanvasGroup>();
-            return cg != null ? cg : target.gameObject.AddComponent<CanvasGroup>();
-        }
+        // UIView에 RequireComponent(CanvasGroup)가 부착되어 트랜지션 대상에는 항상 CanvasGroup이 존재한다.
+        protected static CanvasGroup GetCanvasGroup(RectTransform target) => target.GetComponent<CanvasGroup>();
     }
 }

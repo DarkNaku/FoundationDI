@@ -9,13 +9,13 @@ namespace DarkNaku.FoundationDI
     {
         public override UniTask PlayShow(RectTransform target, CancellationToken ct)
         {
-            var cg = EnsureCanvasGroup(target);
+            var cg = GetCanvasGroup(target);
             return Animate(t => cg.alpha = t, ct);
         }
 
         public override UniTask PlayHide(RectTransform target, CancellationToken ct)
         {
-            var cg = EnsureCanvasGroup(target);
+            var cg = GetCanvasGroup(target);
             return Animate(t => cg.alpha = 1f - t, ct);
         }
     }
