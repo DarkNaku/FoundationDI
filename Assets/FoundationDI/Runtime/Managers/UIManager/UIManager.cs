@@ -95,8 +95,7 @@ namespace DarkNaku.FoundationDI
             presenter.ViewBase.gameObject.SetActive(true); // FIX C1: 캐시 재사용 시 비활성 GameObject 복구
             // 매 표시마다 트랜지션 슬롯을 명시적으로 재설정해 캐시 재사용 시 직전 오버라이드가 잔류하지 않게 한다.
             // 오버라이드는 show/hide 양쪽에 적용하고, 모드 기본값은 settings에서 주입한다.
-            presenter.ViewBase.ShowTransition = presenter.TransitionOverride;
-            presenter.ViewBase.HideTransition = presenter.TransitionOverride;
+            presenter.ViewBase.Transition = presenter.TransitionOverride;
             presenter.ViewBase.DefaultTransition = defaultTransition;
             presenter.OnBeforeShow();
             presenter.Fire(UIPresenterBase.LifecycleEvent.BeforeShow);

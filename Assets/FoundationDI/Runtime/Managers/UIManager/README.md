@@ -144,9 +144,9 @@ public class ConfirmPresenter : UIPopupPresenter<ConfirmView>, IConfigurable<Con
 | --- | --- |
 | `RectTransform RectTransform` | 캐싱된 RectTransform |
 | `bool InputEnabled` | CanvasGroup.interactable 활성/비활성(모달 입력 차단에 사용) |
-| `IUITransition ShowTransition` / `HideTransition` | per-show 트랜지션(코드 설정용) |
+| `IUITransition Transition` | per-show 트랜지션 오버라이드(코드 설정용) |
 | `virtual void OnInitializeView()` | 인스턴스 최초 생성 시 1회 호출 |
-| 인스펙터 `_showTransition` / `_hideTransition` | 기본 트랜지션 에셋 슬롯 |
+| 인스펙터 `_transition` | 트랜지션 에셋 슬롯 |
 
 ### 속성 / 인터페이스 / 트랜지션
 
@@ -184,7 +184,7 @@ public class ConfirmPresenter : UIPopupPresenter<ConfirmView>, IConfigurable<Con
 
 ### 트랜지션 우선순위
 
-`WithTransition(...)`(이번 표시 오버라이드) > `UIView` 인스펙터 에셋(`_showTransition`/`_hideTransition`) > `NoopTransition`(즉시).
+`WithTransition(...)`(이번 표시 오버라이드 = `Transition`) > `UIView` 인스펙터 에셋(`_transition`) > 모드 기본값(`DefaultTransition`) > `NoopTransition`(즉시). 하나의 `IUITransition`이 `PlayShow`/`PlayHide` 한 쌍을 정의하므로 show/hide 슬롯은 분리하지 않는다.
 
 ### 프리팹 로딩
 
