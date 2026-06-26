@@ -36,8 +36,8 @@ public class UIViewTests
         transition.HideAsync(Arg.Any<RectTransform>(), Arg.Any<CancellationToken>()).Returns(UniTask.CompletedTask);
 
         view.Transition = transition;
-        await view.PlayShow(default);
-        await view.PlayHide(default);
+        await view.ShowAsync(default);
+        await view.HideAsync(default);
 
         transition.Received(1).ShowAsync(view.RectTransform, Arg.Any<CancellationToken>());
         transition.Received(1).HideAsync(view.RectTransform, Arg.Any<CancellationToken>());

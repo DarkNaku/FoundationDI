@@ -32,7 +32,7 @@ namespace DarkNaku.FoundationDI
 
         public virtual void OnInitializeView() { }
 
-        public UniTask PlayShow(CancellationToken ct) => Resolve().ShowAsync(RectTransform, ct);
-        public UniTask PlayHide(CancellationToken ct) => Resolve().HideAsync(RectTransform, ct);
+        public UniTask ShowAsync(CancellationToken ct) => Resolve().ShowAsync(RectTransform, ct);
+        public UniTask HideAsync(CancellationToken ct) => Resolve().HideAsync(RectTransform, ct);
     }
 }

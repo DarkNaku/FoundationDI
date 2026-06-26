@@ -4,20 +4,20 @@ namespace DarkNaku.FoundationDI
 {
     internal sealed class OverlayController
     {
-        private readonly List<UIPresenterBase> _above = new();
-        private readonly List<UIPresenterBase> _below = new();
+        private readonly List<UIPresenter> _above = new();
+        private readonly List<UIPresenter> _below = new();
 
-        public IReadOnlyList<UIPresenterBase> Above => _above;
-        public IReadOnlyList<UIPresenterBase> Below => _below;
+        public IReadOnlyList<UIPresenter> Above => _above;
+        public IReadOnlyList<UIPresenter> Below => _below;
 
-        public void Register(UIPresenterBase presenter, bool above) => (above ? _above : _below).Add(presenter);
+        public void Register(UIPresenter presenter, bool above) => (above ? _above : _below).Add(presenter);
 
-        public void Unregister(UIPresenterBase presenter) { 
+        public void Unregister(UIPresenter presenter) { 
             _above.Remove(presenter); 
             _below.Remove(presenter); 
         }
 
-        public bool IsAbove(UIPresenterBase presenter) => _above.Contains(presenter);
+        public bool IsAbove(UIPresenter presenter) => _above.Contains(presenter);
 
         public void Clear() { 
             _above.Clear(); 

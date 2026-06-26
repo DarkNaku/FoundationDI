@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace DarkNaku.FoundationDI
 {
-    public abstract class UIPresenterBase
+    public abstract class UIPresenter
     {
         public enum LifecycleEvent { BeforeShow, AfterShow, BeforeHide, AfterHide, Destroyed }
 
@@ -12,7 +12,7 @@ namespace DarkNaku.FoundationDI
         internal IUIElementHost Host { get; private set; }
         internal IUITransition TransitionOverride { get; private set; }
 
-        private Dictionary<LifecycleEvent, List<Action<UIPresenterBase>>> _subscribers;
+        private Dictionary<LifecycleEvent, List<Action<UIPresenter>>> _subscribers;
 
         internal void Bind(UIView view, IUIElementHost host) 
         { 
@@ -20,7 +20,7 @@ namespace DarkNaku.FoundationDI
             Host = host; 
         }
 
-        internal void Subscribe(LifecycleEvent ev, Action<UIPresenterBase> handler)
+        internal void Subscribe(LifecycleEvent ev, Action<UIPresenter> handler)
         {
             if (handler == null) return;
 
@@ -71,7 +71,7 @@ namespace DarkNaku.FoundationDI
         public void Hide() => Host?.RequestHide(this);
     }
 
-    public abstract class UIPresenterBase<TView> : UIPresenterBase where TView : UIView
+    public abstract class UIPresenter<TView> : UIPresenter where TView : UIView
     {
         protected TView View => (TView)ViewBase;
     }
