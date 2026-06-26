@@ -6,7 +6,7 @@ namespace DarkNaku.FoundationDI
     public abstract class UIPagePresenter<TView> : UIPresenterBase<TView> where TView : UIView
     {
         public UIPagePresenter<TView> OnShown(Action<UIPagePresenter<TView>> cb)
-        { Subscribe(LifecycleEvent.Shown, p => cb((UIPagePresenter<TView>)p)); return this; }
+        { Subscribe(LifecycleEvent.AfterShown, p => cb((UIPagePresenter<TView>)p)); return this; }
 
         public UIPagePresenter<TView> OnAfterHidden(Action<UIPagePresenter<TView>> cb)
         { Subscribe(LifecycleEvent.AfterHidden, p => cb((UIPagePresenter<TView>)p)); return this; }
