@@ -74,11 +74,10 @@ public class Example
 
 ### 4) 닫기
 
-Presenter의 명령 메서드로 닫습니다.
+Presenter의 `Hide()`로 숨깁니다. 숨겨진 인스턴스는 캐시에 보관되어 다음 표시 때 재사용되며, 실제 파괴는 `UIManager.Dispose()`(컨테이너 수명 종료) 시 일괄 처리됩니다.
 
 ```csharp
 presenter.Hide();    // 숨김 + 인스턴스 캐시에 보관(재사용 가능)
-presenter.Close();   // 숨김 + 캐시 제거 + GameObject 파괴
 ```
 
 ### 5) 파라미터 전달
@@ -132,7 +131,7 @@ public class ConfirmPresenter : UIPopupPresenter<ConfirmView>, IConfigurable<Con
 
 ### Presenter 명령 / 라이프사이클 훅 (`UIPresenterBase`)
 
-명령: `void Hide()`, `void Close()`.
+명령: `void Hide()` (숨김 + 캐시 보관). 개별 파괴는 제공하지 않으며, 정리는 `UIManager.Dispose()`에서 일괄 수행된다.
 
 오버라이드 가능한 훅(`protected internal virtual`):
 `OnInitialize` · `OnBeforeShow` · `OnShow` · `OnAfterShow` · `OnBeforeHide` · `OnHide` · `OnAfterHide` · `OnDestroyElement`.
@@ -181,7 +180,7 @@ public class ConfirmPresenter : UIPopupPresenter<ConfirmView>, IConfigurable<Con
 ### 인스턴스 캐시
 
 - `Hide()`된 Presenter는 타입을 키로 `InstanceCache`에 보관되고, 다음 표시 시 재사용된다(이때 `OnInitialize`는 생략, `OnShow` 등 표시 훅은 재호출).
-- `Close()`는 캐시에서 제거하고 GameObject를 파괴한다.
+- 개별 파괴 API는 없다. 캐시·활성 인스턴스의 정리(파괴)는 `UIManager.Dispose()`에서만 일괄 수행된다.
 
 ### 트랜지션 우선순위
 

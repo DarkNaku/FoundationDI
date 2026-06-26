@@ -28,8 +28,6 @@ namespace DarkNaku.FoundationDI
             stack.Push(instance);
         }
 
-        public void Remove(Type type) => _table.Remove(type);
-
         public IReadOnlyCollection<object> AllInstances
         {
             get

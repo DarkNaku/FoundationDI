@@ -56,7 +56,6 @@ namespace DarkNaku.FoundationDI
 
         // 커맨드
         public void Hide() => Host?.RequestHide(this);
-        public void Close() => Host?.RequestDestroy(this);
     }
 
     public abstract class UIPresenterBase<TView> : UIPresenterBase where TView : UIView

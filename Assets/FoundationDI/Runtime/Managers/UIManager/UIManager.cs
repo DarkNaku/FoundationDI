@@ -120,7 +120,6 @@ namespace DarkNaku.FoundationDI
         }
 
         void IUIElementHost.RequestHide(UIPresenterBase e) => _queue.Enqueue(ct => HandleHideAsync(e, ct));
-        void IUIElementHost.RequestDestroy(UIPresenterBase e) => _queue.Enqueue(ct => HandleDestroyAsync(e, ct));
 
         private async UniTask HandleHideAsync(UIPresenterBase e, CancellationToken ct)
         {
@@ -129,14 +128,6 @@ namespace DarkNaku.FoundationDI
             if (_pages.Active == e) _pages.Clear();
             _popups.Remove(e); UpdatePopupModal();
             _overlays.Unregister(e);
-        }
-
-        private async UniTask HandleDestroyAsync(UIPresenterBase e, CancellationToken ct)
-        {
-            await HandleHideAsync(e, ct);
-            _cache.Remove(e.GetType());
-            e.OnDestroyElement(); e.Fire(UIPresenterBase.LifecycleEvent.Destroyed);
-            if (e.ViewBase != null) UnityEngine.Object.Destroy(e.ViewBase.gameObject);
         }
 
         private Transform LayerOf(UIPresenterBase e)
