@@ -14,8 +14,6 @@ namespace DarkNaku.FoundationDI
         private bool _processing;
         private CancellationTokenSource _cts = new();
 
-        public int PendingCount => _pending.Count + (_processing ? 1 : 0);
-
         public void Enqueue(ShowQueueWork work)
         {
             if (work == null) throw new ArgumentNullException(nameof(work));
