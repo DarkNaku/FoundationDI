@@ -126,7 +126,7 @@ public class UIManagerFlowTests
         Assert.AreEqual(1, p.ShowCount, "1차 Show: OnShow 1회 호출");
         Assert.IsTrue(p.ViewBaseForTest.gameObject.activeSelf, "1차 Show 후 GameObject 활성");
 
-        // Hide (ShowQueue를 통해 비동기)
+        // Hide (OperationQueue를 통해 비동기)
         p.Hide();
         await UniTask.WaitUntil(() => !p.ViewBaseForTest.gameObject.activeSelf);
         Assert.IsFalse(p.ViewBaseForTest.gameObject.activeSelf, "Hide 후 GameObject 비활성");

@@ -5,12 +5,12 @@ using NUnit.Framework;
 using UnityEngine.TestTools;
 using DarkNaku.FoundationDI;
 
-public class ShowQueueTests
+public class OperationQueueTests
 {
     [UnityTest]
     public IEnumerator 큐는_등록된_작업을_순서대로_직렬화한다() => UniTask.ToCoroutine(async () =>
     {
-        var queue = new ShowQueue();
+        var queue = new OperationQueue();
         var order = new List<int>();
 
         queue.Enqueue(async ct => { await UniTask.Yield(); order.Add(1); });
@@ -24,7 +24,7 @@ public class ShowQueueTests
     [UnityTest]
     public IEnumerator CancelAndClear_후_대기작업은_실행되지_않는다() => UniTask.ToCoroutine(async () =>
     {
-        var queue = new ShowQueue();
+        var queue = new OperationQueue();
         var ran = false;
         queue.Enqueue(async ct => { await UniTask.Delay(100, cancellationToken: ct); ran = true; });
         queue.CancelAndClear();

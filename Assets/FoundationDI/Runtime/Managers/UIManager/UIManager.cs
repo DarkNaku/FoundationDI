@@ -11,7 +11,7 @@ namespace DarkNaku.FoundationDI
     {
         private readonly UIManagerSettings _settings;
         private readonly UIInstanceFactory _factory;
-        private readonly ShowQueue _queue = new();
+        private readonly OperationQueue _queue = new();
         private readonly InstanceCache _cache = new();
         private readonly PageController _pages = new();
         private readonly PopupController _popups = new();
