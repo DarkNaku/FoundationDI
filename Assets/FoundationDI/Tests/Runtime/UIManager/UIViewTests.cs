@@ -1,6 +1,5 @@
 using NUnit.Framework;
 using UnityEngine;
-using UnityEngine.UI;
 using DarkNaku.FoundationDI;
 
 public class UIViewTests
@@ -8,15 +7,15 @@ public class UIViewTests
     private class TestView : UIView { }
 
     [Test]
-    public void InputEnabled는_GraphicRaycaster를_토글한다()
+    public void InputEnabled는_CanvasGroup_interactable을_토글한다()
     {
-        var go = new GameObject("v", typeof(RectTransform), typeof(Canvas), typeof(GraphicRaycaster));
+        var go = new GameObject("v", typeof(RectTransform), typeof(CanvasGroup));
         var view = go.AddComponent<TestView>();
 
         view.InputEnabled = false;
-        Assert.IsFalse(go.GetComponent<GraphicRaycaster>().enabled);
+        Assert.IsFalse(go.GetComponent<CanvasGroup>().interactable);
         view.InputEnabled = true;
-        Assert.IsTrue(go.GetComponent<GraphicRaycaster>().enabled);
+        Assert.IsTrue(go.GetComponent<CanvasGroup>().interactable);
 
         Object.DestroyImmediate(go);
     }

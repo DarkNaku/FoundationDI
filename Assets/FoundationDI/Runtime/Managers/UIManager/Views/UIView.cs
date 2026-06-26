@@ -1,10 +1,10 @@
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
-using UnityEngine.UI;
 
 namespace DarkNaku.FoundationDI
 {
+    [RequireComponent(typeof(CanvasGroup))]
     public abstract class UIView : MonoBehaviour
     {
         [SerializeField] private UITransitionAsset _showTransition;
@@ -15,13 +15,13 @@ namespace DarkNaku.FoundationDI
         private RectTransform _rectTransform;
         public RectTransform RectTransform => _rectTransform ??= (RectTransform)transform;
 
-        private GraphicRaycaster _raycaster;
-        private GraphicRaycaster Raycaster => _raycaster ??= GetComponent<GraphicRaycaster>();
+        private CanvasGroup _canvasGroup;
+        private CanvasGroup CanvasGroup => _canvasGroup ??= GetComponent<CanvasGroup>();
 
         public bool InputEnabled
         {
-            get => Raycaster != null && Raycaster.enabled;
-            set { if (Raycaster != null) Raycaster.enabled = value; }
+            get => CanvasGroup.interactable;
+            set => CanvasGroup.interactable = value;
         }
 
         // 우선순위: per-show 오버라이드 > 인스펙터 에셋 > settings 모드 기본값 > Noop
