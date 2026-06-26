@@ -7,6 +7,9 @@ namespace DarkNaku.FoundationDI
         private readonly List<UIPresenterBase> _above = new();
         private readonly List<UIPresenterBase> _below = new();
 
+        public IReadOnlyList<UIPresenterBase> Above => _above;
+        public IReadOnlyList<UIPresenterBase> Below => _below;
+
         public void Register(UIPresenterBase presenter, bool above) => (above ? _above : _below).Add(presenter);
 
         public void Unregister(UIPresenterBase presenter) { 
