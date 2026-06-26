@@ -18,8 +18,8 @@ namespace DarkNaku.FoundationDI
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             Object.DontDestroyOnLoad(GO);
 
-            BelowOverlayLayer = CreateLayer("BelowOverlay");
             PageLayer = CreateLayer("Page");
+            BelowOverlayLayer = CreateLayer("BelowOverlay");
             PopupLayer = CreateLayer("Popup");
             AboveOverlayLayer = CreateLayer("AboveOverlay");
         }
