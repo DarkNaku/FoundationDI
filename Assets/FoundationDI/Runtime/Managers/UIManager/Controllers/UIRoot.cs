@@ -11,11 +11,19 @@ namespace DarkNaku.FoundationDI
         public Transform PopupLayer { get; }
         public Transform AboveOverlayLayer { get; }
 
-        public UIRoot()
+        public UIRoot(Vector2 referenceResolution = default)
         {
             GO = new GameObject("[UIManager]", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
             var canvas = GO.GetComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+
+            var scaler = GO.GetComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.Expand;
+            scaler.referenceResolution = (referenceResolution.x > 0f && referenceResolution.y > 0f)
+                ? referenceResolution
+                : new Vector2(1920f, 1080f);
+
             Object.DontDestroyOnLoad(GO);
 
             // 생성 순서 = sibling 순서 = 렌더 순서(아래→위). Overlay는 Popup 기준 Above/Below로 분리된다.

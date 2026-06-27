@@ -26,7 +26,7 @@ namespace DarkNaku.FoundationDI
             _factory = factory;
         }
 
-        private UIRoot Root => _root ??= new UIRoot();
+        private UIRoot Root => _root ??= new UIRoot(_settings != null ? _settings.ReferenceResolution : default);
 
         public T Page<T>() where T : UIPresenter => Acquire<T>(presenter => _queue.Enqueue(ct => ShowPageAsync(presenter, ct)));
         public T Popup<T>() where T : UIPresenter => Acquire<T>(presenter => _queue.Enqueue(ct => ShowPopupAsync(presenter, ct)));
