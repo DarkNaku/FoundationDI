@@ -46,7 +46,7 @@ public class TitleView : UIView { }
 [UIPrefab("UI/Title")]               // Addressables 주소
 public class TitlePresenter : UIPagePresenter<TitleView>
 {
-    protected internal override void OnAfterShow() { /* 표시 직후 */ }
+    protected override void OnAfterShow() { /* 표시 직후 */ }   // 다른 어셈블리에서는 protected override
 }
 ```
 
@@ -102,9 +102,9 @@ public class ConfirmPresenter : UIPopupPresenter<ConfirmView>, IConfigurable<Con
 
 | 멤버 | 시그니처 | 설명 |
 | --- | --- | --- |
-| `Page<T>` | `T Page<T>() where T : UIPresenterBase` | Page 모드로 표시. 즉시 인스턴스 반환 + Show 자동 enqueue. |
-| `Popup<T>` | `T Popup<T>() where T : UIPresenterBase` | Popup(스택) 모드로 표시. |
-| `Overlay<T>` | `T Overlay<T>() where T : UIPresenterBase` | Overlay(상주) 모드로 표시. |
+| `Page<T>` | `T Page<T>() where T : UIPresenter` | Page 모드로 표시. 즉시 인스턴스 반환 + Show 자동 enqueue. |
+| `Popup<T>` | `T Popup<T>() where T : UIPresenter` | Popup(스택) 모드로 표시. |
+| `Overlay<T>` | `T Overlay<T>() where T : UIPresenter` | Overlay(상주) 모드로 표시. |
 
 `UIManager`는 `IUIManager`, `IDisposable`을 구현하며 `RegisterUIManager`로 등록한다.
 
@@ -123,18 +123,21 @@ public class ConfirmPresenter : UIPopupPresenter<ConfirmView>, IConfigurable<Con
 | 메서드 | 설명 |
 | --- | --- |
 | `With<TParams>(TParams p)` | Presenter가 `IConfigurable<TParams>`면 `Configure(p)` 호출 |
+| `OnBeforeShow(Action<...> cb)` | BeforeShow 라이프사이클에 콜백 등록 |
 | `OnAfterShow(Action<...> cb)` | AfterShow 라이프사이클에 콜백 등록 |
+| `OnBeforeHide(Action<...> cb)` | BeforeHide 라이프사이클에 콜백 등록 |
 | `OnAfterHide(Action<...> cb)` | AfterHide 라이프사이클에 콜백 등록 |
 | `WithTransition(IUITransition t)` | 이번 표시에 한해 트랜지션 오버라이드 |
 
-`UIPresenterBase<TView>`는 `protected TView View` 접근자를 제공한다.
+`UIPresenter<TView>`는 `protected TView View` 접근자를 제공한다.
 
-### Presenter 명령 / 라이프사이클 훅 (`UIPresenterBase`)
+### Presenter 명령 / 라이프사이클 훅 (`UIPresenter`)
 
 명령: `void Hide()` (숨김 + 캐시 보관). 개별 파괴는 제공하지 않으며, 정리는 `UIManager.Dispose()`에서 일괄 수행된다.
 
-오버라이드 가능한 훅(`protected internal virtual`):
+오버라이드 가능한 훅(패키지 내부 선언은 `protected internal virtual`):
 `OnInitialize` · `OnBeforeShow` · `OnAfterShow` · `OnBeforeHide` · `OnAfterHide` · `OnDestroyElement`.
+> 패키지를 import해 **다른 어셈블리**에서 파생할 때는 `protected override`로 선언한다(`protected internal`의 `internal` 부분은 외부 어셈블리에 보이지 않음).
 
 ### `UIView : MonoBehaviour`
 
@@ -197,8 +200,8 @@ public class ConfirmPresenter : UIPopupPresenter<ConfirmView>, IConfigurable<Con
 
 ### 테스트
 
-- EditMode: `UIInstanceFactoryTests`(프리팹→Presenter 생성·바인딩), `DIRegistrationTests`(컨테이너 해석).
-- PlayMode: `UIManagerFlowTests`(Page/Popup/Overlay 표시, 재Show 활성화). 프리팹 로드는 `IResourceService`를 NSubstitute로 대체해 가짜 프리팹을 주입한다.
+- EditMode (`Tests/Editor`): `UIInstanceFactoryTests`·`DIRegistrationTests`·`OperationQueueTests`·`InstanceCacheTests`·`PresenterLifecycleTests`·`ModeControllerTests`·`UIPrefabKeyResolverTests`·`NoopTransitionTests`.
+- PlayMode (`Tests/Runtime`): `UIManagerFlowTests`(Page/Popup/Overlay 표시·재Show 활성화)·`UIViewTests`·`UIRootTests`·`TransitionAssetTests`. 프리팹 로드는 `IResourceService`를 NSubstitute로 대체해 가짜 프리팹을 주입한다.
 
 ### 한계 / 후속 과제
 
