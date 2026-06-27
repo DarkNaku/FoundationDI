@@ -11,5 +11,11 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/DarkNaku/FoundationDI.git"
-  }
+  },
+  "samples": [
+    { "displayName": "01 Basic Usage", "description": "Page/Popup/Overlay 기본 표시와 모달 입력 차단", "path": "Samples~/01-BasicUsage" },
+    { "displayName": "02 Page Navigation", "description": "다단계 Page 전환, 파라미터 전달, 라이프사이클 콜백", "path": "Samples~/02-PageNavigation" },
+    { "displayName": "03 Popup Modal", "description": "모달 입력 차단과 결과 반환", "path": "Samples~/03-PopupModal" },
+    { "displayName": "04 Overlay", "description": "Above/Below 오버레이와 HUD 갱신", "path": "Samples~/04-Overlay" }
+  ]
 }
