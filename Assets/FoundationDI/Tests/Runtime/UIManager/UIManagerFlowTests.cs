@@ -26,7 +26,13 @@ public class UIManagerFlowTests
     [UIPrefab("UI/SampleOverlay")]
     public class OverlayP : UIOverlayPresenter<OverlayV> { public bool Shown; protected internal override void OnAfterShow() => Shown = true; }
 
+    // Page 교체(A→B) 재현용 둘째 Page 타입
+    public class V2 : UIView { }
+    [UIPrefab("UI/Sample2")]
+    public class P2 : UIPagePresenter<V2> { public bool Shown; protected internal override void OnAfterShow() => Shown = true; }
+
     private GameObject _prefab;
+    private GameObject _prefab2;
     private GameObject _popupPrefab;
     private GameObject _overlayPrefab;
     private GameObject _reshowPrefab;
@@ -35,6 +41,9 @@ public class UIManagerFlowTests
     {
         _prefab = new GameObject("prefab", typeof(RectTransform));
         _prefab.AddComponent<V>();
+
+        _prefab2 = new GameObject("prefab2", typeof(RectTransform));
+        _prefab2.AddComponent<V2>();
 
         _popupPrefab = new GameObject("popupPrefab", typeof(RectTransform));
         _popupPrefab.AddComponent<PopupV>();
@@ -49,6 +58,7 @@ public class UIManagerFlowTests
     [TearDown] public void Teardown()
     {
         Object.DestroyImmediate(_prefab);
+        Object.DestroyImmediate(_prefab2);
         Object.DestroyImmediate(_popupPrefab);
         Object.DestroyImmediate(_overlayPrefab);
         Object.DestroyImmediate(_reshowPrefab);
@@ -182,6 +192,34 @@ public class UIManagerFlowTests
         await UniTask.WaitUntil(() => popup.Shown);
 
         Assert.IsTrue(overlay.ViewBase.InputEnabled, "AboveOverlay는 모달 팝업 중에도 입력 유지");
+
+        manager.Dispose();
+    });
+
+    // 재현: Fade 트랜지션을 사용한 Page 교체(A→B)에서 새 Page가 표시되는가
+    [UnityTest]
+    public IEnumerator Fade트랜지션_Page교체시_새Page로_전환된다() => UniTask.ToCoroutine(async () =>
+    {
+        var resource = Substitute.For<IResourceService>();
+        resource.Load<GameObject>("UI/Sample").Returns(_prefab);
+        resource.Load<GameObject>("UI/Sample2").Returns(_prefab2);
+        var resolver = Substitute.For<IObjectResolver>();
+        var settings = ScriptableObject.CreateInstance<UIManagerSettings>();
+        var factory = new UIInstanceFactory(resolver, resource);
+        var manager = new UIManager(settings, factory);
+
+        var fade = ScriptableObject.CreateInstance<FadeTransitionAsset>();
+
+        var a = manager.Page<P>();
+        a.WithTransition(fade);
+        await UniTask.WaitUntil(() => a.Shown);
+        Assert.IsTrue(a.Shown, "Page A 표시");
+
+        var b = manager.Page<P2>();
+        b.WithTransition(fade);
+        // hang 가드: 3초 내 B가 표시되지 않으면 hang으로 간주
+        await UniTask.WhenAny(UniTask.WaitUntil(() => b.Shown), UniTask.Delay(3000));
+        Assert.IsTrue(b.Shown, "Page 교체 후 B가 3초 내 표시되어야 함(미표시 시 HideAsync hang)");
 
         manager.Dispose();
     });
