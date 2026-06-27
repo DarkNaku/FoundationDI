@@ -103,3 +103,7 @@ Assets/Plugins/Android/FirebaseCrashlytics.androidlib/res/values/crashlytics_bui
 .vscode
 .claude
 .mcp.json
+
+# UPM 샘플 폴더(Samples~)는 전역 gitignore의 '*~' 패턴에 걸려 통째로 무시된다.
+# 패키지 배포에 반드시 포함되어야 하므로 강제로 추적한다.
+!Assets/FoundationDI/Samples~/
