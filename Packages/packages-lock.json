@@ -47,13 +47,6 @@
       "dependencies": {},
       "hash": "73a63b7f672b88f7e9992f6917eb458a8cbb6fa9"
     },
-    "com.darknaku.director": {
-      "version": "https://github.com/DarkNaku/Director.git?path=/Assets/Director",
-      "depth": 0,
-      "source": "git",
-      "dependencies": {},
-      "hash": "4fe5922f5e9376b3de419ac996d0cbbc3dedcc41"
-    },
     "com.kyrylokuzyk.primetween": {
       "version": "file:../Assets/Plugins/PrimeTween/internal/com.kyrylokuzyk.primetween.tgz",
       "depth": 0,
