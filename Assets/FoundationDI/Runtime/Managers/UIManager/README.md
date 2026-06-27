@@ -162,7 +162,11 @@ public class ConfirmPresenter : UIPopupPresenter<ConfirmView>, IConfigurable<Con
 
 - `void RegisterUIManager(this IContainerBuilder builder, UIManagerSettings settings)` — UIManager 등록 확장.
   **전제: 호출 전에 `IResourceService`가 등록되어 있어야 한다.**
-- `UIManagerSettings` (ScriptableObject) — `DefaultPageTransition` / `DefaultPopupTransition` / `DefaultOverlayTransition` 기본 트랜지션 제공.
+- `UIManagerSettings` (ScriptableObject) — `DefaultPageTransition` / `DefaultPopupTransition` / `DefaultOverlayTransition` 기본 트랜지션과 `ReferenceResolution`(기본 1920×1080) 제공.
+
+### Canvas / CanvasScaler
+
+UIManager는 루트 Canvas(`[UIManager]`, ScreenSpaceOverlay)에 `CanvasScaler`를 **Scale With Screen Size + Screen Match Mode = Expand**로 구성하고, 기준 해상도로 `UIManagerSettings.ReferenceResolution`을 사용한다(설정이 없거나 0 이하면 1920×1080으로 폴백). 즉 해상도 대응은 UIManager가 자동 처리하므로 View 프리팹에 별도 `CanvasScaler`를 둘 필요가 없다.
 
 ---
 
