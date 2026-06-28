@@ -242,6 +242,31 @@ public class SoundServiceTest
     });
 
     [UnityTest]
+    public IEnumerator 프리로드_진행중_같은키_재생하면_잉여_참조를_해제한다() => UniTask.ToCoroutine(async () =>
+    {
+        var clip = MakeClip();
+        var source = new UniTaskCompletionSource<AudioClip>();
+        var resource = Substitute.For<IResourceService>();
+        resource.LoadAsync<AudioClip>("r/a").Returns(source.Task);
+        resource.Load<AudioClip>("r/a").Returns(clip);
+        var catalog = Substitute.For<ISoundCatalog>();
+        catalog.PreloadResourceKeys.Returns(new[] { "r/a" });
+        catalog.TryGetResourceKey("A", out Arg.Any<string>())
+            .Returns(call => { call[1] = "r/a"; return true; });
+        var sut = new SoundService(resource, catalog) { SFXEnabled = true };
+
+        var preload = sut.PreloadAsync();   // LoadAsync in-flight (await pending)
+        sut.Play("A");                       // 동기 Load로 _table 채움
+        source.TrySetResult(clip);           // preload 완료 → 잉여 참조 해제해야 함
+        await preload;
+
+        resource.Received(1).Release("r/a");
+
+        sut.Dispose();                       // _table의 r/a 1개 → Release 1회 더
+        resource.Received(2).Release("r/a");
+    });
+
+    [UnityTest]
     public IEnumerator 프리로드된_키_재생시_추가_Load없이_캐시를_사용한다() => UniTask.ToCoroutine(async () =>
     {
         var resource = Substitute.For<IResourceService>();

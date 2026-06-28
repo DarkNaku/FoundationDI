@@ -200,6 +200,14 @@ namespace DarkNaku.FoundationDI
 
             var clip = await _resourceService.LoadAsync<AudioClip>(resourceKey);
 
+            // await 동안 다른 경로(Play의 동기 Load 또는 동시 Preload)가 이미 캐시했으면
+            // 이번 LoadAsync로 증가한 잉여 참조를 해제한다(refcount 누수 방지).
+            if (_table.ContainsKey(resourceKey))
+            {
+                _resourceService.Release(resourceKey);
+                return;
+            }
+
             if (clip != null)
             {
                 _table[resourceKey] = clip;
