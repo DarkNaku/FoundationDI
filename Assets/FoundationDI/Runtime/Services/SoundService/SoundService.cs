@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 using Object = UnityEngine.Object;
@@ -17,6 +18,7 @@ namespace DarkNaku.FoundationDI
         void Play(string clipName);
         void PlayBGM(string clipName);
         void StopBGM();
+        UniTask PreloadAsync();
     }
     
     public class SoundService : ISoundService
@@ -175,7 +177,35 @@ namespace DarkNaku.FoundationDI
         {
             _bgmPlayer.Stop();
         }
-        
+
+        public async UniTask PreloadAsync()
+        {
+            var resourceKeys = _catalog.PreloadResourceKeys;
+            if (resourceKeys == null) return;
+
+            var tasks = new List<UniTask>();
+
+            foreach (var resourceKey in resourceKeys.Distinct())
+            {
+                tasks.Add(PreloadOneAsync(resourceKey));
+            }
+
+            await UniTask.WhenAll(tasks);
+        }
+
+        private async UniTask PreloadOneAsync(string resourceKey)
+        {
+            if (string.IsNullOrEmpty(resourceKey)) return;
+            if (_table.ContainsKey(resourceKey)) return;
+
+            var clip = await _resourceService.LoadAsync<AudioClip>(resourceKey);
+
+            if (clip != null)
+            {
+                _table[resourceKey] = clip;
+            }
+        }
+
         private void OnPostLateUpdate(Unit unit) 
         {
             _playedClipInThisFrame.Clear();

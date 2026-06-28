@@ -1,8 +1,11 @@
+using System.Collections;
 using System.Linq;
+using Cysharp.Threading.Tasks;
 using DarkNaku.FoundationDI;
 using NSubstitute;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.TestTools;
 
 public class SoundServiceTest
 {
@@ -203,4 +206,57 @@ public class SoundServiceTest
 
         sut.Dispose();
     }
+
+    [UnityTest]
+    public IEnumerator PreloadAsync는_Preload대상_리소스키를_LoadAsync로_로드한다() => UniTask.ToCoroutine(async () =>
+    {
+        var resource = Substitute.For<IResourceService>();
+        resource.LoadAsync<AudioClip>("r/a").Returns(UniTask.FromResult(MakeClip()));
+        resource.LoadAsync<AudioClip>("r/c").Returns(UniTask.FromResult(MakeClip()));
+        var catalog = Substitute.For<ISoundCatalog>();
+        catalog.PreloadResourceKeys.Returns(new[] { "r/a", "r/c" });
+        var sut = new SoundService(resource, catalog);
+
+        await sut.PreloadAsync();
+
+        _ = resource.Received(1).LoadAsync<AudioClip>("r/a");
+        _ = resource.Received(1).LoadAsync<AudioClip>("r/c");
+
+        sut.Dispose();
+    });
+
+    [UnityTest]
+    public IEnumerator PreloadAsync는_중복_리소스키를_한번만_로드한다() => UniTask.ToCoroutine(async () =>
+    {
+        var resource = Substitute.For<IResourceService>();
+        resource.LoadAsync<AudioClip>("r/a").Returns(UniTask.FromResult(MakeClip()));
+        var catalog = Substitute.For<ISoundCatalog>();
+        catalog.PreloadResourceKeys.Returns(new[] { "r/a", "r/a" });
+        var sut = new SoundService(resource, catalog);
+
+        await sut.PreloadAsync();
+
+        _ = resource.Received(1).LoadAsync<AudioClip>("r/a");
+
+        sut.Dispose();
+    });
+
+    [UnityTest]
+    public IEnumerator 프리로드된_키_재생시_추가_Load없이_캐시를_사용한다() => UniTask.ToCoroutine(async () =>
+    {
+        var resource = Substitute.For<IResourceService>();
+        resource.LoadAsync<AudioClip>("r/a").Returns(UniTask.FromResult(MakeClip()));
+        var catalog = Substitute.For<ISoundCatalog>();
+        catalog.PreloadResourceKeys.Returns(new[] { "r/a" });
+        catalog.TryGetResourceKey("A", out Arg.Any<string>())
+            .Returns(call => { call[1] = "r/a"; return true; });
+        var sut = new SoundService(resource, catalog) { SFXEnabled = true };
+
+        await sut.PreloadAsync();
+        sut.Play("A");
+
+        resource.DidNotReceive().Load<AudioClip>(Arg.Any<string>());
+
+        sut.Dispose();
+    });
 }
