@@ -1,19 +1,15 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using Object = UnityEngine.Object;
 using R3;
-using UnityEngine.AddressableAssets;
-using UnityEngine.Pool;
-using UnityEngine.ResourceManagement.AsyncOperations;
 
 namespace DarkNaku.FoundationDI
 {
     public interface ISoundService : IDisposable
     {
-        bool IsSFXEnabled { get; set; }
-        bool IsBGMEnabled { get; set; }
+        bool SFXEnabled { get; set; }
+        bool BGMEnabled { get; set; }
         bool IsPlayingBGM { get; }
         float VolumeSFX { get; set; }
         float VolumeBGM { get; set; }
@@ -24,10 +20,26 @@ namespace DarkNaku.FoundationDI
     
     public class SoundService : ISoundService
     {
-        public bool IsSFXEnabled { get; set; }
-        public bool IsBGMEnabled { get; set; }
-        public bool IsPlayingBGM { get; }
-        
+        public bool SFXEnabled
+        {
+            get => PlayerPrefs.GetInt(SFX_ENABLED, 1) != 0;
+            set
+            {
+                PlayerPrefs.SetInt(SFX_ENABLED, value ? 1 : 0);
+                PlayerPrefs.Save();
+            }
+        }
+
+        public bool BGMEnabled
+        {
+            get => PlayerPrefs.GetInt(BGM_ENABLED, 1) != 0;
+            set
+            {
+                PlayerPrefs.SetInt(BGM_ENABLED, value ? 1 : 0);
+                PlayerPrefs.Save();
+            }
+        }
+
         public float VolumeSFX 
         {
             get => Mathf.Clamp01(PlayerPrefs.GetFloat(SFX_VOLUME, 1f));
@@ -50,26 +62,35 @@ namespace DarkNaku.FoundationDI
             }
         }
         
+        public bool IsPlayingBGM => _bgmPlayer != null && _bgmPlayer.isPlaying;
+        
         private const string SFX_VOLUME = "SFX_VOLUME";
         private const string BGM_VOLUME = "BGM_VOLUME";
+        private const string SFX_ENABLED = "SFX_ENABLED";
+        private const string BGM_ENABLED = "BGM_ENABLED";
         
+        private readonly IResourceService _resourceService;
         private readonly Transform _root;
-        private readonly Dictionary<string, SoundData> _table;
+        private readonly Dictionary<string, AudioClip> _table;
         private AudioSource _bgmPlayer;
         private HashSet<AudioSource> _sfxPlayers = new();
         private HashSet<string> _playedClipInThisFrame = new();
         private IDisposable _disposable;
 
-        public SoundService()
+        public SoundService(IResourceService resourceService)
         {
-            _table = new Dictionary<string, SoundData>();
-            
+            _resourceService = resourceService;
+            _table = new Dictionary<string, AudioClip>();
+
             var root = new GameObject("[SoundService]");
-            
+
             _root = root.transform;
-            
-            Object.DontDestroyOnLoad(root);
-            
+
+            if (Application.isPlaying)
+            {
+                Object.DontDestroyOnLoad(root);
+            }
+
             _bgmPlayer = new GameObject("BGM Player").AddComponent<AudioSource>();
             _bgmPlayer.transform.parent = _root;
 
@@ -79,13 +100,27 @@ namespace DarkNaku.FoundationDI
         public void Dispose()
         {
             _disposable.Dispose();
-            
-            Object.Destroy(_root.gameObject);
+
+            foreach (var key in _table.Keys)
+            {
+                _resourceService.Release(key);
+            }
+
+            _table.Clear();
+
+            if (Application.isPlaying)
+            {
+                Object.Destroy(_root.gameObject);
+            }
+            else
+            {
+                Object.DestroyImmediate(_root.gameObject);
+            }
         }
         
         public void Play(string clipName)
         {
-            if (Mathf.Approximately(VolumeSFX, 0f) || !IsSFXEnabled) return;
+            if (Mathf.Approximately(VolumeSFX, 0f) || !SFXEnabled) return;
             if (_playedClipInThisFrame.Contains(clipName)) return;
 
             var player = GetPlayer();
@@ -103,7 +138,7 @@ namespace DarkNaku.FoundationDI
 
         public void PlayBGM(string clipName)
         {
-            if (Mathf.Approximately(VolumeBGM, 0f) || !IsBGMEnabled) return;
+            if (Mathf.Approximately(VolumeBGM, 0f) || !BGMEnabled) return;
 
             var clip = GetClip(clipName);
 
@@ -145,72 +180,42 @@ namespace DarkNaku.FoundationDI
             {
                 player = new GameObject("SFX Player").AddComponent<AudioSource>();
                 player.transform.parent = _root;
-                Object.DontDestroyOnLoad(player.gameObject);
+
+                if (Application.isPlaying)
+                {
+                    Object.DontDestroyOnLoad(player.gameObject);
+                }
+
                 _sfxPlayers.Add(player);
             }
 
             return player;
         }
 
-        private AudioClip GetClip(string key) 
+        private AudioClip GetClip(string key)
         {
-            if (_table.TryGetValue(key, out var data)) 
+            if (_table.TryGetValue(key, out var clip))
             {
-                return data.Clip;
-            } 
-            else
-            {
-                return Load(key)?.Clip;
+                return clip;
             }
-        }
 
-        private SoundData Load(string key)
-        {
             if (string.IsNullOrEmpty(key))
             {
-                Debug.LogError($"[SoundService] Load : Key is wrong.");
+                Debug.LogError($"[SoundService] GetClip : Key is wrong.");
                 return null;
             }
-            
-            var clip = Resources.Load<AudioClip>(key);
+
+            clip = _resourceService.Load<AudioClip>(key);
 
             if (clip == null)
             {
-                try
-                {
-                    var handle = Addressables.LoadAssetAsync<AudioClip>(key);
-                    clip = handle.WaitForCompletion();
-                    return Register(key, clip, handle);
-                }
-                catch (InvalidKeyException e)
-                {
-                    Debug.LogError($"[PoolService] Load : {e.Message}");
-                    return null;
-                }
-            }
-
-            return Register(key, clip, default);
-        }
-        
-        private SoundData Register(string key, AudioClip clip, AsyncOperationHandle<AudioClip> handle)
-        {
-            if (string.IsNullOrEmpty(key))
-            {
-                Debug.LogError($"[SoundService] Register : Key is wrong.");
+                Debug.LogError($"[SoundService] GetClip : Clip is null. ({key})");
                 return null;
             }
 
-            if (clip == null)
-            {
-                Debug.LogError($"[SoundService] Register : Prefab is null.");
-                return null;
-            }
+            _table.Add(key, clip);
 
-            var data = new SoundData(clip, handle);
-            
-            _table.TryAdd(key, data);
-
-            return data;
+            return clip;
         }
     }
 }
