@@ -24,10 +24,6 @@ namespace DarkNaku.FoundationDI
         private readonly Dictionary<string, Entry> _cache = new();
         private readonly Dictionary<string, UniTaskCompletionSource<Object>> _loading = new();
 
-        public ResourceService() : this(new AddressableResourceProvider())
-        {
-        }
-
         public ResourceService(IResourceProvider provider)
         {
             _provider = provider;

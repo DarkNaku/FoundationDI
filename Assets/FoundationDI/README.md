@@ -1,7 +1,7 @@
 # FoundationDI
 
 ![Unity](https://img.shields.io/badge/Unity-6000.3%2B-black?logo=unity)
-![Version](https://img.shields.io/badge/version-0.1.2-blue)
+![Version](https://img.shields.io/badge/version-0.1.3-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Author](https://img.shields.io/badge/author-DarkNaku-orange)
 
@@ -53,7 +53,7 @@ public class RootLifetimeScope : LifetimeScope
 
     protected override void Configure(IContainerBuilder builder)
     {
-        builder.Register<IResourceService, ResourceService>(Lifetime.Singleton);
+        builder.Register<IResourceService, AddressableResourceService>(Lifetime.Singleton);
         builder.RegisterUIManager(_uiSettings);
         builder.RegisterInjector();   // 씬 배치 컴포넌트 주입(SoundButton 등)
         // 필요한 서비스를 같은 방식으로 추가 등록 (예: builder.RegisterSoundService(_soundCatalog))
