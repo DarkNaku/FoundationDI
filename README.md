@@ -7,6 +7,8 @@
 
 DI(의존성 주입) 기반 Unity 게임 개발 파운데이션 패키지입니다. [VContainer](https://github.com/hadashiA/VContainer)를 코어로 MessagePipe·R3·UniTask·Addressables를 조합한 공통 서비스 계층(메시징·리소스·UI·풀·사운드)을 제공합니다. 각 서비스는 인터페이스(`IXxxService`)로 등록되어 생성자 주입으로 소비되며, 외부 의존(Addressables 등)은 seam으로 분리되어 EditMode 단위 테스트가 가능합니다.
 
+> 패키지 본체는 [`Assets/FoundationDI`](Assets/FoundationDI)에 있습니다.
+
 ## 주요 기능
 
 - **DI 컴포지션** — VContainer `LifetimeScope`에서 서비스를 인터페이스로 등록하고 생성자 주입으로 소비
@@ -79,14 +81,14 @@ public class TitleFlow
 
 | 구성 요소 | 설명 | 상세 문서 |
 | --- | --- | --- |
-| **UIManager** | uGUI 기반 UI 표시/전환 시스템. Presenter 타입으로 Page(단일 교체)/Popup(LIFO·모달)/Overlay(상주) 모드를 고정하고, 자동-show 빌더 API·모달 입력 차단(`CanvasGroup.interactable`)·트랜지션 추상화를 제공. 프리팹 로딩은 `IResourceService`에 위임. | [README](Runtime/Managers/UIManager/README.md) |
-| **ResourceService** | Addressables 추상화. `LoadAsync`/`Load`/`Release`/`Dispose` API로 키 단위 캐싱 + 참조 카운팅. 에셋 로딩이 필요한 모든 서비스의 위임 대상. | [README](Runtime/Services/ResourceService/README.md) |
+| **UIManager** | uGUI 기반 UI 표시/전환 시스템. Presenter 타입으로 Page(단일 교체)/Popup(LIFO·모달)/Overlay(상주) 모드를 고정하고, 자동-show 빌더 API·모달 입력 차단(`CanvasGroup.interactable`)·트랜지션 추상화를 제공. 프리팹 로딩은 `IResourceService`에 위임. | [README](Assets/FoundationDI/Runtime/Managers/UIManager/README.md) |
+| **ResourceService** | Addressables 추상화. `LoadAsync`/`Load`/`Release`/`Dispose` API로 키 단위 캐싱 + 참조 카운팅. 에셋 로딩이 필요한 모든 서비스의 위임 대상. | [README](Assets/FoundationDI/Runtime/Services/ResourceService/README.md) |
 | **MessageService** | MessagePipe 래퍼. `IObjectResolver`로 `IPublisher<T>`/`ISubscriber<T>`를 지연 해석해 캐싱하고, 동기/비동기(UniTask) pub-sub을 제공. | — |
 | **PoolService** | 키 기반 GameObject 오브젝트 풀. Resources→Addressables fallback으로 프리팹을 로드하며, 풀 항목 생명주기 콜백과 지연 반환(`Release(delay)`)을 지원. | — |
-| **SoundService** | SFX/BGM 재생. 사운드 카탈로그(문자열키→리소스키)·엄격 모드·비동기 프리로드(`PreloadAsync`)를 제공하고 클립 로딩을 `IResourceService`에 위임. 볼륨/활성화는 `PlayerPrefs`에 영속. 버튼용 `SoundButton` 포함. | [README](Runtime/Services/SoundService/README.md) |
-| **InjectorService** | 씬에 배치된 MonoBehaviour에 의존성을 주입하는 인프라. 정적 요청 큐 + EntryPoint로 위치·계층·순서에 무관하게 주입. `InjectableBehaviour` 베이스 상속으로 사용. | [README](Runtime/Services/InjectorService/README.md) |
+| **SoundService** | SFX/BGM 재생. 사운드 카탈로그(문자열키→리소스키)·엄격 모드·비동기 프리로드(`PreloadAsync`)를 제공하고 클립 로딩을 `IResourceService`에 위임. 볼륨/활성화는 `PlayerPrefs`에 영속. 버튼용 `SoundButton` 포함. | [README](Assets/FoundationDI/Runtime/Services/SoundService/README.md) |
+| **InjectorService** | 씬에 배치된 MonoBehaviour에 의존성을 주입하는 인프라. 정적 요청 큐 + EntryPoint로 위치·계층·순서에 무관하게 주입. `InjectableBehaviour` 베이스 상속으로 사용. | [README](Assets/FoundationDI/Runtime/Services/InjectorService/README.md) |
 
-> 상세 문서가 아직 없는 구성 요소는 소스(`Runtime/Services/<이름>/`)와 인터페이스(`IXxxService`)를 참고하세요.
+> 상세 문서가 아직 없는 구성 요소는 소스(`Assets/FoundationDI/Runtime/Services/<이름>/`)와 인터페이스(`IXxxService`)를 참고하세요.
 
 ## 샘플
 

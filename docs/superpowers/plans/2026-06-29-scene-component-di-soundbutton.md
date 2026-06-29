@@ -48,7 +48,6 @@
 - [ ] **Step 1: 실패 테스트 작성** — `Assets/FoundationDI/Tests/InjectorServiceTest.cs` 생성
 
 ```csharp
-using System;
 using DarkNaku.FoundationDI;
 using NSubstitute;
 using NUnit.Framework;
@@ -206,6 +205,7 @@ namespace DarkNaku.FoundationDI
 `Assets/FoundationDI/Runtime/DI/InjectorVContainerExtensions.cs`:
 ```csharp
 using VContainer;
+using VContainer.Unity;
 
 namespace DarkNaku.FoundationDI
 {
@@ -269,6 +269,8 @@ public class InjectableBehaviourTest
 {
     private class TestInjectable : InjectableBehaviour
     {
+        // EditMode에서는 AddComponent가 Awake를 자동 호출하지 않으므로 수동 트리거용.
+        public void CallAwake() => Awake();
         public void CallEnsure() => EnsureInjected();
     }
 
@@ -294,7 +296,8 @@ public class InjectableBehaviourTest
         var resolver = Substitute.For<IObjectResolver>();
         new InjectorService(resolver).Start();   // 컨테이너 준비(즉시 주입 경로)
 
-        var mb = _go.AddComponent<TestInjectable>();  // Awake → EnsureInjected → Request
+        var mb = _go.AddComponent<TestInjectable>();
+        mb.CallAwake();                          // Awake → EnsureInjected → Request
 
         resolver.Received(1).Inject(mb);
     }
@@ -304,7 +307,8 @@ public class InjectableBehaviourTest
     {
         var resolver = Substitute.For<IObjectResolver>();
         new InjectorService(resolver).Start();
-        var mb = _go.AddComponent<TestInjectable>();  // Awake에서 1회
+        var mb = _go.AddComponent<TestInjectable>();
+        mb.CallAwake();                                // Awake에서 1회
 
         mb.CallEnsure();                               // 추가 호출은 무시되어야 함
 
