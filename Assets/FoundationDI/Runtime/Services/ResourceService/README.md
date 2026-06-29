@@ -1,10 +1,11 @@
 # ResourceService
 
-Addressables 기반의 **범용 에셋 로더 서비스**입니다. 임의 타입 `T`의 에셋을 키로 로드/해제하는 단일 진입점을 제공하고, **참조 카운팅**으로 핸들 생명주기를 안전하게 관리합니다.
+**범용 에셋 로더 서비스**입니다. 임의 타입 `T`의 에셋을 키로 로드/해제하는 단일 진입점을 제공하고, **참조 카운팅**으로 생명주기를 안전하게 관리합니다. 로딩 백엔드는 `IResourceProvider` seam 뒤에 두며, 백엔드별 구체 클래스(Addressables / Resources.Load)를 등록합니다.
 
-- **Addressables 전용** — `Resources.Load` 폴백 없음
+- **백엔드 분리** — `AddressableResourceService`(Addressables) / `DefaultResourceService`(Resources.Load) 중 선택해 등록
+- **단일 백엔드 내 폴백 없음** — 한 서비스 인스턴스는 한 백엔드만 사용(예: Addressable 서비스는 `Resources.Load` 폴백 없음)
 - **비동기/동기** 로드 모두 지원 (`LoadAsync<T>` / `Load<T>`)
-- **키 단위 캐싱 + 참조 카운팅** — 참조가 0이 되면 실제 Addressables 핸들 해제
+- **키 단위 캐싱 + 참조 카운팅** — 참조가 0이 되면 실제 핸들/에셋 해제
 - **진행 중(in-flight) 중복 제거** — 같은 키를 동시에 로드해도 실제 로드는 1회
 
 구체 구현은 백엔드별로 둘 — `AddressableResourceService`(Addressables) / `DefaultResourceService`(Resources.Load). 코어 `ResourceService`는 `IResourceProvider`를 받는 단일 생성자이며 직접 등록 대신 구체 클래스를 등록한다.
