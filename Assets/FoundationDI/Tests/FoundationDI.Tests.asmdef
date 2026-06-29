@@ -4,6 +4,7 @@
     "references": [
         "FoundationDI",
         "UniTask",
+        "VContainer",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],
