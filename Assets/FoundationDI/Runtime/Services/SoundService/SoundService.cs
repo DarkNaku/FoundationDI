@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 using Object = UnityEngine.Object;
 using R3;
@@ -16,6 +18,7 @@ namespace DarkNaku.FoundationDI
         void Play(string clipName);
         void PlayBGM(string clipName);
         void StopBGM();
+        UniTask PreloadAsync();
     }
     
     public class SoundService : ISoundService
@@ -70,6 +73,7 @@ namespace DarkNaku.FoundationDI
         private const string BGM_ENABLED = "BGM_ENABLED";
         
         private readonly IResourceService _resourceService;
+        private readonly ISoundCatalog _catalog;
         private readonly Transform _root;
         private readonly Dictionary<string, AudioClip> _table;
         private AudioSource _bgmPlayer;
@@ -77,9 +81,10 @@ namespace DarkNaku.FoundationDI
         private HashSet<string> _playedClipInThisFrame = new();
         private IDisposable _disposable;
 
-        public SoundService(IResourceService resourceService)
+        public SoundService(IResourceService resourceService, ISoundCatalog catalog)
         {
             _resourceService = resourceService;
+            _catalog = catalog;
             _table = new Dictionary<string, AudioClip>();
 
             var root = new GameObject("[SoundService]");
@@ -118,13 +123,20 @@ namespace DarkNaku.FoundationDI
             }
         }
         
-        public void Play(string clipName)
+        public void Play(string key)
         {
             if (Mathf.Approximately(VolumeSFX, 0f) || !SFXEnabled) return;
-            if (_playedClipInThisFrame.Contains(clipName)) return;
+            // 프레임 중복 차단은 호출 측 논리 키 기준(_table 캐시는 리소스 키 기준).
+            if (_playedClipInThisFrame.Contains(key)) return;
+
+            if (!_catalog.TryGetResourceKey(key, out var resourceKey))
+            {
+                Debug.LogError($"[SoundService] Play : Key not found in catalog. ({key})");
+                return;
+            }
 
             var player = GetPlayer();
-            var clip = GetClip(clipName);
+            var clip = GetClip(resourceKey);
 
             if (clip == null) return;
 
@@ -133,18 +145,24 @@ namespace DarkNaku.FoundationDI
             player.volume = VolumeSFX;
             player.Play();
 
-            _playedClipInThisFrame.Add(clipName);
+            _playedClipInThisFrame.Add(key);
         }
 
-        public void PlayBGM(string clipName)
+        public void PlayBGM(string key)
         {
             if (Mathf.Approximately(VolumeBGM, 0f) || !BGMEnabled) return;
 
-            var clip = GetClip(clipName);
+            if (!_catalog.TryGetResourceKey(key, out var resourceKey))
+            {
+                Debug.LogError($"[SoundService] PlayBGM : Key not found in catalog. ({key})");
+                return;
+            }
+
+            var clip = GetClip(resourceKey);
 
             if (clip == null) return;
 
-            if (_bgmPlayer.isPlaying) 
+            if (_bgmPlayer.isPlaying)
             {
                 _bgmPlayer.Stop();
             }
@@ -159,7 +177,43 @@ namespace DarkNaku.FoundationDI
         {
             _bgmPlayer.Stop();
         }
-        
+
+        public async UniTask PreloadAsync()
+        {
+            var resourceKeys = _catalog.PreloadResourceKeys;
+            if (resourceKeys == null) return;
+
+            var tasks = new List<UniTask>();
+
+            foreach (var resourceKey in resourceKeys.Distinct())
+            {
+                tasks.Add(PreloadOneAsync(resourceKey));
+            }
+
+            await UniTask.WhenAll(tasks);
+        }
+
+        private async UniTask PreloadOneAsync(string resourceKey)
+        {
+            if (string.IsNullOrEmpty(resourceKey)) return;
+            if (_table.ContainsKey(resourceKey)) return;
+
+            var clip = await _resourceService.LoadAsync<AudioClip>(resourceKey);
+
+            // await 동안 다른 경로(Play의 동기 Load 또는 동시 Preload)가 이미 캐시했으면
+            // 이번 LoadAsync로 증가한 잉여 참조를 해제한다(refcount 누수 방지).
+            if (_table.ContainsKey(resourceKey))
+            {
+                _resourceService.Release(resourceKey);
+                return;
+            }
+
+            if (clip != null)
+            {
+                _table[resourceKey] = clip;
+            }
+        }
+
         private void OnPostLateUpdate(Unit unit) 
         {
             _playedClipInThisFrame.Clear();
