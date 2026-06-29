@@ -2,7 +2,7 @@
 
 SFX/BGM 재생과 **사운드 카탈로그**, **비동기 프리로드**를 제공하는 사운드 서비스입니다. 사운드를 논리 **문자열키**로 식별하고, 클립 로딩은 [`IResourceService`](../ResourceService/README.md)에 위임합니다. 버튼에 붙여 클릭 시 사운드를 재생하는 `SoundButton` 컴포넌트도 포함합니다.
 
-- **사운드 카탈로그** — 문자열키 → 리소스키 매핑(`SoundCatalog` ScriptableObject). `Play("Jump")`처럼 친숙한 이름으로 재생
+- **사운드 카탈로그** — 문자열키 → 리소스키 매핑(`SoundCatalogSO` ScriptableObject). `Play("Jump")`처럼 친숙한 이름으로 재생
 - **엄격 모드** — 카탈로그에 없는 키는 `Debug.LogError` 후 무시(오타/누락 조기 발견)
 - **비동기 프리로드** — `PreloadAsync()`로 `IResourceService.LoadAsync` 병렬 로드, 첫 재생 지연 제거
 - **영속화** — SFX/BGM 볼륨과 활성화 상태를 `PlayerPrefs`에 저장
@@ -33,7 +33,7 @@ using DarkNaku.FoundationDI;
 
 public class RootLifetimeScope : LifetimeScope
 {
-    [SerializeField] private SoundCatalog _soundCatalog;
+    [SerializeField] private SoundCatalogSO _soundCatalog;
 
     protected override void Configure(IContainerBuilder builder)
     {
@@ -105,7 +105,7 @@ public interface ISoundCatalog
 }
 ```
 
-### `SoundCatalog : ScriptableObject, ISoundCatalog`
+### `SoundCatalogSO : ScriptableObject, ISoundCatalog`
 
 `[CreateAssetMenu(menuName = "DarkNaku/SoundCatalog")]`. 직렬화된 `SoundEntry` 목록을 보유하고, 첫 조회 시 키→리소스키 사전을 lazy 빌드합니다. 중복 `Key`는 마지막 값을 채택하고 경고를 남깁니다.
 
@@ -126,7 +126,7 @@ public struct SoundEntry
 ### DI 등록
 
 ```csharp
-public static void RegisterSoundService(this IContainerBuilder builder, SoundCatalog catalog);
+public static void RegisterSoundService(this IContainerBuilder builder, SoundCatalogSO catalog);
 ```
 `ISoundCatalog` 인스턴스 등록 + `ISoundService`/`SoundService` 싱글톤 등록. **전제: `IResourceService` 선등록.**
 

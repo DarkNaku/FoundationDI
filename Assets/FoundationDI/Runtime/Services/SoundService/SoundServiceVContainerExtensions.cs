@@ -9,7 +9,7 @@ namespace DarkNaku.FoundationDI
         /// 전제: 호출 전에 <see cref="IResourceService"/>가 이미 등록되어 있어야 한다
         /// (SoundService가 클립 로드를 IResourceService에 위임함).
         /// </summary>
-        public static void RegisterSoundService(this IContainerBuilder builder, SoundCatalog catalog)
+        public static void RegisterSoundService(this IContainerBuilder builder, SoundCatalogSO catalog)
         {
             builder.RegisterInstance<ISoundCatalog>(catalog);
             builder.Register<ISoundService, SoundService>(Lifetime.Singleton);

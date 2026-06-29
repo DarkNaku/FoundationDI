@@ -6,9 +6,9 @@ using UnityEngine.TestTools;
 
 public class SoundCatalogTest
 {
-    private static SoundCatalog MakeCatalog(string json)
+    private static SoundCatalogSO MakeCatalog(string json)
     {
-        var catalog = ScriptableObject.CreateInstance<SoundCatalog>();
+        var catalog = ScriptableObject.CreateInstance<SoundCatalogSO>();
         JsonUtility.FromJsonOverwrite(json, catalog);
         return catalog;
     }

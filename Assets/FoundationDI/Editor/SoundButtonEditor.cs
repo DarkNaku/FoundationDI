@@ -16,7 +16,7 @@ namespace DarkNaku.FoundationDI.Editor
 
             EditorGUILayout.PropertyField(catalogProp);
 
-            var catalog = catalogProp.objectReferenceValue as SoundCatalog;
+            var catalog = catalogProp.objectReferenceValue as SoundCatalogSO;
             var keys = catalog != null ? new List<string>(catalog.Keys) : null;
 
             if (keys != null && keys.Count > 0)

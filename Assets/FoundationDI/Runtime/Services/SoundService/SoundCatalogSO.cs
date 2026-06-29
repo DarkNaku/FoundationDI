@@ -20,7 +20,7 @@ namespace DarkNaku.FoundationDI
     }
 
     [CreateAssetMenu(fileName = "SoundCatalog", menuName = "DarkNaku/SoundCatalog")]
-    public sealed class SoundCatalog : ScriptableObject, ISoundCatalog
+    public sealed class SoundCatalogSO : ScriptableObject, ISoundCatalog
     {
         [SerializeField] private List<SoundEntry> _entries = new();
 
@@ -69,7 +69,7 @@ namespace DarkNaku.FoundationDI
 
                 if (_map.ContainsKey(entry.Key))
                 {
-                    Debug.LogWarning($"[SoundCatalog] Duplicate key '{entry.Key}', overwriting with last value.");
+                    Debug.LogWarning($"[SoundCatalogSO] Duplicate key '{entry.Key}', overwriting with last value.");
                 }
                 else
                 {
