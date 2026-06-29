@@ -48,7 +48,6 @@
 - [ ] **Step 1: 실패 테스트 작성** — `Assets/FoundationDI/Tests/InjectorServiceTest.cs` 생성
 
 ```csharp
-using System;
 using DarkNaku.FoundationDI;
 using NSubstitute;
 using NUnit.Framework;
@@ -206,6 +205,7 @@ namespace DarkNaku.FoundationDI
 `Assets/FoundationDI/Runtime/DI/InjectorVContainerExtensions.cs`:
 ```csharp
 using VContainer;
+using VContainer.Unity;
 
 namespace DarkNaku.FoundationDI
 {
