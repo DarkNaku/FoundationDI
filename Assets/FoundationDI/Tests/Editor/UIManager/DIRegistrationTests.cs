@@ -9,10 +9,20 @@ public class DIRegistrationTests
     public void 컨테이너에서_IUIManager를_해석할_수_있다()
     {
         var builder = new ContainerBuilder();
-        builder.Register<IResourceService>(_ => new ResourceService(), Lifetime.Singleton);
+        builder.Register<IResourceService, AddressableResourceService>(Lifetime.Singleton);
         builder.RegisterUIManager(ScriptableObject.CreateInstance<UIManagerSettings>());
 
         var container = builder.Build();
         Assert.IsNotNull(container.Resolve<IUIManager>());
+    }
+
+    [Test]
+    public void AddressableResourceService로_등록하면_IResourceProvider_없이_해석된다()
+    {
+        var builder = new ContainerBuilder();
+        builder.Register<IResourceService, AddressableResourceService>(Lifetime.Singleton);
+
+        var container = builder.Build();
+        Assert.IsNotNull(container.Resolve<IResourceService>());
     }
 }
