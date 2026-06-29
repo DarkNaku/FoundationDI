@@ -14,6 +14,7 @@ namespace DarkNaku.FoundationDI
     {
         [Inject] private ISoundService _sound;
 
+        [Tooltip("에디터 키 드롭다운 전용. 런타임 미사용 — DI로 등록된 ISoundCatalog와 동일 에셋을 지정해야 _key가 유효하다.")]
         [SerializeField] private SoundCatalog _catalog;
         [SerializeField] private string _key;
 
