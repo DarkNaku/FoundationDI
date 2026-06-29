@@ -25,4 +25,14 @@ public class DIRegistrationTests
         var container = builder.Build();
         Assert.IsNotNull(container.Resolve<IResourceService>());
     }
+
+    [Test]
+    public void DefaultResourceService로_등록하면_IResourceProvider_없이_해석된다()
+    {
+        var builder = new ContainerBuilder();
+        builder.Register<IResourceService, DefaultResourceService>(Lifetime.Singleton);
+
+        var container = builder.Build();
+        Assert.IsNotNull(container.Resolve<IResourceService>());
+    }
 }
