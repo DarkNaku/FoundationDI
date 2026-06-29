@@ -37,7 +37,7 @@ public class RootLifetimeScope : LifetimeScope
 
     protected override void Configure(IContainerBuilder builder)
     {
-        builder.Register<IResourceService, ResourceService>(Lifetime.Singleton);
+        builder.Register<IResourceService, AddressableResourceService>(Lifetime.Singleton);
         builder.RegisterSoundService(_soundCatalog);
     }
 }

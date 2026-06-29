@@ -53,7 +53,7 @@ public class RootLifetimeScope : LifetimeScope
 
     protected override void Configure(IContainerBuilder builder)
     {
-        builder.Register<IResourceService, ResourceService>(Lifetime.Singleton);
+        builder.Register<IResourceService, AddressableResourceService>(Lifetime.Singleton);
         builder.RegisterUIManager(_uiSettings);
         builder.RegisterInjector();   // 씬 배치 컴포넌트 주입(SoundButton 등)
         // 필요한 서비스를 같은 방식으로 추가 등록 (예: builder.RegisterSoundService(_soundCatalog))
