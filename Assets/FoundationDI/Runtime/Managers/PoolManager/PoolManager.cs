@@ -8,22 +8,22 @@ using Object = UnityEngine.Object;
 
 namespace DarkNaku.FoundationDI
 {
-    public interface IPoolService : IDisposable {
+    public interface IPoolManager : IDisposable {
         GameObject Get(string key, Transform parent = null);
         T Get<T>(string key, Transform parent = null) where T : class;
         void Release(GameObject item, float delay = 0f);
     }
     
-    public class PoolService : IPoolService
+    public class PoolManager : IPoolManager
     {
         private readonly Dictionary<string, PoolData> _table;
         private readonly Transform _root;
         
-        public PoolService()
+        public PoolManager()
         {
             _table = new();
             
-            var root = new GameObject("[PoolService]");
+            var root = new GameObject("[PoolManager]");
             
             _root = root.transform;
             
@@ -82,13 +82,13 @@ namespace DarkNaku.FoundationDI
         {
             if (string.IsNullOrEmpty(key))
             {
-                Debug.LogError($"[PoolService] Register : Key is wrong.");
+                Debug.LogError($"[PoolManager] Register : Key is wrong.");
                 return null;
             }
 
             if (prefab == null)
             {
-                Debug.LogError($"[PoolService] Register : Prefab is null.");
+                Debug.LogError($"[PoolManager] Register : Prefab is null.");
                 return null;
             }
 
@@ -123,7 +123,7 @@ namespace DarkNaku.FoundationDI
         {
             if (string.IsNullOrEmpty(key))
             {
-                Debug.LogError($"[PoolService] Load : Key is wrong.");
+                Debug.LogError($"[PoolManager] Load : Key is wrong.");
                 return null;
             }
 
@@ -139,7 +139,7 @@ namespace DarkNaku.FoundationDI
                 }
                 catch (InvalidKeyException e)
                 {
-                    Debug.LogError($"[PoolService] Load : {e.Message}");
+                    Debug.LogError($"[PoolManager] Load : {e.Message}");
                     return null;
                 }
             }
