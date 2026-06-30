@@ -104,7 +104,8 @@ namespace DarkNaku.FoundationDI
         
         public void Dispose()
         {
-            _disposable.Dispose();
+            _disposable?.Dispose();
+            _disposable = null;
 
             foreach (var key in _table.Keys)
             {
@@ -113,13 +114,19 @@ namespace DarkNaku.FoundationDI
 
             _table.Clear();
 
-            if (Application.isPlaying)
+            // 플레이모드 종료 시 Unity의 오브젝트 파괴와 Container.Dispose 순서가 보장되지 않는다.
+            // _root가 먼저 파괴되면 _root.gameObject 접근에서 MissingReferenceException이 나므로
+            // fake-null 가드로 이미 파괴된 경우를 건너뛴다.
+            if (_root != null)
             {
-                Object.Destroy(_root.gameObject);
-            }
-            else
-            {
-                Object.DestroyImmediate(_root.gameObject);
+                if (Application.isPlaying)
+                {
+                    Object.Destroy(_root.gameObject);
+                }
+                else
+                {
+                    Object.DestroyImmediate(_root.gameObject);
+                }
             }
         }
         
@@ -230,15 +237,12 @@ namespace DarkNaku.FoundationDI
                 break;
             }
 
-            if (player == null) 
+            if (player == null)
             {
                 player = new GameObject("SFX Player").AddComponent<AudioSource>();
+                // _root가 DontDestroyOnLoad라 자식은 자동으로 따라간다.
+                // 비-root에 DontDestroyOnLoad를 걸면 경고만 나고 무시되므로 걸지 않는다(BGM Player와 동일).
                 player.transform.parent = _root;
-
-                if (Application.isPlaying)
-                {
-                    Object.DontDestroyOnLoad(player.gameObject);
-                }
 
                 _sfxPlayers.Add(player);
             }
