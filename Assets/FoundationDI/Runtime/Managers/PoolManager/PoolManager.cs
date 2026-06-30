@@ -1,9 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.AddressableAssets;
 using UnityEngine.Pool;
-using UnityEngine.ResourceManagement.AsyncOperations;
 using Object = UnityEngine.Object;
 
 namespace DarkNaku.FoundationDI
@@ -13,21 +11,30 @@ namespace DarkNaku.FoundationDI
         T Get<T>(string key, Transform parent = null) where T : class;
         void Release(GameObject item, float delay = 0f);
     }
-    
+
     public class PoolManager : IPoolManager
     {
+        private readonly IResourceService _resourceService;
         private readonly Dictionary<string, PoolData> _table;
         private readonly Transform _root;
-        
-        public PoolManager()
+
+        public PoolManager(IResourceService resourceService, Transform parent = null)
         {
+            _resourceService = resourceService;
             _table = new();
-            
+
+            // 풀 루트는 DontDestroyOnLoad로 두지 않는다.
+            // parent(보통 씬 LifetimeScope의 transform)가 주어지면 그 아래에 둬서
+            // 풀 루트가 활성 씬이 아니라 스코프가 속한 씬에 확실히 귀속되도록 한다.
+            // 그러면 씬 언로드 시 풀도 함께 정리된다. parent가 없으면 활성 씬에 생성된다.
             var root = new GameObject("[PoolManager]");
-            
+
             _root = root.transform;
-            
-            Object.DontDestroyOnLoad(root);
+
+            if (parent != null)
+            {
+                _root.SetParent(parent, false);
+            }
         }
 
         public GameObject Get(string key, Transform parent = null)
@@ -61,24 +68,31 @@ namespace DarkNaku.FoundationDI
 
         public void Dispose()
         {
-            // Pool items 정리 (GameObject 파괴 전에 수행)
-            foreach (var data in _table.Values)
+            // Pool items 정리 (GameObject 파괴 전에 수행) 후 로드한 에셋을 ResourceService에 반환
+            foreach (var pair in _table)
             {
-                data.Clear();
+                pair.Value.Clear();
+                _resourceService.Release(pair.Key);
             }
 
             _table.Clear();
 
-            // 모든 pool이 정리된 후 root GameObject 파괴 (null check 추가)
+            // 씬 언로드/플레이모드 종료 시 Unity의 오브젝트 파괴와 Container.Dispose 순서가
+            // 보장되지 않는다. _root가 먼저 파괴됐으면 fake-null 가드로 건너뛴다.
             if (_root != null)
             {
-                Object.Destroy(_root.gameObject);
+                if (Application.isPlaying)
+                {
+                    Object.Destroy(_root.gameObject);
+                }
+                else
+                {
+                    Object.DestroyImmediate(_root.gameObject);
+                }
             }
-
-            Resources.UnloadUnusedAssets();
         }
 
-        private PoolData Register(string key, GameObject prefab, AsyncOperationHandle<GameObject> handle)
+        private PoolData Register(string key, GameObject prefab)
         {
             if (string.IsNullOrEmpty(key))
             {
@@ -112,7 +126,7 @@ namespace DarkNaku.FoundationDI
                 OnReleaseItem,
                 OnDestroyItem);
 
-            var data = new PoolData(pool, handle);
+            var data = new PoolData(pool);
 
             _table.TryAdd(key, data);
 
@@ -127,24 +141,17 @@ namespace DarkNaku.FoundationDI
                 return null;
             }
 
-            var go = Resources.Load<GameObject>(key);
+            // 에셋 로딩은 ResourceService에 위임한다 (핸들/참조 카운팅을 한 곳에서 관리).
+            var prefab = _resourceService.Load<GameObject>(key);
 
-            if (go == null)
+            if (prefab == null)
             {
-                try
-                {
-                    var handle = Addressables.LoadAssetAsync<GameObject>(key);
-                    go = handle.WaitForCompletion();
-                    return Register(key, go, handle);
-                }
-                catch (InvalidKeyException e)
-                {
-                    Debug.LogError($"[PoolManager] Load : {e.Message}");
-                    return null;
-                }
+                Debug.LogError($"[PoolManager] Load : Failed to load prefab. (key: {key})");
+                // 실패한 로드는 ResourceService가 캐시/카운트하지 않으므로 Release로 보상할 필요가 없다.
+                return null;
             }
 
-            return Register(key, go, default);
+            return Register(key, prefab);
         }
 
         private void OnGetItem(IPoolItem item)
@@ -165,7 +172,14 @@ namespace DarkNaku.FoundationDI
 
             if (item.GO != null)
             {
-                Object.Destroy(item.GO);
+                if (Application.isPlaying)
+                {
+                    Object.Destroy(item.GO);
+                }
+                else
+                {
+                    Object.DestroyImmediate(item.GO);
+                }
             }
         }
     }

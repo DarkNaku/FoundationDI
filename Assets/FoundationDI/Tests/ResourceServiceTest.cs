@@ -150,4 +150,46 @@ public class ResourceServiceTest
         provider.Received(1).Load<GameObject>("key");
         provider.Received(1).Release("key");
     }
+
+    [Test]
+    public void 동기_로드_실패시_캐시하지_않아_다음_로드는_provider를_다시_호출한다()
+    {
+        var provider = Substitute.For<IResourceProvider>();
+        provider.Load<GameObject>("missing").Returns((GameObject)null);
+        var sut = new ResourceService(provider);
+
+        var first = sut.Load<GameObject>("missing");
+        var second = sut.Load<GameObject>("missing");
+
+        Assert.IsNull(first);
+        Assert.IsNull(second);
+        provider.Received(2).Load<GameObject>("missing");   // 캐시 안 됨 → 매번 provider 호출
+    }
+
+    [Test]
+    public void 동기_로드_실패시_provider_Release로_핸들을_정리한다()
+    {
+        var provider = Substitute.For<IResourceProvider>();
+        provider.Load<GameObject>("missing").Returns((GameObject)null);
+        var sut = new ResourceService(provider);
+
+        sut.Load<GameObject>("missing");
+
+        provider.Received(1).Release("missing");
+    }
+
+    [UnityTest]
+    public IEnumerator 비동기_로드_실패시_캐시하지_않아_다음_로드는_provider를_다시_호출한다() => UniTask.ToCoroutine(async () =>
+    {
+        var provider = Substitute.For<IResourceProvider>();
+        provider.LoadAsync<GameObject>("missing").Returns(_ => UniTask.FromResult<GameObject>(null));
+        var sut = new ResourceService(provider);
+
+        var first = await sut.LoadAsync<GameObject>("missing");
+        var second = await sut.LoadAsync<GameObject>("missing");
+
+        Assert.IsNull(first);
+        Assert.IsNull(second);
+        _ = provider.Received(2).LoadAsync<GameObject>("missing");
+    });
 }

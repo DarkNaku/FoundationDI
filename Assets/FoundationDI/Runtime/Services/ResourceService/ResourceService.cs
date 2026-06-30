@@ -46,6 +46,14 @@ namespace DarkNaku.FoundationDI
 
             var asset = await tcs.Task;
             _loading.Remove(key);
+
+            if (asset == null)
+            {
+                // 실패한 로드는 캐시/참조 카운트에 반영하지 않는다 → 호출자는 Release 짝을 맞출 필요가 없다.
+                _provider.Release(key);
+                return null;
+            }
+
             _cache[key].RefCount++;
             return asset as T;
         }
@@ -54,7 +62,8 @@ namespace DarkNaku.FoundationDI
         {
             var asset = await _provider.LoadAsync<T>(key);
 
-            if (!_cache.ContainsKey(key))
+            // 실패(null)는 캐시하지 않는다. 다음 로드가 다시 시도할 수 있게 둔다.
+            if (asset != null && !_cache.ContainsKey(key))
             {
                 _cache[key] = new Entry { Asset = asset, RefCount = 0 };
             }
@@ -71,6 +80,15 @@ namespace DarkNaku.FoundationDI
             }
 
             var asset = _provider.Load<T>(key);
+
+            if (asset == null)
+            {
+                // 실패한 로드는 캐시/참조 카운트에 반영하지 않는다 → 호출자는 Release 짝을 맞출 필요가 없다.
+                // provider가 보유했을 수 있는 핸들(Addressables 등)은 정리한다.
+                _provider.Release(key);
+                return null;
+            }
+
             _cache[key] = new Entry { Asset = asset, RefCount = 1 };
             return asset;
         }
