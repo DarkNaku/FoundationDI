@@ -46,7 +46,7 @@ namespace DarkNaku.FoundationDI
             AttachTo(presenter, Root.PageLayer);
             RefreshInputBlocking();
 
-            await ShowAsync(presenter, _settings?.DefaultPageTransition, ct);
+            await ShowAsync(presenter, ct);
         }
 
         private async UniTask ShowOverlayAsync(UIPresenter presenter, CancellationToken ct)
@@ -56,7 +56,7 @@ namespace DarkNaku.FoundationDI
             _overlays.Register(presenter, above);
             AttachTo(presenter, above ? Root.AboveOverlayLayer : Root.BelowOverlayLayer);
             RefreshInputBlocking();
-            await ShowAsync(presenter, _settings?.DefaultOverlayTransition, ct);
+            await ShowAsync(presenter, ct);
         }
 
         private async UniTask ShowPopupAsync(UIPresenter presenter, CancellationToken ct)
@@ -65,7 +65,7 @@ namespace DarkNaku.FoundationDI
             _popups.Add(presenter);
             AttachTo(presenter, Root.PopupLayer);
             RefreshInputBlocking();
-            await ShowAsync(presenter, _settings?.DefaultPopupTransition, ct);
+            await ShowAsync(presenter, ct);
         }
 
         private T Acquire<T>(Action<UIPresenter> enqueueShow) where T : UIPresenter
@@ -90,13 +90,12 @@ namespace DarkNaku.FoundationDI
 
         private void AttachTo(UIPresenter presenter, Transform layer) => presenter.ViewBase.RectTransform.SetParent(layer, false);
 
-        private async UniTask ShowAsync(UIPresenter presenter, IUITransition defaultTransition, CancellationToken ct)
+        private async UniTask ShowAsync(UIPresenter presenter, CancellationToken ct)
         {
             presenter.ViewBase.gameObject.SetActive(true); // FIX C1: 캐시 재사용 시 비활성 GameObject 복구
-            // 매 표시마다 트랜지션 슬롯을 명시적으로 재설정해 캐시 재사용 시 직전 오버라이드가 잔류하지 않게 한다.
-            // 오버라이드는 show/hide 양쪽에 적용하고, 모드 기본값은 settings에서 주입한다.
+            // 매 표시마다 트랜지션 오버라이드를 명시적으로 재설정해 캐시 재사용 시 직전 오버라이드가 잔류하지 않게 한다.
+            // 오버라이드는 show/hide 양쪽에 적용하고, 오버라이드가 없으면 View에 부착된 트랜지션 컴포넌트가 사용된다.
             presenter.ViewBase.Transition = presenter.TransitionOverride;
-            presenter.ViewBase.DefaultTransition = defaultTransition;
             presenter.OnBeforeShow();
             presenter.Fire(UIPresenter.LifecycleEvent.BeforeShow);
             await presenter.ViewBase.ShowAsync(ct);

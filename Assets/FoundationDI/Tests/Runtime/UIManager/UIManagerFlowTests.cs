@@ -208,7 +208,9 @@ public class UIManagerFlowTests
         var factory = new UIInstanceFactory(resolver, resource);
         var manager = new UIManager(settings, factory);
 
-        var fade = ScriptableObject.CreateInstance<FadeTransitionAsset>();
+        var fadeGo = new GameObject("fade", typeof(RectTransform), typeof(FadeTransition));
+        var fade = fadeGo.GetComponent<FadeTransition>();
+        TransitionTestHelpers.SetPrivate(fade, "_duration", 0.05f);
 
         var a = manager.Page<P>();
         a.WithTransition(fade);
@@ -222,5 +224,6 @@ public class UIManagerFlowTests
         Assert.IsTrue(b.Shown, "Page 교체 후 B가 3초 내 표시되어야 함(미표시 시 HideAsync hang)");
 
         manager.Dispose();
+        Object.DestroyImmediate(fadeGo);
     });
 }

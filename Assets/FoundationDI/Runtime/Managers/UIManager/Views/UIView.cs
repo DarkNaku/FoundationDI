@@ -7,8 +7,6 @@ namespace DarkNaku.FoundationDI
     [RequireComponent(typeof(CanvasGroup))]
     public abstract class UIView : MonoBehaviour
     {
-        [SerializeField] private UITransitionAsset _transition;
-
         private static readonly NoopTransition Noop = new();
 
         private RectTransform _rectTransform;
@@ -26,7 +24,6 @@ namespace DarkNaku.FoundationDI
         // 해석 우선순위: per-show 오버라이드(Transition) > 부착된 트랜지션 컴포넌트 > Noop
         // 하나의 IUITransition이 ShowAsync/HideAsync 한 쌍을 정의하므로 show/hide 슬롯을 분리하지 않는다.
         public IUITransition Transition { get; set; }
-        public IUITransition DefaultTransition { get; set; }
 
         private IUITransition _componentTransition;
         private bool _resolvedComponent;
