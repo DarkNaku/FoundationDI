@@ -4,8 +4,6 @@ using UnityEngine;
 
 namespace DarkNaku.FoundationDI
 {
-    public enum SlideDirection { Left, Right, Top, Bottom }
-
     [CreateAssetMenu(fileName = "SlideTransition", menuName = "DarkNaku/UI Transition/Slide")]
     public sealed class SlideTransitionAsset : UITransitionAsset
     {
