@@ -23,12 +23,25 @@ namespace DarkNaku.FoundationDI
             set => CanvasGroup.interactable = value;
         }
 
-        // 해석 우선순위: per-show 오버라이드(Transition) > 인스펙터 에셋(_transition) > settings 모드 기본값(DefaultTransition) > Noop
+        // 해석 우선순위: per-show 오버라이드(Transition) > 부착된 트랜지션 컴포넌트 > Noop
         // 하나의 IUITransition이 ShowAsync/HideAsync 한 쌍을 정의하므로 show/hide 슬롯을 분리하지 않는다.
         public IUITransition Transition { get; set; }
         public IUITransition DefaultTransition { get; set; }
 
-        private IUITransition Resolve() => Transition ?? _transition ?? DefaultTransition ?? Noop;
+        private IUITransition _componentTransition;
+        private bool _resolvedComponent;
+
+        private IUITransition ResolveComponent()
+        {
+            if (!_resolvedComponent)
+            {
+                _componentTransition = GetComponent<IUITransition>();
+                _resolvedComponent = true;
+            }
+            return _componentTransition;
+        }
+
+        private IUITransition Resolve() => Transition ?? ResolveComponent() ?? Noop;
 
         public virtual void OnInitializeView() { }
 
