@@ -22,8 +22,8 @@ public class BackgroundBelowOverlay : UIOverlayPresenter<BackgroundOverlayView>
     protected override bool Above => false;   // Below: Popup 아래
 }
 
-// 트랜지션은 UIManagerSettings의 DefaultOverlayTransition(Fade)을 사용.
-// per-show 오버라이드가 필요하면 .WithTransition(asset) 체인.
+// 트랜지션은 View 프리팹 루트에 부착한 FadeTransition 컴포넌트를 사용.
+// per-show 오버라이드가 필요하면 .WithTransition(transition) 체인.
 ```
 
 ## 실행

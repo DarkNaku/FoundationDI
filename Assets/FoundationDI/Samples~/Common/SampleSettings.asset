@@ -12,6 +12,3 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: acd0e9c8147914e10b02045a2015d024, type: 3}
   m_Name: SampleSettings
   m_EditorClassIdentifier: FoundationDI::DarkNaku.FoundationDI.UIManagerSettings
-  _defaultPageTransition: {fileID: 11400000, guid: 6cb1a58f36ed24aa0b358d5d7516e12b, type: 2}
-  _defaultPopupTransition: {fileID: 11400000, guid: d3cab77111c12460381dd8dbc9b225ba, type: 2}
-  _defaultOverlayTransition: {fileID: 11400000, guid: 6cb1a58f36ed24aa0b358d5d7516e12b, type: 2}
