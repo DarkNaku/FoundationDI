@@ -52,32 +52,17 @@
 
 ---
 
-### Task 0: PlayMode 테스트 어셈블리 구성 (STRUCTURAL)
+### Task 0: 테스트 헬퍼 추가 (STRUCTURAL) — 실행 시 조정됨
+
+> **조정:** PlayMode 테스트 어셈블리 `FoundationDI.Tests.Runtime`(references: FoundationDI/UniTask/VContainer/TestRunner, precompiled: nunit/NSubstitute/Castle)이 **이미 존재**한다. 신규 asmdef를 만들지 않고 이를 재사용한다. 기존 PlayMode 테스트는 `Tests/Runtime/UIManager/`에 있으며 **전역 네임스페이스 + `using DarkNaku.FoundationDI;`** 관례를 쓴다. 신규 트랜지션 테스트도 같은 폴더·관례를 따른다.
 
 **Files:**
-- Create: `Assets/FoundationDI/Tests/PlayMode/FoundationDI.PlayModeTests.asmdef`
-- Create: `Assets/FoundationDI/Tests/PlayMode/Transitions/TransitionTestHelpers.cs`
+- Create: `Assets/FoundationDI/Tests/Runtime/UIManager/TransitionTestHelpers.cs`
 
 **Interfaces:**
-- Produces: `FoundationDI.PlayModeTests` 어셈블리(NUnit/UnityEngine.TestTools/FoundationDI/UniTask 참조). 헬퍼 `TransitionTestHelpers.SetPrivate(object, string, object)`, `TransitionTestHelpers.NewUINode(string, params Type[])`.
+- Produces: 헬퍼 `TransitionTestHelpers.SetPrivate(object, string, object)`, `TransitionTestHelpers.NewUINode(string, params Type[])` (전역 네임스페이스).
 
-- [ ] **Step 1: asmdef 작성**
-
-`FoundationDI.PlayModeTests.asmdef`:
-```json
-{
-    "name": "FoundationDI.PlayModeTests",
-    "references": ["FoundationDI", "UniTask"],
-    "includePlatforms": ["Editor"],
-    "overrideReferences": true,
-    "precompiledReferences": ["nunit.framework.dll"],
-    "defineConstraints": ["UNITY_INCLUDE_TESTS"],
-    "optionalUnityReferences": ["TestAssemblies"]
-}
-```
-(`UniTask` 어셈블리명이 다르면 실제 이름으로 교체 — `Cysharp.Threading.Tasks`일 수 있음. UnityMCP `manage_asset`/프로젝트 참조로 확인 후 지정.)
-
-- [ ] **Step 2: 테스트 헬퍼 작성**
+- [ ] **Step 1: 테스트 헬퍼 작성**
 
 `TransitionTestHelpers.cs`:
 ```csharp
@@ -85,40 +70,40 @@ using System;
 using System.Reflection;
 using UnityEngine;
 
-namespace DarkNaku.FoundationDI.PlayModeTests
+// 전역 네임스페이스(기존 PlayMode 테스트 관례와 일치)
+public static class TransitionTestHelpers
 {
-    public static class TransitionTestHelpers
+    // private [SerializeField] 필드 주입
+    public static void SetPrivate(object target, string field, object value)
     {
-        // private [SerializeField] 필드 주입
-        public static void SetPrivate(object target, string field, object value)
-        {
-            var f = target.GetType().GetField(field,
-                BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
-            if (f == null) throw new ArgumentException($"field not found: {field}");
-            f.SetValue(target, value);
-        }
+        var f = target.GetType().GetField(field,
+            BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+        if (f == null) throw new ArgumentException($"field not found: {field}");
+        f.SetValue(target, value);
+    }
 
-        // RectTransform 노드 생성 (+ 추가 컴포넌트)
-        public static GameObject NewUINode(string name, params Type[] extra)
-        {
-            var go = new GameObject(name, typeof(RectTransform));
-            foreach (var t in extra) go.AddComponent(t);
-            return go;
-        }
+    // RectTransform 노드 생성 (+ 추가 컴포넌트)
+    public static GameObject NewUINode(string name, params Type[] extra)
+    {
+        var go = new GameObject(name, typeof(RectTransform));
+        foreach (var t in extra) go.AddComponent(t);
+        return go;
     }
 }
 ```
 
-- [ ] **Step 3: 컴파일 확인**
+- [ ] **Step 2: 컴파일 확인**
 
-UnityMCP `read_console`로 에러 없음 확인. `editor_state.isCompiling == false` 대기.
+UnityMCP `read_console`로 에러 없음 확인. `editor/state`의 `compilation.is_compiling == false` 대기.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 3: Commit**
 
 ```bash
-git add Assets/FoundationDI/Tests/PlayMode
-git commit -m "[STRUCTURAL] PlayMode 테스트 어셈블리 및 트랜지션 테스트 헬퍼 추가"
+git add Assets/FoundationDI/Tests/Runtime/UIManager/TransitionTestHelpers.cs
+git commit -m "[STRUCTURAL] 트랜지션 PlayMode 테스트 헬퍼 추가"
 ```
+
+> 신규 테스트 파일 경로는 모두 `Assets/FoundationDI/Tests/Runtime/UIManager/`로 두고, 클래스는 전역 네임스페이스에 둔다(아래 Task 1~4의 파일 경로/네임스페이스를 이에 맞춰 읽는다).
 
 ---
 
@@ -731,6 +716,8 @@ git commit -m "[BEHAVIORAL] UIView가 부착된 IUITransition 컴포넌트를 Ge
 - Modify: `UIManager.cs` (`ShowAsync`의 `defaultTransition` 경로 제거, 호출부 3곳 수정)
 - Modify: `Settings/UIManagerSettings.cs` (트랜지션 3필드/프로퍼티 제거)
 - Delete: `Transitions/UITransitionAsset.cs`, `FadeTransitionAsset.cs`, `ScaleTransitionAsset.cs`, `SlideTransitionAsset.cs` (+.meta)
+- Delete: `Tests/Runtime/UIManager/TransitionAssetTests.cs` (+.meta) — 커버리지는 Task 1의 `FadeTransitionTests.cs`로 대체됨
+- Modify: `Tests/Runtime/UIManager/UIManagerFlowTests.cs:211` — `FadeTransitionAsset` 사용을 `FadeTransition` 컴포넌트로 마이그레이션
 
 **Interfaces:**
 - Consumes: 없음(제거 전용).
@@ -789,11 +776,22 @@ namespace DarkNaku.FoundationDI
 
 - [ ] **Step 4: 에셋 트랜지션 파일 삭제**
 
-UnityMCP `delete_script`(또는 `manage_asset` 삭제)로 `.cs`+`.meta` 제거:
+`.cs`+`.meta` 제거:
 - `Transitions/UITransitionAsset.cs`
 - `Transitions/FadeTransitionAsset.cs`
 - `Transitions/ScaleTransitionAsset.cs`
 - `Transitions/SlideTransitionAsset.cs`
+
+- [ ] **Step 4b: 깨지는 기존 테스트 정리**
+
+`Tests/Runtime/UIManager/TransitionAssetTests.cs` 삭제(+.meta). `UIManagerFlowTests.cs`의 `FadeTransitionAsset` 사용부(약 211행)를 컴포넌트로 교체:
+```csharp
+// 기존: var fade = ScriptableObject.CreateInstance<FadeTransitionAsset>();
+var fadeGo = new GameObject("fade", typeof(RectTransform), typeof(FadeTransition));
+var fade = fadeGo.GetComponent<FadeTransition>();
+TransitionTestHelpers.SetPrivate(fade, "_duration", 0.05f);
+// ... 테스트 끝에서 Object.DestroyImmediate(fadeGo); (기존 정리 흐름에 맞춰 추가)
+```
 
 - [ ] **Step 5: 컴파일 + 전체 테스트**
 
