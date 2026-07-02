@@ -159,8 +159,9 @@ public class ConfirmPresenter : UIPopupPresenter<ConfirmView>, IConfigurable<Con
   - 기본 구현(**MonoBehaviour 컴포넌트**, 공통 기반 `UITransitionBehaviour`): `FadeTransition`, `SlideTransition`, `ScaleTransition`. 폴백: `NoopTransition`(즉시).
   - View 루트 GameObject에 컴포넌트를 부착해 사용한다. 컴포넌트는 씬 인스턴스를 참조할 수 있으므로, 한 팝업 안에서 **배경과 컨텐츠를 분리 연출**할 수 있다.
     - `FadeTransition` — `_target`(CanvasGroup, 미지정 시 View 루트) 페이드.
-    - `SlideTransition` — `_background`(CanvasGroup, **선택적**·미지정 시 페이드 생략) 페이드 + `_content`(RectTransform, 미지정 시 View 루트) 슬라이드. `_direction`(Left/Right/Top/Bottom). 배경 페이드와 컨텐츠 슬라이드는 **병렬** 재생.
-    - `ScaleTransition` — `_background`(선택적) 페이드 + `_content` 스케일(`_fromScale`, 기본 0.8). 병렬 재생.
+    - `SlideTransition` — `_background`(**Image**, **선택적**·미지정 시 페이드 생략) 페이드 + `_content`(RectTransform, 미지정 시 View 루트) 슬라이드. `_direction`(Left/Right/Top/Bottom). 배경 페이드와 컨텐츠 슬라이드는 **병렬** 재생.
+    - `ScaleTransition` — `_background`(**Image**, 선택적) 페이드 + `_content` 스케일(`_fromScale`, 기본 0.8). 병렬 재생.
+    - 배경 페이드는 Image의 **디자인 알파(휴지 상태 `color.a`)까지** 진행한다(반투명 dim 배경의 원래 투명도 보존). 해당 알파는 최초 재생 시 1회 캡처된다.
     - 공통 인스펙터: `_duration`, `_ease`(AnimationCurve), `_unscaledTime`.
 
 ### DI / 설정

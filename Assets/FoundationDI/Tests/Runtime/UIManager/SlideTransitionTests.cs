@@ -3,12 +3,13 @@ using System.Threading;
 using Cysharp.Threading.Tasks;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.UI;
 using UnityEngine.TestTools;
 using DarkNaku.FoundationDI;
 
 public class SlideTransitionTests
 {
-    private static SlideTransition NewSlide(out GameObject root, out RectTransform content, out CanvasGroup bg)
+    private static SlideTransition NewSlide(out GameObject root, out RectTransform content, out Image bg)
     {
         root = TransitionTestHelpers.NewUINode("slide", typeof(SlideTransition));
         var contentGo = TransitionTestHelpers.NewUINode("content");
@@ -17,8 +18,8 @@ public class SlideTransitionTests
         content.sizeDelta = new Vector2(200, 200);
         content.anchoredPosition = Vector2.zero;
 
-        var bgGo = TransitionTestHelpers.NewUINode("bg", typeof(CanvasGroup));
-        bg = bgGo.GetComponent<CanvasGroup>();
+        var bgGo = TransitionTestHelpers.NewUINode("bg", typeof(Image));
+        bg = bgGo.GetComponent<Image>();
         bgGo.transform.SetParent(root.transform, false);
 
         var slide = root.GetComponent<SlideTransition>();
@@ -36,12 +37,26 @@ public class SlideTransitionTests
         await slide.ShowAsync((RectTransform)root.transform, CancellationToken.None);
 
         Assert.AreEqual(Vector2.zero, content.anchoredPosition);
-        Assert.AreEqual(1f, bg.alpha, 0.001f);
+        Assert.AreEqual(1f, bg.color.a, 0.001f);
         Object.DestroyImmediate(root);
     });
 
     [UnityTest]
-    public IEnumerator Hide_완료후_컨텐츠는_home으로_복원된다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator Show_완료후_배경은_디자인알파까지_페이드된다() => UniTask.ToCoroutine(async () =>
+    {
+        var slide = NewSlide(out var root, out var content, out var bg);
+        bg.color = new Color(0f, 0f, 0f, 0.6f); // 반투명 dim 배경
+        TransitionTestHelpers.SetPrivate(slide, "_content", content);
+        TransitionTestHelpers.SetPrivate(slide, "_background", bg);
+
+        await slide.ShowAsync((RectTransform)root.transform, CancellationToken.None);
+
+        Assert.AreEqual(0.6f, bg.color.a, 0.001f); // 1이 아니라 디자인 알파(0.6)까지
+        Object.DestroyImmediate(root);
+    });
+
+    [UnityTest]
+    public IEnumerator Hide_완료후_컨텐츠는_home으로_복원_배경알파는_0() => UniTask.ToCoroutine(async () =>
     {
         var slide = NewSlide(out var root, out var content, out var bg);
         TransitionTestHelpers.SetPrivate(slide, "_content", content);
@@ -50,6 +65,7 @@ public class SlideTransitionTests
         await slide.HideAsync((RectTransform)root.transform, CancellationToken.None);
 
         Assert.AreEqual(Vector2.zero, content.anchoredPosition);
+        Assert.AreEqual(0f, bg.color.a, 0.001f);
         Object.DestroyImmediate(root);
     });
 
