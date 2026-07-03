@@ -17,9 +17,24 @@ namespace DarkNaku.FoundationDI
 
         private readonly IHapticProvider _provider;
 
+        public HapticService() : this(CreatePlatformProvider())
+        {
+        }
+
         public HapticService(IHapticProvider provider)
         {
             _provider = provider;
+        }
+
+        private static IHapticProvider CreatePlatformProvider()
+        {
+#if UNITY_IOS && !UNITY_EDITOR
+            return new iOSHapticProvider();
+#elif UNITY_ANDROID && !UNITY_EDITOR
+            return new AndroidHapticProvider();
+#else
+            return new NoopHapticProvider();
+#endif
         }
 
         public bool Enabled
