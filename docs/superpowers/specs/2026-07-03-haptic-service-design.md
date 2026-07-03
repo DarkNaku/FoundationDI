@@ -69,7 +69,7 @@ public interface IHapticProvider
   `#else` → `NoopHapticProvider`.
 - **테스트 생성자**: `HapticService(IHapticProvider provider)`로 seam을 주입받아 EditMode에서
   NSubstitute로 검증한다.
-- `Enabled` 기본값: `PlayerPrefs.GetInt("HapticEnabled", 1) != 0` (기존 SoundService의
+- `Enabled` 기본값: `PlayerPrefs.GetInt("HAPTIC_ENABLED", 1) != 0` (기존 SoundService의
   `SFXEnabled` 패턴과 동일).
 
 ## 동작 규약
@@ -90,9 +90,10 @@ public interface IHapticProvider
 
 ### Android (`AndroidHapticProvider`)
 - `AndroidJavaObject`로 현재 `Activity`의 `Vibrator` 서비스를 획득.
-- API 26+(`Build.VERSION.SDK_INT >= 26`): `VibrationEffect.createPredefined`
+- API 29+(`Build.VERSION.SDK_INT >= 29`): `VibrationEffect.createPredefined`
   (Selection→EFFECT_TICK, Light/Soft→EFFECT_TICK, Medium→EFFECT_CLICK,
-  Heavy/Rigid→EFFECT_HEAVY_CLICK). Notification은 짧은 패턴(`createWaveform`)으로 근사.
+  Heavy/Rigid→EFFECT_HEAVY_CLICK). Notification도 predefined effect로 근사
+  (Success→EFFECT_CLICK, Warning/Error→EFFECT_HEAVY_CLICK).
 - 구버전 폴백: `vibrate(long milliseconds)`로 스타일별 지속시간 근사.
 - **권한**: `AndroidManifest.xml`에 `<uses-permission android:name="android.permission.VIBRATE"/>`
   필요. README에 설정 방법 명시.
