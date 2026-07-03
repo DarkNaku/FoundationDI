@@ -76,4 +76,17 @@ public class HapticServiceTest
 
         Assert.IsFalse(reloaded.Enabled);
     }
+
+    [Test]
+    public void Noop_provider는_예외없이_모든_메서드를_수행한다()
+    {
+        var provider = new NoopHapticProvider();
+
+        Assert.DoesNotThrow(() =>
+        {
+            provider.Impact(HapticImpact.Light);
+            provider.Notification(HapticNotification.Error);
+            provider.Selection();
+        });
+    }
 }
