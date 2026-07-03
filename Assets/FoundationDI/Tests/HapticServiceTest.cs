@@ -2,6 +2,7 @@ using DarkNaku.FoundationDI;
 using NSubstitute;
 using NUnit.Framework;
 using UnityEngine;
+using VContainer;
 
 public class HapticServiceTest
 {
@@ -88,5 +89,18 @@ public class HapticServiceTest
             provider.Notification(HapticNotification.Error);
             provider.Selection();
         });
+    }
+
+    [Test]
+    public void RegisterHapticService로_등록하면_IHapticService가_해석된다()
+    {
+        var builder = new ContainerBuilder();
+        builder.RegisterHapticService();
+        var container = builder.Build();
+
+        var haptic = container.Resolve<IHapticService>();
+
+        Assert.IsNotNull(haptic);
+        Assert.IsInstanceOf<HapticService>(haptic);
     }
 }

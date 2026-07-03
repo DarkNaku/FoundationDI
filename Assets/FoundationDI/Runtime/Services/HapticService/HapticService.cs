@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using VContainer;
 
 namespace DarkNaku.FoundationDI
 {
@@ -17,6 +18,7 @@ namespace DarkNaku.FoundationDI
 
         private readonly IHapticProvider _provider;
 
+        [Inject]
         public HapticService() : this(CreatePlatformProvider())
         {
         }
