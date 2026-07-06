@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  HapticService(AndroidHapticProvider)가 Vibrator를 사용하기 위해 필요한 권한을 선언한다.
+  이 매니페스트는 Android 라이브러리 플러그인(.androidlib)의 것으로, Gradle 병합 단계에서
+  앱의 최종 AndroidManifest 에 자동 병합된다. 따라서 이 패키지를 사용하는 프로젝트는
+  호스트 매니페스트를 직접 수정하지 않아도 VIBRATE 권한을 얻는다.
+  (VIBRATE는 normal 레벨 권한이라 설치 시 자동 승인되며 런타임 요청은 불필요하다.)
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.VIBRATE" />
+</manifest>

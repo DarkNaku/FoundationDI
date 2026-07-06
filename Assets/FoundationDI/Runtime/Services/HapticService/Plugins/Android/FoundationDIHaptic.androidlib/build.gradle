@@ -1,0 +1,14 @@
+// FoundationDI HapticService가 요구하는 android.permission.VIBRATE 권한을
+// 앱 매니페스트에 병합하기 위한 Android 라이브러리 플러그인.
+// 컴파일할 코드는 없고, src/main/AndroidManifest.xml 의 권한 선언만 제공한다.
+apply plugin: 'com.android.library'
+
+android {
+    // AGP 8/9는 매니페스트의 package 속성을 허용하지 않으므로 namespace로 지정해야 한다.
+    // (없으면 "Namespace not specified" 로 빌드가 실패한다.)
+    namespace 'com.darknaku.foundationdi.haptic'
+
+    // 프로젝트(Unity 6000.3.x)의 compileSdk와 맞춘다.
+    // Unity가 SDK를 올리면 이 값도 함께 갱신한다.
+    compileSdk 36
+}
