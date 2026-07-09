@@ -20,6 +20,13 @@ namespace DarkNaku.FoundationDI
             return (TSelf)this;
         }
 
+        /// <summary>
+        /// Presenter가 <see cref="IConfigurable{TParams}"/>를 구현한 경우 <c>Configure(p)</c>를 동기 호출한다.
+        /// </summary>
+        /// <remarks>
+        /// <b>주의:</b> <c>Configure</c>는 View에 접근하지 말 것 — 호출 시점에 View가 아직 바인딩되지 않았을 수 있다.
+        /// 전달 params만 저장하고 View 접근은 <c>OnInitialize</c>/<c>OnBeforeShow</c>에서 수행한다.
+        /// </remarks>
         public TSelf With<TParams>(TParams p)
         {
             if (this is IConfigurable<TParams> config)

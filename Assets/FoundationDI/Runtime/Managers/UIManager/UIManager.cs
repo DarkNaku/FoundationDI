@@ -36,7 +36,7 @@ namespace DarkNaku.FoundationDI
         public T Page<T>() where T : UIPresenter
         {
             if (_disposed) throw new ObjectDisposedException(nameof(UIManager));
-            var presenter = (T)_factory.CreatePresenterWithHost(typeof(T), this);
+            var presenter = (T)_factory.CreatePresenter(typeof(T), this);
             _queue.Enqueue(ct => ShowPageAsync(presenter, ct));
             return presenter;
         }
@@ -44,7 +44,7 @@ namespace DarkNaku.FoundationDI
         public T Popup<T>() where T : UIPresenter
         {
             if (_disposed) throw new ObjectDisposedException(nameof(UIManager));
-            var presenter = (T)_factory.CreatePresenterWithHost(typeof(T), this);
+            var presenter = (T)_factory.CreatePresenter(typeof(T), this);
             _queue.Enqueue(ct => ShowPopupAsync(presenter, ct));
             return presenter;
         }
@@ -52,7 +52,7 @@ namespace DarkNaku.FoundationDI
         public T Overlay<T>() where T : UIPresenter
         {
             if (_disposed) throw new ObjectDisposedException(nameof(UIManager));
-            var presenter = (T)_factory.CreatePresenterWithHost(typeof(T), this);
+            var presenter = (T)_factory.CreatePresenter(typeof(T), this);
             _queue.Enqueue(ct => ShowOverlayAsync(presenter, ct));
             return presenter;
         }

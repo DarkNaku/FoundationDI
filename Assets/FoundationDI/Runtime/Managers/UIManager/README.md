@@ -90,7 +90,12 @@ public readonly struct ConfirmParams { public readonly string Message; public Co
 [UIPrefab("UI/Confirm")]
 public class ConfirmPresenter : UIPopupPresenter<ConfirmView>, IConfigurable<ConfirmParams>
 {
-    public void Configure(ConfirmParams p) => View.SetMessage(p.Message);
+    private ConfirmParams _params;
+
+    // Configure는 View 바인딩 전에 동기 호출되므로 View에 접근하지 말고 params만 저장한다.
+    public void Configure(ConfirmParams p) => _params = p;
+
+    protected override void OnBeforeShow() => View.SetMessage(_params.Message);
 }
 ```
 

@@ -14,12 +14,6 @@ namespace DarkNaku.FoundationDI
 
         private Dictionary<LifecycleEvent, List<Action<UIPresenter>>> _subscribers;
 
-        internal void Bind(UIView view, IUIElementHost host)
-        {
-            ViewBase = view;
-            Host = host;
-        }
-
         // 뷰를 나중에 바인딩할 때 사용 (Host는 생성 시 미리 설정됨)
         internal void BindHost(IUIElementHost host) => Host = host;
         internal void BindView(UIView view) => ViewBase = view;
