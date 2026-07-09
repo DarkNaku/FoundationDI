@@ -34,7 +34,9 @@ namespace DarkNaku.FoundationDI
                     return;
                 }
 
-                await UniTask.Yield(PlayerLoopTiming.Update, ct);
+                // ct를 Yield에 넘기지 않는다: 취소 시 예외를 던지는 대신 루프 상단 체크에서
+                // apply(1f) 후 정상 종료해, 취소 경로에서도 항상 "끝 상태로 마감"을 보장한다.
+                await UniTask.Yield(PlayerLoopTiming.Update);
                 elapsed += _unscaledTime ? Time.unscaledDeltaTime : Time.deltaTime;
                 var t = Mathf.Clamp01(elapsed / _duration);
                 apply(_ease.Evaluate(t));
