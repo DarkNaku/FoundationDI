@@ -144,6 +144,13 @@ public class ConfirmPresenter : UIPopupPresenter<ConfirmView>, IConfigurable<Con
 `OnInitialize` · `OnBeforeShow` · `OnAfterShow` · `OnBeforeHide` · `OnAfterHide` · `OnDestroyElement`.
 > 패키지를 import해 **다른 어셈블리**에서 파생할 때는 `protected override`로 선언한다(`protected internal`의 `internal` 부분은 외부 어셈블리에 보이지 않음).
 
+### 구독 해제 컨벤션 (필수)
+
+Presenter는 매 Show마다 새로 생성되고 View는 풀에서 재사용된다. 따라서
+Presenter가 View 위젯(버튼 onClick, R3 Subscribe 등)에 건 구독은 반드시
+`OnAfterHide`에서 해제해야 한다. 해제하지 않으면 다음 Show에서 재사용된
+View에 이전 구독이 남아 중복/유령 핸들러가 쌓인다.
+
 ### `UIView : MonoBehaviour`
 
 프리팹 루트에 부착하는 View 기반 클래스.

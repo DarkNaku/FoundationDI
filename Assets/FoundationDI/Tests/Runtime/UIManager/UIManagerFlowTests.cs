@@ -40,12 +40,34 @@ public class UIManagerFlowTests
         protected internal override void OnAfterHide() => AfterHideCalled = true;
     }
 
+    // 구독 해제 컨벤션 검증용: OnBeforeShow에서 카운터에 구독, OnAfterHide에서 해제.
+    public class SubV : UIView { public System.Action OnTick; public void Tick() => OnTick?.Invoke(); }
+    [UIPrefab("UI/Sub")]
+    public class SubP : UIPopupPresenter<SubV>
+    {
+        public static int TickHandlerCalls;
+        private System.Action _handler;
+        public bool Shown;
+        protected internal override void OnAfterShow() => Shown = true;
+        protected internal override void OnBeforeShow()
+        {
+            _handler = () => TickHandlerCalls++;
+            View.OnTick += _handler;              // pooled View 위젯에 구독
+        }
+        protected internal override void OnAfterHide()
+        {
+            View.OnTick -= _handler;              // 컨벤션: OnAfterHide에서 해제
+            _handler = null;
+        }
+    }
+
     private GameObject _prefab;
     private GameObject _prefab2;
     private GameObject _popupPrefab;
     private GameObject _overlayPrefab;
     private GameObject _reshowPrefab;
     private GameObject _hideTrackPrefab;
+    private GameObject _subPrefab;
 
     [SetUp] public void Setup()
     {
@@ -66,6 +88,9 @@ public class UIManagerFlowTests
 
         _hideTrackPrefab = new GameObject("hideTrackPrefab", typeof(RectTransform));
         _hideTrackPrefab.AddComponent<HideTrackV>();
+
+        _subPrefab = new GameObject("subPrefab", typeof(RectTransform));
+        _subPrefab.AddComponent<SubV>();
     }
 
     [TearDown] public void Teardown()
@@ -76,6 +101,7 @@ public class UIManagerFlowTests
         Object.DestroyImmediate(_overlayPrefab);
         Object.DestroyImmediate(_reshowPrefab);
         Object.DestroyImmediate(_hideTrackPrefab);
+        Object.DestroyImmediate(_subPrefab);
     }
 
     [UnityTest]
@@ -301,5 +327,35 @@ public class UIManagerFlowTests
 
         Assert.IsTrue(p.AfterHideCalled, "Dispose 시 활성 presenter OnAfterHide 발화");
         Assert.AreEqual(1, HideTrackV.DestroyCount, "풀 View 파괴 시 OnDestroyView 호출");
+    });
+
+    [UnityTest]
+    public IEnumerator Show_Hide_반복시_View위젯에_중복핸들러가_없다() => UniTask.ToCoroutine(async () =>
+    {
+        SubP.TickHandlerCalls = 0;
+        var resource = Substitute.For<IResourceService>();
+        resource.Load<GameObject>("UI/Sub").Returns(_subPrefab);
+        var resolver = Substitute.For<IObjectResolver>();
+        var settings = ScriptableObject.CreateInstance<UIManagerSettings>();
+        var factory = new UIInstanceFactory(resolver);
+        var manager = new UIManager(settings, factory, resource);
+
+        // 1회차 Show → Hide
+        var s1 = manager.Popup<SubP>();
+        await UniTask.WaitUntil(() => s1.Shown);
+        var view = (SubV)s1.ViewBase;
+        s1.Hide();
+        await UniTask.WaitUntil(() => !view.gameObject.activeSelf);
+
+        // 2회차 Show(같은 View 재사용) → Tick 1회
+        var s2 = manager.Popup<SubP>();
+        await UniTask.WaitUntil(() => s2.Shown);
+        Assert.AreSame(view, s2.ViewBase, "View 풀 재사용 전제");
+
+        SubP.TickHandlerCalls = 0;
+        view.Tick();
+        Assert.AreEqual(1, SubP.TickHandlerCalls, "이전 presenter 구독이 남지 않아 핸들러는 1회만 호출");
+
+        manager.Dispose();
     });
 }
