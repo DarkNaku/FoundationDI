@@ -6,7 +6,7 @@ namespace DarkNaku.FoundationDI
 {
     public abstract class UIPresenter
     {
-        public enum LifecycleEvent { BeforeShow, AfterShow, BeforeHide, AfterHide, Destroyed }
+        public enum LifecycleEvent { BeforeShow, AfterShow, BeforeHide, AfterHide }
 
         internal UIView ViewBase { get; private set; }
         internal IUIElementHost Host { get; private set; }
@@ -14,11 +14,15 @@ namespace DarkNaku.FoundationDI
 
         private Dictionary<LifecycleEvent, List<Action<UIPresenter>>> _subscribers;
 
-        internal void Bind(UIView view, IUIElementHost host) 
-        { 
-            ViewBase = view; 
-            Host = host; 
+        internal void Bind(UIView view, IUIElementHost host)
+        {
+            ViewBase = view;
+            Host = host;
         }
+
+        // 뷰를 나중에 바인딩할 때 사용 (Host는 생성 시 미리 설정됨)
+        internal void BindHost(IUIElementHost host) => Host = host;
+        internal void BindView(UIView view) => ViewBase = view;
 
         internal void Subscribe(LifecycleEvent ev, Action<UIPresenter> handler)
         {
@@ -53,19 +57,12 @@ namespace DarkNaku.FoundationDI
 
         internal void SetTransitionOverride(IUITransition t) => TransitionOverride = t;
 
-        internal virtual void ResetTransient()
-        {
-            _subscribers?.Clear();
-            TransitionOverride = null;
-        }
-
         // 라이프사이클 훅
         protected internal virtual void OnInitialize() { }
         protected internal virtual void OnBeforeShow() { }
         protected internal virtual void OnAfterShow() { }
         protected internal virtual void OnBeforeHide() { }
         protected internal virtual void OnAfterHide() { }
-        protected internal virtual void OnDestroyElement() { }
 
         // 커맨드
         public void Hide() => Host?.RequestHide(this);

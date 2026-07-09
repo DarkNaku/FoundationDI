@@ -1,5 +1,4 @@
 using System;
-using UnityEngine;
 using VContainer;
 
 namespace DarkNaku.FoundationDI
@@ -7,34 +6,28 @@ namespace DarkNaku.FoundationDI
     internal sealed class UIInstanceFactory
     {
         private readonly IObjectResolver _resolver;
-        private readonly IResourceService _resource;
 
-        public UIInstanceFactory(IObjectResolver resolver, IResourceService resource)
+        public UIInstanceFactory(IObjectResolver resolver)
         {
             _resolver = resolver;
-            _resource = resource;
         }
 
-        public UIPresenter Create(Type presenterType, IUIElementHost host)
+        // View는 풀이 제공한다. 여기서는 presenter만 생성/주입/바인딩한다.
+        public UIPresenter CreatePresenter(Type presenterType, UIView view, IUIElementHost host)
         {
-            var key = UIPrefabKeyResolver.Resolve(presenterType);
-            var prefab = _resource.Load<GameObject>(key);
-
-            var go = UnityEngine.Object.Instantiate(prefab);
-            var view = go.GetComponent<UIView>();
-            if (view == null)
-            {
-                UnityEngine.Object.Destroy(go);
-                throw new InvalidOperationException($"[UIManager] {key} prefab 루트에 UIView가 없습니다.");
-            }
-
             var presenter = (UIPresenter)Activator.CreateInstance(presenterType);
             _resolver.Inject(presenter);
-
             presenter.Bind(view, host);
-            view.OnInitializeView();
-            presenter.OnInitialize();
+            return presenter;
+        }
 
+        // Host만 미리 설정하고 View 바인딩은 나중에 (BindView) 한다.
+        // UIManager 내부에서 Pool.Get 전에 presenter를 반환해야 할 때 사용.
+        internal UIPresenter CreatePresenterWithHost(Type presenterType, IUIElementHost host)
+        {
+            var presenter = (UIPresenter)Activator.CreateInstance(presenterType);
+            _resolver.Inject(presenter);
+            presenter.BindHost(host);
             return presenter;
         }
     }

@@ -11,23 +11,19 @@ public class UIInstanceFactoryTests
     private class P : UIPagePresenter<V> { }
 
     [Test]
-    public void ResourceService가_제공한_prefab으로_Presenter를_생성하고_바인딩한다()
+    public void 주어진_view로_Presenter를_생성하고_바인딩한다()
     {
-        var prefab = new GameObject("prefab", typeof(RectTransform));
-        prefab.AddComponent<V>();
-
-        var resource = Substitute.For<IResourceService>();
-        resource.Load<GameObject>("UI/Sample").Returns(prefab);
-
+        var go = new GameObject("v", typeof(RectTransform), typeof(CanvasGroup));
+        var view = go.AddComponent<V>();
         var resolver = Substitute.For<IObjectResolver>();
         var host = Substitute.For<IUIElementHost>();
 
-        var factory = new UIInstanceFactory(resolver, resource);
-        var presenter = factory.Create(typeof(P), host);
+        var factory = new UIInstanceFactory(resolver);
+        var presenter = factory.CreatePresenter(typeof(P), view, host);
 
         Assert.IsInstanceOf<P>(presenter);
-        Assert.IsNotNull(((P)presenter).ViewBase);   // Bind 확인용 internal 노출
+        Assert.AreSame(view, ((P)presenter).ViewBase);
 
-        Object.DestroyImmediate(prefab);
+        Object.DestroyImmediate(go);
     }
 }

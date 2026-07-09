@@ -13,8 +13,8 @@ public class UIManagerFlowTests
     [UIPrefab("UI/Sample")]
     public class P : UIPagePresenter<V> { public bool Shown; protected internal override void OnAfterShow() => Shown = true; }
 
-    // 재Show 테스트용: OnAfterShow 호출 횟수를 추적
-    public class ReshowV : UIView { }
+    // 재Show 테스트용: OnAfterShow / OnInitializeView 호출 횟수 추적
+    public class ReshowV : UIView { public int InitCount; public override void OnInitializeView() => InitCount++; }
     [UIPrefab("UI/ReshowSample")]
     public class ReshowP : UIPagePresenter<ReshowV> { public int ShowCount; protected internal override void OnAfterShow() => ShowCount++; }
 
@@ -31,11 +31,21 @@ public class UIManagerFlowTests
     [UIPrefab("UI/Sample2")]
     public class P2 : UIPagePresenter<V2> { public bool Shown; protected internal override void OnAfterShow() => Shown = true; }
 
+    public class HideTrackV : UIView { public static int DestroyCount; protected override void OnDestroyView() => DestroyCount++; }
+    [UIPrefab("UI/HideTrack")]
+    public class HideTrackP : UIPagePresenter<HideTrackV>
+    {
+        public bool Shown; public bool AfterHideCalled;
+        protected internal override void OnAfterShow() => Shown = true;
+        protected internal override void OnAfterHide() => AfterHideCalled = true;
+    }
+
     private GameObject _prefab;
     private GameObject _prefab2;
     private GameObject _popupPrefab;
     private GameObject _overlayPrefab;
     private GameObject _reshowPrefab;
+    private GameObject _hideTrackPrefab;
 
     [SetUp] public void Setup()
     {
@@ -53,6 +63,9 @@ public class UIManagerFlowTests
 
         _reshowPrefab = new GameObject("reshowPrefab", typeof(RectTransform));
         _reshowPrefab.AddComponent<ReshowV>();
+
+        _hideTrackPrefab = new GameObject("hideTrackPrefab", typeof(RectTransform));
+        _hideTrackPrefab.AddComponent<HideTrackV>();
     }
 
     [TearDown] public void Teardown()
@@ -62,6 +75,7 @@ public class UIManagerFlowTests
         Object.DestroyImmediate(_popupPrefab);
         Object.DestroyImmediate(_overlayPrefab);
         Object.DestroyImmediate(_reshowPrefab);
+        Object.DestroyImmediate(_hideTrackPrefab);
     }
 
     [UnityTest]
@@ -71,9 +85,9 @@ public class UIManagerFlowTests
         resource.Load<GameObject>("UI/Sample").Returns(_prefab);
         var resolver = Substitute.For<IObjectResolver>();
         var settings = ScriptableObject.CreateInstance<UIManagerSettings>();
-        var factory = new UIInstanceFactory(resolver, resource);
+        var factory = new UIInstanceFactory(resolver);
 
-        var manager = new UIManager(settings, factory);
+        var manager = new UIManager(settings, factory, resource);
         var p = manager.Page<P>();
 
         await UniTask.WaitUntil(() => p.Shown);
@@ -89,9 +103,9 @@ public class UIManagerFlowTests
         resource.Load<GameObject>("UI/SamplePopup").Returns(_popupPrefab);
         var resolver = Substitute.For<IObjectResolver>();
         var settings = ScriptableObject.CreateInstance<UIManagerSettings>();
-        var factory = new UIInstanceFactory(resolver, resource);
+        var factory = new UIInstanceFactory(resolver);
 
-        var manager = new UIManager(settings, factory);
+        var manager = new UIManager(settings, factory, resource);
         var p = manager.Popup<PopupP>();
 
         await UniTask.WaitUntil(() => p.Shown);
@@ -107,9 +121,9 @@ public class UIManagerFlowTests
         resource.Load<GameObject>("UI/SampleOverlay").Returns(_overlayPrefab);
         var resolver = Substitute.For<IObjectResolver>();
         var settings = ScriptableObject.CreateInstance<UIManagerSettings>();
-        var factory = new UIInstanceFactory(resolver, resource);
+        var factory = new UIInstanceFactory(resolver);
 
-        var manager = new UIManager(settings, factory);
+        var manager = new UIManager(settings, factory, resource);
         var p = manager.Overlay<OverlayP>();
 
         await UniTask.WaitUntil(() => p.Shown);
@@ -118,35 +132,31 @@ public class UIManagerFlowTests
         manager.Dispose();
     });
 
-    // FIX C1 가드: Hide 후 재Show 시 GameObject가 다시 활성화되고 OnAfterShow가 재호출된다
     [UnityTest]
-    public IEnumerator 재Show시_GameObject가_다시_활성화된다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 재Show시_새_Presenter가_생성되고_View는_풀에서_재사용된다() => UniTask.ToCoroutine(async () =>
     {
         var resource = Substitute.For<IResourceService>();
         resource.Load<GameObject>("UI/ReshowSample").Returns(_reshowPrefab);
         var resolver = Substitute.For<IObjectResolver>();
         var settings = ScriptableObject.CreateInstance<UIManagerSettings>();
-        var factory = new UIInstanceFactory(resolver, resource);
+        var factory = new UIInstanceFactory(resolver);
+        var manager = new UIManager(settings, factory, resource);
 
-        var manager = new UIManager(settings, factory);
-
-        // 1차 Show
         var p = manager.Page<ReshowP>();
         await UniTask.WaitUntil(() => p.ShowCount >= 1);
-        Assert.AreEqual(1, p.ShowCount, "1차 Show: OnAfterShow 1회 호출");
-        Assert.IsTrue(p.ViewBase.gameObject.activeSelf, "1차 Show 후 GameObject 활성");
+        var view1 = p.ViewBase;
+        Assert.AreEqual(1, ((ReshowV)view1).InitCount, "OnInitializeView 1차 1회");
 
-        // Hide (OperationQueue를 통해 비동기)
         p.Hide();
-        await UniTask.WaitUntil(() => !p.ViewBase.gameObject.activeSelf);
-        Assert.IsFalse(p.ViewBase.gameObject.activeSelf, "Hide 후 GameObject 비활성");
+        await UniTask.WaitUntil(() => !view1.gameObject.activeSelf);
 
-        // 2차 재Show — 캐시에서 꺼낸 인스턴스여야 하고 GameObject가 다시 활성화되어야 함
         var p2 = manager.Page<ReshowP>();
-        Assert.AreSame(p, p2, "캐시 재사용: 동일 인스턴스");
-        await UniTask.WaitUntil(() => p2.ShowCount >= 2);
-        Assert.AreEqual(2, p2.ShowCount, "재Show: OnAfterShow 2회 호출");
-        Assert.IsTrue(p2.ViewBase.gameObject.activeSelf, "재Show 후 GameObject 다시 활성");
+        Assert.AreNotSame(p, p2, "fresh presenter: 새 인스턴스");
+        await UniTask.WaitUntil(() => p2.ShowCount >= 1);
+
+        Assert.AreEqual(1, p2.ShowCount, "fresh presenter: ShowCount는 1부터");
+        Assert.AreSame(view1, p2.ViewBase, "View는 풀에서 재사용");
+        Assert.AreEqual(1, ((ReshowV)p2.ViewBase).InitCount, "OnInitializeView는 물리 1회(재호출 안 됨)");
 
         manager.Dispose();
     });
@@ -159,8 +169,8 @@ public class UIManagerFlowTests
         resource.Load<GameObject>("UI/SamplePopup").Returns(_popupPrefab);
         var resolver = Substitute.For<IObjectResolver>();
         var settings = ScriptableObject.CreateInstance<UIManagerSettings>();
-        var factory = new UIInstanceFactory(resolver, resource);
-        var manager = new UIManager(settings, factory);
+        var factory = new UIInstanceFactory(resolver);
+        var manager = new UIManager(settings, factory, resource);
 
         var page = manager.Page<P>();
         await UniTask.WaitUntil(() => page.Shown);
@@ -182,8 +192,8 @@ public class UIManagerFlowTests
         resource.Load<GameObject>("UI/SamplePopup").Returns(_popupPrefab);
         var resolver = Substitute.For<IObjectResolver>();
         var settings = ScriptableObject.CreateInstance<UIManagerSettings>();
-        var factory = new UIInstanceFactory(resolver, resource);
-        var manager = new UIManager(settings, factory);
+        var factory = new UIInstanceFactory(resolver);
+        var manager = new UIManager(settings, factory, resource);
 
         var overlay = manager.Overlay<OverlayP>();
         await UniTask.WaitUntil(() => overlay.Shown);
@@ -205,8 +215,8 @@ public class UIManagerFlowTests
         resource.Load<GameObject>("UI/Sample2").Returns(_prefab2);
         var resolver = Substitute.For<IObjectResolver>();
         var settings = ScriptableObject.CreateInstance<UIManagerSettings>();
-        var factory = new UIInstanceFactory(resolver, resource);
-        var manager = new UIManager(settings, factory);
+        var factory = new UIInstanceFactory(resolver);
+        var manager = new UIManager(settings, factory, resource);
 
         var fadeGo = new GameObject("fade", typeof(RectTransform), typeof(FadeTransition));
         var fade = fadeGo.GetComponent<FadeTransition>();
@@ -225,5 +235,71 @@ public class UIManagerFlowTests
 
         manager.Dispose();
         Object.DestroyImmediate(fadeGo);
+    });
+
+    [UnityTest]
+    public IEnumerator 같은_타입_팝업을_두번_열면_스택된다() => UniTask.ToCoroutine(async () =>
+    {
+        var resource = Substitute.For<IResourceService>();
+        resource.Load<GameObject>("UI/SamplePopup").Returns(_popupPrefab);
+        var resolver = Substitute.For<IObjectResolver>();
+        var settings = ScriptableObject.CreateInstance<UIManagerSettings>();
+        var factory = new UIInstanceFactory(resolver);
+        var manager = new UIManager(settings, factory, resource);
+
+        var p1 = manager.Popup<PopupP>();
+        await UniTask.WaitUntil(() => p1.Shown);
+        var p2 = manager.Popup<PopupP>();
+        await UniTask.WaitUntil(() => p2.Shown);
+
+        Assert.AreNotSame(p1, p2, "같은 타입도 새 인스턴스");
+        Assert.IsFalse(p1.ViewBase.InputEnabled, "하위 팝업 입력 차단");
+        Assert.IsTrue(p2.ViewBase.InputEnabled, "상단 팝업 입력 활성");
+
+        manager.Dispose();
+    });
+
+    [UnityTest]
+    public IEnumerator 같은_타입_Page_재요청은_새_인스턴스로_교체된다() => UniTask.ToCoroutine(async () =>
+    {
+        var resource = Substitute.For<IResourceService>();
+        resource.Load<GameObject>("UI/Sample").Returns(_prefab);
+        var resolver = Substitute.For<IObjectResolver>();
+        var settings = ScriptableObject.CreateInstance<UIManagerSettings>();
+        var factory = new UIInstanceFactory(resolver);
+        var manager = new UIManager(settings, factory, resource);
+
+        var a = manager.Page<P>();
+        await UniTask.WaitUntil(() => a.Shown);
+        var viewA = a.ViewBase;
+
+        var a2 = manager.Page<P>();
+        await UniTask.WaitUntil(() => a2.Shown);
+
+        Assert.AreNotSame(a, a2, "같은 타입 Page 재요청 = 새 인스턴스(새로고침)");
+        Assert.AreSame(viewA, a2.ViewBase, "이전 View는 풀 반환 후 재사용");
+
+        manager.Dispose();
+    });
+
+    [UnityTest]
+    public IEnumerator Dispose시_활성_presenter의_OnAfterHide발화와_View파괴가_일어난다() => UniTask.ToCoroutine(async () =>
+    {
+        HideTrackV.DestroyCount = 0;
+        var resource = Substitute.For<IResourceService>();
+        resource.Load<GameObject>("UI/HideTrack").Returns(_hideTrackPrefab);
+        var resolver = Substitute.For<IObjectResolver>();
+        var settings = ScriptableObject.CreateInstance<UIManagerSettings>();
+        var factory = new UIInstanceFactory(resolver);
+        var manager = new UIManager(settings, factory, resource);
+
+        var p = manager.Page<HideTrackP>();
+        await UniTask.WaitUntil(() => p.Shown);
+
+        manager.Dispose();
+        await UniTask.Yield(); // Object.Destroy 반영
+
+        Assert.IsTrue(p.AfterHideCalled, "Dispose 시 활성 presenter OnAfterHide 발화");
+        Assert.AreEqual(1, HideTrackV.DestroyCount, "풀 View 파괴 시 OnDestroyView 호출");
     });
 }
