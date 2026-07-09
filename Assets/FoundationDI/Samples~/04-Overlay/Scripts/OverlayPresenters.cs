@@ -1,4 +1,3 @@
-using UnityEngine;
 using VContainer;
 using VContainer.Unity;
 
@@ -21,18 +20,29 @@ namespace DarkNaku.FoundationDI.Samples
     [UIPrefab("OverlayConfirm")]
     public class OverlayConfirm : UIPopupPresenter<OverlayConfirmView>
     {
-        protected override void OnInitialize() => View.closeButton.onClick.AddListener(Hide);
+        protected override void OnBeforeShow() => View.closeButton.onClick.AddListener(Hide);
+        protected override void OnAfterHide() => View.closeButton.onClick.RemoveAllListeners();
     }
 
     [UIPrefab("OverlayHost")]
     public class OverlayHostPage : UIPagePresenter<OverlayHostView>
     {
         [Inject] private IUIManager _ui;
+        private HudAboveOverlay _hud;
 
-        protected override void OnInitialize()
+        protected override void OnBeforeShow()
         {
-            View.addScoreButton.onClick.AddListener(() => _ui.Overlay<HudAboveOverlay>().AddScore(10));
+            // 같은 타입도 매 호출마다 새 인스턴스가 생기므로(타입 dedup 없음),
+            // 갱신할 오버레이는 참조를 보관해 재사용한다.
+            _hud = _ui.Overlay<HudAboveOverlay>();
+            View.addScoreButton.onClick.AddListener(() => _hud.AddScore(10));
             View.popupButton.onClick.AddListener(() => _ui.Popup<OverlayConfirm>());
+        }
+
+        protected override void OnAfterHide()
+        {
+            View.addScoreButton.onClick.RemoveAllListeners();
+            View.popupButton.onClick.RemoveAllListeners();
         }
     }
 
@@ -44,8 +54,7 @@ namespace DarkNaku.FoundationDI.Samples
         public void Start()
         {
             _ui.Overlay<BackgroundBelowOverlay>();   // Below 배경
-            _ui.Page<OverlayHostPage>();              // Page
-            _ui.Overlay<HudAboveOverlay>();           // Above HUD
+            _ui.Page<OverlayHostPage>();             // Page — OnBeforeShow에서 Above HUD 생성
         }
     }
 }
