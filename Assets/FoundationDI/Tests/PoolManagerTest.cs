@@ -72,6 +72,32 @@ public class PoolManagerTest
     }
 
     [Test]
+    public void Get은_아이템의_로컬_트랜스폼을_보존한다()
+    {
+        // 원점이 아닌 부모(ScreenSpaceOverlay Canvas의 스크린 좌표계를 모사) 아래에 풀을 둔다.
+        var scope = new GameObject("scope");
+        scope.transform.position = new Vector3(100f, 200f, 0f);
+
+        var prefab = new GameObject("uiPrefab", typeof(RectTransform));
+        prefab.transform.localPosition = Vector3.zero;
+        prefab.transform.localScale = Vector3.one;
+
+        var resource = Substitute.For<IResourceService>();
+        resource.Load<GameObject>("ui").Returns(prefab);
+        var sut = new PoolManager(resource, scope.transform);
+
+        var go = sut.Get("ui");
+
+        // worldPositionStays=true면 부모의 월드 위치를 상쇄하려 로컬이 (-100,-200)으로 어긋난다.
+        Assert.AreEqual(Vector3.zero, go.transform.localPosition, "Get 후 로컬 위치 보존");
+        Assert.AreEqual(Vector3.one, go.transform.localScale, "Get 후 로컬 스케일 보존");
+
+        sut.Dispose();
+        Object.DestroyImmediate(prefab);
+        Object.DestroyImmediate(scope);
+    }
+
+    [Test]
     public void Get은_로드_실패시_null을_반환하고_ResourceService에_Release하지_않는다()
     {
         var resource = Substitute.For<IResourceService>();

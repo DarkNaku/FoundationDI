@@ -49,7 +49,9 @@ namespace DarkNaku.FoundationDI
 
             var item = data.Get();
 
-            item.GO.transform.SetParent(parent == null ? _root : parent);
+            // worldPositionStays:false — 풀 아이템은 프리팹의 로컬 트랜스폼을 유지해야 한다.
+            // 기본값(true)은 부모의 월드 위치를 상쇄해 RectTransform 레이아웃을 어긋나게 한다.
+            item.GO.transform.SetParent(parent == null ? _root : parent, false);
 
             return item.GO;
 
