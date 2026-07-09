@@ -18,6 +18,7 @@ namespace DarkNaku.FoundationDI
         private readonly IResourceService _resourceService;
         private readonly Dictionary<string, PoolData> _table;
         private readonly Transform _root;
+        private bool _disposed;
 
         public PoolManager(IResourceService resourceService, Transform parent = null)
         {
@@ -40,6 +41,14 @@ namespace DarkNaku.FoundationDI
 
         public GameObject Get(string key, Transform parent = null)
         {
+            if (_disposed) return null;
+
+            if (string.IsNullOrEmpty(key))
+            {
+                Debug.LogError($"[PoolManager] Get : Key is wrong.");
+                return null;
+            }
+
             if (!_table.TryGetValue(key, out var data))
             {
                 data = Load(key);
@@ -54,12 +63,25 @@ namespace DarkNaku.FoundationDI
             item.GO.transform.SetParent(parent == null ? _root : parent, false);
 
             return item.GO;
-
         }
 
         public T Get<T>(string key, Transform parent = null) where T : class
         {
-            return Get(key, parent)?.GetComponent<T>();
+            var go = Get(key, parent);
+
+            if (go == null) return null;
+
+            var component = go.GetComponent<T>();
+
+            if (component == null)
+            {
+                // 컴포넌트가 없으면 아이템이 활성 상태로 방치되지 않도록 즉시 반환한다.
+                Debug.LogError($"[PoolManager] Get : Component '{typeof(T).Name}' not found. (key: {key})");
+                Release(go);
+                return null;
+            }
+
+            return component;
         }
 
         public void Release(GameObject item, float delay = 0f)
@@ -71,6 +93,9 @@ namespace DarkNaku.FoundationDI
 
         public void Dispose()
         {
+            if (_disposed) return;
+            _disposed = true;
+
             // Pool items 정리 (GameObject 파괴 전에 수행) 후 로드한 에셋을 ResourceService에 반환
             foreach (var pair in _table)
             {
@@ -131,7 +156,12 @@ namespace DarkNaku.FoundationDI
 
             var data = new PoolData(pool);
 
-            _table.TryAdd(key, data);
+            if (!_table.TryAdd(key, data))
+            {
+                // 이미 등록돼 있으면(경쟁 등) 새로 만든 풀은 버리고 기존 것을 반환한다.
+                pool.Clear();
+                return _table[key];
+            }
 
             return data;
         }
@@ -171,18 +201,21 @@ namespace DarkNaku.FoundationDI
         {
             if (item == null) return;
 
+            // IPoolItem(인터페이스) 참조로 == null 비교하면 Unity의 fake-null이 감지되지 않는다.
+            // GO 게터는 내부에서 UnityEngine.Object로 비교하므로 파괴된 경우 null을 돌려준다.
+            var go = item.GO;
+
+            if (go == null) return;
+
             item.OnDestroyItem();
 
-            if (item.GO != null)
+            if (Application.isPlaying)
             {
-                if (Application.isPlaying)
-                {
-                    Object.Destroy(item.GO);
-                }
-                else
-                {
-                    Object.DestroyImmediate(item.GO);
-                }
+                Object.Destroy(go);
+            }
+            else
+            {
+                Object.DestroyImmediate(go);
             }
         }
     }

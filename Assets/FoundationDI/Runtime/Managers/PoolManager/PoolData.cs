@@ -37,8 +37,9 @@ namespace DarkNaku.FoundationDI
             // Pool items 정리 시 null check 추가
             foreach (var item in _items)
             {
-                // GameObject가 이미 파괴되었을 수 있으니 체크
-                if (item != null)
+                // IPoolItem(인터페이스) 참조로 == null 하면 Unity fake-null이 감지되지 않으므로
+                // GO(UnityEngine.Object)를 경유해 이미 파괴된 아이템을 걸러낸다.
+                if (item != null && item.GO != null)
                 {
                     _pool.Release(item);
                 }
