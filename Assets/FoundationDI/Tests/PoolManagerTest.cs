@@ -146,6 +146,26 @@ public class PoolManagerTest
 
         sut.Get("enemy");
 
+        // 프리팹에 MonoBehaviour(PoolItem) 1개뿐이라 Inject 호출도 1회
+        resolver.Received(1).Inject(Arg.Any<object>());
+
+        sut.Dispose();
+        Object.DestroyImmediate(prefab);
+    }
+
+    [Test]
+    public void 재사용된_아이템은_다시_주입하지_않는다()
+    {
+        var prefab = new GameObject("prefab");
+        var resource = Substitute.For<IResourceService>();
+        resource.Load<GameObject>("enemy").Returns(prefab);
+        var resolver = Substitute.For<IObjectResolver>();
+        var sut = new PoolManager(resource, resolver);
+
+        var first = sut.Get("enemy");
+        sut.Release(first);       // 풀로 반환
+        sut.Get("enemy");         // 같은 인스턴스 재사용
+
         resolver.Received(1).Inject(Arg.Any<object>());
 
         sut.Dispose();
