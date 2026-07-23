@@ -4,6 +4,7 @@ using NSubstitute;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
+using VContainer;
 using Object = UnityEngine.Object;
 
 public class PoolManagerTest
@@ -132,5 +133,22 @@ public class PoolManagerTest
 
         Object.DestroyImmediate(prefabA);
         Object.DestroyImmediate(prefabB);
+    }
+
+    [Test]
+    public void Get은_새_인스턴스_생성시_resolver로_컴포넌트에_주입한다()
+    {
+        var prefab = new GameObject("prefab");
+        var resource = Substitute.For<IResourceService>();
+        resource.Load<GameObject>("enemy").Returns(prefab);
+        var resolver = Substitute.For<IObjectResolver>();
+        var sut = new PoolManager(resource, resolver);
+
+        sut.Get("enemy");
+
+        resolver.Received(1).Inject(Arg.Any<object>());
+
+        sut.Dispose();
+        Object.DestroyImmediate(prefab);
     }
 }

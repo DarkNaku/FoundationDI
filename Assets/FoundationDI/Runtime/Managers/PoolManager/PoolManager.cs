@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEngine.Pool;
 using Object = UnityEngine.Object;
 using VContainer;
+using VContainer.Unity;
 
 namespace DarkNaku.FoundationDI
 {
@@ -147,6 +148,10 @@ namespace DarkNaku.FoundationDI
                     {
                         item = go.AddComponent<PoolItem>();
                     }
+
+                    // 생성 시 1회 계층 전체 MonoBehaviour에 DI 주입.
+                    // resolver가 없으면(테스트/컨테이너 미사용) 조용히 건너뛴다.
+                    _resolver?.InjectGameObject(go);
 
                     item.OnCreateItem();
 
