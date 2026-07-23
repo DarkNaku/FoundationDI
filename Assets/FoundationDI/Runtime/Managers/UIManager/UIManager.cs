@@ -31,7 +31,7 @@ namespace DarkNaku.FoundationDI
         private UIRoot Root => _root ??= new UIRoot(_settings != null ? _settings.ReferenceResolution : default);
 
         // 전용 풀: 루트를 Canvas(DontDestroyOnLoad) 아래에 둬 UIManager와 수명을 함께한다.
-        private PoolManager Pool => _pool ??= new PoolManager(_resource, Root.GO.transform);
+        private PoolManager Pool => _pool ??= new PoolManager(_resource, null, Root.GO.transform);
 
         public T Page<T>() where T : UIPresenter
         {

@@ -4,6 +4,7 @@ using NSubstitute;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
+using VContainer;
 using Object = UnityEngine.Object;
 
 public class PoolManagerTest
@@ -14,7 +15,7 @@ public class PoolManagerTest
         var prefab = new GameObject("prefab");
         var resource = Substitute.For<IResourceService>();
         resource.Load<GameObject>("enemy").Returns(prefab);
-        var sut = new PoolManager(resource);
+        var sut = new PoolManager(resource, null);
 
         sut.Get("enemy");
 
@@ -30,7 +31,7 @@ public class PoolManagerTest
         var prefab = new GameObject("prefab");
         var resource = Substitute.For<IResourceService>();
         resource.Load<GameObject>("enemy").Returns(prefab);
-        var sut = new PoolManager(resource);
+        var sut = new PoolManager(resource, null);
 
         sut.Get("enemy");
         sut.Get("enemy");
@@ -46,7 +47,7 @@ public class PoolManagerTest
     {
         var parent = new GameObject("scope");
         var resource = Substitute.For<IResourceService>();
-        var sut = new PoolManager(resource, parent.transform);
+        var sut = new PoolManager(resource, null, parent.transform);
 
         var root = parent.transform.Find("[PoolManager]");
 
@@ -61,7 +62,7 @@ public class PoolManagerTest
     {
         var resource = Substitute.For<IResourceService>();
 
-        var sut = new PoolManager(resource);
+        var sut = new PoolManager(resource, null);
 
         var root = GameObject.Find("[PoolManager]");
 
@@ -84,7 +85,7 @@ public class PoolManagerTest
 
         var resource = Substitute.For<IResourceService>();
         resource.Load<GameObject>("ui").Returns(prefab);
-        var sut = new PoolManager(resource, scope.transform);
+        var sut = new PoolManager(resource, null, scope.transform);
 
         var go = sut.Get("ui");
 
@@ -102,7 +103,7 @@ public class PoolManagerTest
     {
         var resource = Substitute.For<IResourceService>();
         resource.Load<GameObject>("missing").Returns((GameObject)null);
-        var sut = new PoolManager(resource);
+        var sut = new PoolManager(resource, null);
 
         LogAssert.Expect(LogType.Error, new Regex("Failed to load prefab"));
         var result = sut.Get("missing");
@@ -121,7 +122,7 @@ public class PoolManagerTest
         var resource = Substitute.For<IResourceService>();
         resource.Load<GameObject>("a").Returns(prefabA);
         resource.Load<GameObject>("b").Returns(prefabB);
-        var sut = new PoolManager(resource);
+        var sut = new PoolManager(resource, null);
         sut.Get("a");
         sut.Get("b");
 
@@ -132,5 +133,42 @@ public class PoolManagerTest
 
         Object.DestroyImmediate(prefabA);
         Object.DestroyImmediate(prefabB);
+    }
+
+    [Test]
+    public void Get은_새_인스턴스_생성시_resolver로_컴포넌트에_주입한다()
+    {
+        var prefab = new GameObject("prefab");
+        var resource = Substitute.For<IResourceService>();
+        resource.Load<GameObject>("enemy").Returns(prefab);
+        var resolver = Substitute.For<IObjectResolver>();
+        var sut = new PoolManager(resource, resolver);
+
+        sut.Get("enemy");
+
+        // 프리팹에 MonoBehaviour(PoolItem) 1개뿐이라 Inject 호출도 1회
+        resolver.Received(1).Inject(Arg.Any<object>());
+
+        sut.Dispose();
+        Object.DestroyImmediate(prefab);
+    }
+
+    [Test]
+    public void 재사용된_아이템은_다시_주입하지_않는다()
+    {
+        var prefab = new GameObject("prefab");
+        var resource = Substitute.For<IResourceService>();
+        resource.Load<GameObject>("enemy").Returns(prefab);
+        var resolver = Substitute.For<IObjectResolver>();
+        var sut = new PoolManager(resource, resolver);
+
+        var first = sut.Get("enemy");
+        sut.Release(first);       // 풀로 반환
+        sut.Get("enemy");         // 같은 인스턴스 재사용
+
+        resolver.Received(1).Inject(Arg.Any<object>());
+
+        sut.Dispose();
+        Object.DestroyImmediate(prefab);
     }
 }
