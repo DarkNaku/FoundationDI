@@ -16,13 +16,15 @@ namespace DarkNaku.FoundationDI
     public class PoolManager : IPoolManager
     {
         private readonly IResourceService _resourceService;
+        private readonly IObjectResolver _resolver;
         private readonly Dictionary<string, PoolData> _table;
         private readonly Transform _root;
         private bool _disposed;
 
-        public PoolManager(IResourceService resourceService, Transform parent = null)
+        public PoolManager(IResourceService resourceService, IObjectResolver resolver, Transform parent = null)
         {
             _resourceService = resourceService;
+            _resolver = resolver;
             _table = new();
 
             // 풀 루트는 DontDestroyOnLoad로 두지 않는다.

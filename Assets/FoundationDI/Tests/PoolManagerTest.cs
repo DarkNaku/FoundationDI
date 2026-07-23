@@ -14,7 +14,7 @@ public class PoolManagerTest
         var prefab = new GameObject("prefab");
         var resource = Substitute.For<IResourceService>();
         resource.Load<GameObject>("enemy").Returns(prefab);
-        var sut = new PoolManager(resource);
+        var sut = new PoolManager(resource, null);
 
         sut.Get("enemy");
 
@@ -30,7 +30,7 @@ public class PoolManagerTest
         var prefab = new GameObject("prefab");
         var resource = Substitute.For<IResourceService>();
         resource.Load<GameObject>("enemy").Returns(prefab);
-        var sut = new PoolManager(resource);
+        var sut = new PoolManager(resource, null);
 
         sut.Get("enemy");
         sut.Get("enemy");
@@ -46,7 +46,7 @@ public class PoolManagerTest
     {
         var parent = new GameObject("scope");
         var resource = Substitute.For<IResourceService>();
-        var sut = new PoolManager(resource, parent.transform);
+        var sut = new PoolManager(resource, null, parent.transform);
 
         var root = parent.transform.Find("[PoolManager]");
 
@@ -61,7 +61,7 @@ public class PoolManagerTest
     {
         var resource = Substitute.For<IResourceService>();
 
-        var sut = new PoolManager(resource);
+        var sut = new PoolManager(resource, null);
 
         var root = GameObject.Find("[PoolManager]");
 
@@ -84,7 +84,7 @@ public class PoolManagerTest
 
         var resource = Substitute.For<IResourceService>();
         resource.Load<GameObject>("ui").Returns(prefab);
-        var sut = new PoolManager(resource, scope.transform);
+        var sut = new PoolManager(resource, null, scope.transform);
 
         var go = sut.Get("ui");
 
@@ -102,7 +102,7 @@ public class PoolManagerTest
     {
         var resource = Substitute.For<IResourceService>();
         resource.Load<GameObject>("missing").Returns((GameObject)null);
-        var sut = new PoolManager(resource);
+        var sut = new PoolManager(resource, null);
 
         LogAssert.Expect(LogType.Error, new Regex("Failed to load prefab"));
         var result = sut.Get("missing");
@@ -121,7 +121,7 @@ public class PoolManagerTest
         var resource = Substitute.For<IResourceService>();
         resource.Load<GameObject>("a").Returns(prefabA);
         resource.Load<GameObject>("b").Returns(prefabB);
-        var sut = new PoolManager(resource);
+        var sut = new PoolManager(resource, null);
         sut.Get("a");
         sut.Get("b");
 
