@@ -154,6 +154,32 @@ public class PoolManagerTest
     }
 
     [Test]
+    public void 반환된_아이템은_비활성화_후_부모를_풀_루트로_되돌린다()
+    {
+        var prefab = new GameObject("prefab");
+        var resource = Substitute.For<IResourceService>();
+        resource.Load<GameObject>("enemy").Returns(prefab);
+        var scope = new GameObject("scope");
+        var sut = new PoolManager(resource, null, scope.transform);
+        var root = scope.transform.Find("[PoolManager]");
+
+        var customParent = new GameObject("customParent");
+        var go = sut.Get("enemy", customParent.transform);
+
+        Assert.AreEqual(customParent.transform, go.transform.parent, "Get 후에는 지정한 부모 아래에 있어야 한다");
+
+        sut.Release(go);
+
+        Assert.IsFalse(go.activeSelf, "Release 후에는 비활성화되어야 한다");
+        Assert.AreEqual(root, go.transform.parent, "Release 후에는 풀 루트 아래로 되돌아가야 한다");
+
+        sut.Dispose();
+        Object.DestroyImmediate(prefab);
+        Object.DestroyImmediate(scope);
+        Object.DestroyImmediate(customParent);
+    }
+
+    [Test]
     public void 재사용된_아이템은_다시_주입하지_않는다()
     {
         var prefab = new GameObject("prefab");

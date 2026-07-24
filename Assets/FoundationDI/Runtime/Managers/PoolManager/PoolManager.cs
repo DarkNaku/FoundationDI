@@ -202,6 +202,16 @@ namespace DarkNaku.FoundationDI
         private void OnReleaseItem(IPoolItem item)
         {
             item.OnReleaseItem();
+
+            // 반환된 아이템은 비활성화 후 부모를 풀 루트로 되돌린다.
+            // Get 시점에 지정된 부모(호출자 계층) 아래에 방치되지 않게 해서
+            // 씬 정리/재사용 시 아이템이 항상 풀 루트에 귀속되도록 한다.
+            var go = item.GO;
+
+            if (go != null && _root != null)
+            {
+                go.transform.SetParent(_root, false);
+            }
         }
 
         private void OnDestroyItem(IPoolItem item)
