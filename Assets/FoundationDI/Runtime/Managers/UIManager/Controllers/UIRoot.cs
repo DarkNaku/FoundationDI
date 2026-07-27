@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -11,7 +12,12 @@ namespace DarkNaku.FoundationDI
         public Transform PopupLayer { get; }
         public Transform AboveOverlayLayer { get; }
 
-        public UIRoot(Vector2 referenceResolution = default)
+        public UIRoot(
+            Vector2 referenceResolution = default,
+            string sortingLayerName = "Default",
+            int sortingOrder = 0,
+            float planeDistance = 100f,
+            Func<Camera> cameraProvider = null)
         {
             GO = new GameObject("[UIManager]", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
             var canvas = GO.GetComponent<Canvas>();
@@ -24,7 +30,7 @@ namespace DarkNaku.FoundationDI
                 ? referenceResolution
                 : new Vector2(1920f, 1080f);
 
-            Object.DontDestroyOnLoad(GO);
+            UnityEngine.Object.DontDestroyOnLoad(GO);
 
             // 생성 순서 = sibling 순서 = 렌더 순서(아래→위). Overlay는 Popup 기준 Above/Below로 분리된다.
             PageLayer = CreateLayer("[Page]");
