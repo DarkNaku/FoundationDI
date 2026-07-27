@@ -28,7 +28,11 @@ namespace DarkNaku.FoundationDI
             _resource = resource;
         }
 
-        private UIRoot Root => _root ??= new UIRoot(_settings != null ? _settings.ReferenceResolution : default);
+        private UIRoot Root => _root ??= new UIRoot(
+            _settings != null ? _settings.ReferenceResolution : default,
+            _settings != null ? _settings.SortingLayerName : "Default",
+            _settings != null ? _settings.SortingOrder : 0,
+            _settings != null ? _settings.PlaneDistance : 100f);
 
         // 전용 풀: 루트를 Canvas(DontDestroyOnLoad) 아래에 둬 UIManager와 수명을 함께한다.
         private PoolManager Pool => _pool ??= new PoolManager(_resource, null, Root.GO.transform);
