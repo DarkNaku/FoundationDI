@@ -50,8 +50,21 @@ Sorting Layer 정렬을 하려면 Canvas를 `ScreenSpaceCamera`로 두고 씬의
 
 ### 2. UIRoot 렌더 방식 전환 (`UIRoot.cs`)
 
-- 생성자를 `UIRoot(UIManagerSettings settings, Func<Camera> cameraProvider = null)`로 변경.
-  - settings가 null이면 지금처럼 안전한 기본값(1920x1080, "Default", 0, 100) 사용.
+- 생성자를 다음으로 변경(원시 값 파라미터 유지 — 기존 테스트 `new UIRoot()` /
+  `new UIRoot(Vector2)`가 그대로 컴파일되고, `UIManagerSettings`의 private 필드를 테스트에서
+  세팅할 필요가 없어짐):
+
+  ```csharp
+  public UIRoot(
+      Vector2 referenceResolution = default,
+      string sortingLayerName = "Default",
+      int sortingOrder = 0,
+      float planeDistance = 100f,
+      Func<Camera> cameraProvider = null)
+  ```
+
+  - UIManager는 `new UIRoot(settings.ReferenceResolution, settings.SortingLayerName,
+    settings.SortingOrder, settings.PlaneDistance)`로 호출.
   - `cameraProvider`가 null이면 내부 기본값 `() => Camera.main` 사용. 테스트용 seam.
 - `Object.DontDestroyOnLoad(GO);` **한 줄 제거** → `new GameObject`는 생성 시점의 active
   씬에 자동 소속(= "인스턴스를 만드는 씬"에 귀속).
@@ -95,7 +108,11 @@ private UIRoot Root
     get
     {
         if (_root != null && _root.GO == null) ResetSceneState(); // 씬 파괴로 fake-null → 재구성
-        return _root ??= new UIRoot(_settings);
+        return _root ??= new UIRoot(
+            _settings != null ? _settings.ReferenceResolution : default,
+            _settings != null ? _settings.SortingLayerName : "Default",
+            _settings != null ? _settings.SortingOrder : 0,
+            _settings != null ? _settings.PlaneDistance : 100f);
     }
 }
 ```
@@ -108,33 +125,47 @@ private UIRoot Root
 
 ## 테스트 전략
 
-프로젝트의 seam 분리 관례를 살려 가능한 많은 부분을 EditMode로 끌어온다.
+**기존 테스트 어셈블리를 그대로 사용한다(신규 asmdef 불필요).** 이미 존재:
+`FoundationDI.Tests.Editor`(EditMode), `FoundationDI.Tests.Runtime`(PlayMode). 둘 다
+`[assembly: InternalsVisibleTo]`로 `FoundationDI`의 internal(`UIRoot` 등)에 접근 가능.
+기존 `UIRootTests`/`UIManagerFlowTests`는 `Tests/Runtime/UIManager/`(PlayMode)에 있다.
 
-### EditMode (`FoundationDI.Tests`, 기존 어셈블리 재사용)
+### EditMode (`FoundationDI.Tests.Editor`)
 
 - `UIManagerSettings`의 `SortingLayerName`/`SortingOrder`/`PlaneDistance`가 설정값을 반환한다.
-- `cameraProvider`가 카메라를 주면 UIRoot Canvas가 `ScreenSpaceCamera` + 지정
-  sortingOrder/planeDistance/worldCamera로 구성된다.
+  (private 필드는 `SerializedObject` 또는 reflection으로 세팅해 검증.)
+
+### PlayMode (`FoundationDI.Tests.Runtime`, 기존 `UIRootTests.cs`에 추가)
+
+`Canvas`/`Camera` 런타임 컴포넌트가 필요하므로 UIRoot 렌더 검증은 이 어셈블리에서 한다.
+
+- `cameraProvider`가 카메라를 주면 UIRoot Canvas가 `ScreenSpaceCamera` +
+  지정 sortingLayerID/sortingOrder/planeDistance/worldCamera로 구성된다.
 - `cameraProvider`가 null(카메라 없음)이면 Canvas가 `ScreenSpaceOverlay`로 폴백한다.
 - 생성된 Canvas GO가 `DontDestroyOnLoad` 씬에 있지 **않다**(생성 시점 씬에 소속).
-- (내부 진입점 직접 호출) `ResetSceneState()`가 `_root`/`_pool`을 null로 만들고, 이후
-  `Root` 접근이 새 UIRoot를 재구성한다(리셋 순서·멱등성).
+  (`GO.scene.buildIndex != -1` 또는 `GO.scene == SceneManager.GetActiveScene()`로 검증.)
 
-### PlayMode (신규 `FoundationDI.Tests.PlayMode` asmdef)
+### PlayMode 씬 전환 (`FoundationDI.Tests.Runtime`, `UIManagerSceneResetTests.cs` 신규 파일)
 
-- 실제 `SceneManager.LoadScene`로 active 씬을 바꾸면 `_root`/`_pool`이 재구성되고 이전
-  presenter의 teardown(구독 해제)이 발생한다.
-- additive로 UI 씬만 언로드된 뒤 `Page<T>()` 호출 시 게터 방어로 재구성된다.
+빌드 세팅 없이 `SceneManager.CreateScene(...)` + `SceneManager.SetActiveScene(...)`로
+`activeSceneChanged`를 실제 발화시켜 검증(테스트 종료 시 `SceneManager.UnloadSceneAsync`로 정리):
+
+- active 씬을 바꾸면 이전 활성 presenter의 `OnAfterHide`(teardown)가 발화하고 풀 View가
+  파괴된다(기존 `HideTrackP`/`DestroyCount` 패턴 재사용).
+- 씬 전환 후 `Page<T>()`를 다시 호출하면 새 씬에서 정상적으로 Show까지 도달한다(재구성).
 
 ## 작업 순서 (Tidy First — 구조/행동 분리 커밋)
 
-1. `[STRUCTURAL]` `UIManagerSettings`에 필드/프로퍼티 추가(기본값으로 기존 동작 불변),
-   `UIRoot` 생성자 시그니처를 `(UIManagerSettings, Func<Camera>)`로 변경 + 호출부(UIManager) 수정.
-   렌더 방식은 아직 Overlay 그대로 두어 동작 불변.
-2. `[STRUCTURAL]` PlayMode 테스트용 `FoundationDI.Tests.PlayMode` asmdef 신설.
-3. `[BEHAVIORAL]` UIRoot 카메라 바인딩(ScreenSpaceCamera + 정렬) + DontDestroyOnLoad 제거.
+1. `[STRUCTURAL]` `UIRoot` 생성자에 `sortingLayerName`/`sortingOrder`/`planeDistance`/
+   `cameraProvider` 파라미터 추가(기본값으로 기존 동작·기존 테스트 불변). 아직 사용하지 않음.
+2. `[BEHAVIORAL]` `UIManagerSettings`에 3개 필드/프로퍼티 추가 + UIRoot가 카메라 바인딩
+   (ScreenSpaceCamera + 정렬) + DontDestroyOnLoad 제거 + UIManager 호출부가 settings 값을 전달.
    TDD(RED→GREEN→REFACTOR). `plan.md`에 테스트 항목 추가.
-4. `[BEHAVIORAL]` UIManager 씬 전환 구독 + `ResetSceneState()` + 게터 방어. TDD.
+3. `[BEHAVIORAL]` UIManager 씬 전환 구독 + `ResetSceneState()` 추출(Dispose 통합) + 게터 방어.
+   TDD.
+
+기존 테스트 어셈블리(`FoundationDI.Tests.Editor`/`FoundationDI.Tests.Runtime`)를 재사용하므로
+asmdef 신설 커밋은 없다.
 
 ## 범위 밖 (YAGNI)
 
