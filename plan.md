@@ -10,5 +10,5 @@
 - [x] UIRoot는 카메라가 있으면 Canvas를 ScreenSpaceCamera와 지정 정렬/거리로 구성한다
 - [x] UIRoot는 카메라가 없으면 Canvas를 ScreenSpaceOverlay로 폴백한다
 - [x] UIRoot의 Canvas GO는 생성 시점 active 씬에 소속된다(DontDestroyOnLoad 아님)
-- [ ] active 씬이 바뀌면 활성 presenter가 teardown되고 풀 View가 파괴된다
-- [ ] 씬 전환 후 Page 재요청 시 새 씬에서 정상적으로 Show까지 도달한다
+- [x] active 씬이 바뀌면 활성 presenter가 teardown되고 풀 View가 파괴된다
+- [x] 씬 전환 후 Page 재요청 시 새 씬에서 정상적으로 Show까지 도달한다

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using VContainer;
 
 namespace DarkNaku.FoundationDI
@@ -26,15 +27,23 @@ namespace DarkNaku.FoundationDI
             _settings = settings;
             _factory = factory;
             _resource = resource;
+            SceneManager.activeSceneChanged += OnActiveSceneChanged;
         }
 
-        private UIRoot Root => _root ??= new UIRoot(
-            _settings != null ? _settings.ReferenceResolution : default,
-            _settings != null ? _settings.SortingLayerName : "Default",
-            _settings != null ? _settings.SortingOrder : 0,
-            _settings != null ? _settings.PlaneDistance : 100f);
+        private UIRoot Root
+        {
+            get
+            {
+                if (_root != null && _root.GO == null) ResetSceneState(); // 씬 파괴로 fake-null → 재구성
+                return _root ??= new UIRoot(
+                    _settings != null ? _settings.ReferenceResolution : default,
+                    _settings != null ? _settings.SortingLayerName : "Default",
+                    _settings != null ? _settings.SortingOrder : 0,
+                    _settings != null ? _settings.PlaneDistance : 100f);
+            }
+        }
 
-        // 전용 풀: 루트를 Canvas(DontDestroyOnLoad) 아래에 둬 UIManager와 수명을 함께한다.
+        // 전용 풀: active 씬 Canvas 아래에 위치하며 씬 전환 시 dispose/재구성된다.
         private PoolManager Pool => _pool ??= new PoolManager(_resource, null, Root.GO.transform);
 
         public T Page<T>() where T : UIPresenter
@@ -180,13 +189,17 @@ namespace DarkNaku.FoundationDI
             RefreshInputBlocking();
         }
 
-        public void Dispose()
+        private void OnActiveSceneChanged(Scene previous, Scene next)
         {
-            if (_disposed) return;
-            _disposed = true;
+            if (_disposed || _root == null) return;
+            ResetSceneState();
+        }
+
+        // 씬 전환/Dispose 공통: 활성 UI teardown + 풀/루트 파괴 후 참조를 비워 다음 접근에 재구성.
+        private void ResetSceneState()
+        {
             _queue.CancelAndClear();
 
-            // 활성 presenter teardown: 트랜지션 없이 OnBeforeHide→OnAfterHide 동기 발화(구독 해제).
             foreach (var p in _active)
             {
                 p.OnBeforeHide(); p.Fire(UIPresenter.LifecycleEvent.BeforeHide);
@@ -198,8 +211,19 @@ namespace DarkNaku.FoundationDI
             _popups.Clear();
             _overlays.Clear();
 
-            _pool?.Dispose(); // OnDestroyItem으로 전 View 파괴 + IResourceService.Release
+            _pool?.Dispose();
+            _pool = null;
+
             if (_root != null && _root.GO != null) UnityEngine.Object.Destroy(_root.GO);
+            _root = null;
+        }
+
+        public void Dispose()
+        {
+            if (_disposed) return;
+            _disposed = true;
+            SceneManager.activeSceneChanged -= OnActiveSceneChanged;
+            ResetSceneState();
         }
     }
 
