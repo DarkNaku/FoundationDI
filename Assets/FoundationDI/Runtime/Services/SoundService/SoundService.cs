@@ -225,8 +225,8 @@ namespace DarkNaku.FoundationDI
     {
         /// <summary>
         /// SoundService를 컨테이너에 등록한다.
-        /// 전제: 호출 전에 <see cref="IResourceService"/>가 이미 등록되어 있어야 한다
-        /// (SoundService가 클립 로드를 IResourceService에 위임함).
+        /// SoundService는 등록된 <see cref="ISoundCatalog"/>에서 클립을 직접 가져와 재생하므로
+        /// <see cref="IResourceService"/> 등록은 필요하지 않다.
         /// </summary>
         public static void RegisterSoundService(this IContainerBuilder builder, SoundCatalogSO catalog)
         {
