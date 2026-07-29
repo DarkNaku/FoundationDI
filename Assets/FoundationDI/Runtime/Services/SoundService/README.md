@@ -1,10 +1,10 @@
 # SoundService
 
-SFX/BGM 재생과 **사운드 카탈로그**, **비동기 프리로드**를 제공하는 사운드 서비스입니다. 사운드를 논리 **문자열키**로 식별하고, 클립 로딩은 [`IResourceService`](../ResourceService/README.md)에 위임합니다. 버튼에 붙여 클릭 시 사운드를 재생하는 `SoundButton` 컴포넌트도 포함합니다.
+SFX/BGM 재생과 **사운드 카탈로그**, **비동기 프리로드**를 제공하는 사운드 서비스입니다. 사운드를 논리 **문자열키**로 식별하고, 카탈로그가 보유한 **`AudioClip` 직접 참조**로 재생합니다. 버튼에 붙여 클릭 시 사운드를 재생하는 `SoundButton` 컴포넌트도 포함합니다.
 
-- **사운드 카탈로그** — 문자열키 → 리소스키 매핑(`SoundCatalogSO` ScriptableObject). `Play("Jump")`처럼 친숙한 이름으로 재생
+- **사운드 카탈로그** — 문자열키 → **`AudioClip` 직접 참조**(`SoundCatalogSO` ScriptableObject). `Play("Jump")`처럼 친숙한 이름으로 재생
 - **엄격 모드** — 카탈로그에 없는 키는 `Debug.LogError` 후 무시(오타/누락 조기 발견)
-- **비동기 프리로드** — `PreloadAsync()`로 `IResourceService.LoadAsync` 병렬 로드, 첫 재생 지연 제거
+- **비동기 프리로드** — `PreloadAsync()`로 `Preload=true` 클립의 `AudioClip.LoadAudioData()`를 병렬 대기, 첫 재생 지연 제거
 - **영속화** — SFX/BGM 볼륨과 활성화 상태를 `PlayerPrefs`에 저장
 - **프레임당 중복 방지** — R3 `Observable.EveryUpdate`로 같은 프레임에 같은 SFX가 겹쳐 재생되는 것을 차단
 
@@ -19,12 +19,12 @@ SFX/BGM 재생과 **사운드 카탈로그**, **비동기 프리로드**를 제�
 | 필드 | 설명 |
 | --- | --- |
 | `Key` | 논리 이름. `Play`의 인자, `SoundButton` 드롭다운에 표시 (예: `Jump`) |
-| `ResourceKey` | `IResourceService` 로드 키(Addressables 주소/키) |
+| `Clip` | 재생할 `AudioClip`. 인스펙터에서 직접 드래그하는 직접 참조 |
 | `Preload` | 프리로드 대상 여부 |
 
 ### 2) DI 등록 (VContainer)
 
-`SoundService`는 클립 로딩을 `IResourceService`에 위임하므로, `RegisterSoundService` **전에** `IResourceService`가 등록되어 있어야 합니다.
+`SoundService`는 등록된 `ISoundCatalog`에서 클립을 직접 가져와 재생하므로 `IResourceService` 등록은 필요하지 않습니다.
 
 ```csharp
 using VContainer;
@@ -37,7 +37,6 @@ public class RootLifetimeScope : LifetimeScope
 
     protected override void Configure(IContainerBuilder builder)
     {
-        builder.Register<IResourceService, AddressableResourceService>(Lifetime.Singleton);
         builder.RegisterSoundService(_soundCatalog);
     }
 }
@@ -53,7 +52,7 @@ public class GameFlow
 
     public async UniTask LoadAsync()
     {
-        await _sound.PreloadAsync();   // Preload=true 항목을 병렬 로드 (로딩 화면 등에서)
+        await _sound.PreloadAsync();   // Preload=true 클립의 LoadAudioData()를 병렬 대기 (로딩 화면 등에서)
     }
 
     public void OnJump() => _sound.Play("Jump");     // 문자열키로 SFX 재생
@@ -90,32 +89,32 @@ _sound.BGMEnabled = false; // BGM 끄기(영속). 끈 상태에서 PlayBGM은 �
 | `Play` | `void Play(string key)` | 카탈로그 키로 SFX 1회 재생. 같은 프레임 중복 키는 무시 |
 | `PlayBGM` | `void PlayBGM(string key)` | 카탈로그 키로 BGM 재생(루프). 기존 BGM은 교체 |
 | `StopBGM` | `void StopBGM()` | BGM 정지 |
-| `PreloadAsync` | `UniTask PreloadAsync()` | 카탈로그의 `Preload=true` 항목을 병렬 로드해 캐시를 채움 |
+| `PreloadAsync` | `UniTask PreloadAsync()` | 카탈로그의 `Preload=true` 클립들의 `AudioClip.LoadAudioData()`를 병렬 대기 |
 
 ### `ISoundCatalog`
 
-문자열키 → 리소스키 매핑을 추상화한 seam. `SoundService`는 이 인터페이스에 의존하므로 테스트에서 mock으로 대체할 수 있습니다.
+문자열키 → `AudioClip` 매핑을 추상화한 seam. `SoundService`는 이 인터페이스에 의존하므로 테스트에서 mock으로 대체할 수 있습니다.
 
 ```csharp
 public interface ISoundCatalog
 {
-    bool TryGetResourceKey(string key, out string resourceKey); // 문자열키 → 리소스키
-    IReadOnlyList<string> Keys { get; }                         // SoundButton 드롭다운 소스
-    IEnumerable<string> PreloadResourceKeys { get; }            // Preload=true 항목의 리소스키
+    bool TryGetClip(string key, out AudioClip clip); // 문자열키 → AudioClip
+    IReadOnlyList<string> Keys { get; }               // SoundButton 드롭다운 소스
+    IEnumerable<AudioClip> PreloadClips { get; }       // Preload=true 항목의 AudioClip
 }
 ```
 
 ### `SoundCatalogSO : ScriptableObject, ISoundCatalog`
 
-`[CreateAssetMenu(menuName = "DarkNaku/SoundCatalog")]`. 직렬화된 `SoundEntry` 목록을 보유하고, 첫 조회 시 키→리소스키 사전을 lazy 빌드합니다. 중복 `Key`는 마지막 값을 채택하고 경고를 남깁니다.
+`[CreateAssetMenu(menuName = "DarkNaku/SoundCatalog")]`. 직렬화된 `SoundEntry` 목록을 보유하고, 첫 조회 시 키→`AudioClip` 사전을 lazy 빌드합니다. 중복 `Key`는 마지막 값을 채택하고 경고를 남깁니다.
 
 ```csharp
 [Serializable]
 public struct SoundEntry
 {
-    public string Key;          // 논리 이름
-    public string ResourceKey;  // IResourceService 로드 키
-    public bool Preload;        // 프리로드 대상 여부
+    public string Key;        // 논리 이름
+    public AudioClip Clip;    // 재생할 AudioClip 직접 참조
+    public bool Preload;      // 프리로드 대상 여부
 }
 ```
 
@@ -128,7 +127,7 @@ public struct SoundEntry
 ```csharp
 public static void RegisterSoundService(this IContainerBuilder builder, SoundCatalogSO catalog);
 ```
-`ISoundCatalog` 인스턴스 등록 + `ISoundService`/`SoundService` 싱글톤 등록. **전제: `IResourceService` 선등록.**
+`ISoundCatalog` 인스턴스 등록 + `ISoundService`/`SoundService` 싱글톤 등록. 클립을 카탈로그에서 직접 가져오므로 `IResourceService` 등록은 필요하지 않습니다.
 
 ---
 
@@ -136,9 +135,9 @@ public static void RegisterSoundService(this IContainerBuilder builder, SoundCat
 
 ### 카탈로그 키 모델
 
-- **문자열키(`Key`)** 와 **리소스키(`ResourceKey`)** 를 분리합니다. `Play`/드롭다운은 문자열키를, 실제 로딩은 리소스키를 사용합니다.
-- 분리 이유: 리소스 경로가 바뀌어도 `Key`는 안정적이고, 인스펙터에 친숙한 이름을 노출할 수 있습니다.
-- 여러 문자열키가 같은 리소스키를 가리켜도 됩니다(예: `Click`/`Tap` → 같은 효과음).
+- **문자열키(`Key`)** 가 `AudioClip`을 **직접 참조**합니다. `Play`/드롭다운은 문자열키를 사용하고, 재생 시 카탈로그에서 바로 해당 `AudioClip`을 가져옵니다.
+- 인스펙터에서 클립을 드래그해 연결하므로 리소스 경로/키 문자열을 별도로 관리할 필요가 없습니다.
+- 여러 문자열키가 같은 `AudioClip`을 가리켜도 됩니다(예: `Click`/`Tap` → 같은 효과음).
 
 ### 엄격 모드
 
@@ -146,13 +145,13 @@ public static void RegisterSoundService(this IContainerBuilder builder, SoundCat
 
 ### 프리로드
 
-- `PreloadAsync()`는 `Preload=true` 항목의 리소스키를 `IResourceService.LoadAsync`로 **병렬 로드**(`UniTask.WhenAll`)하고 내부 캐시를 채웁니다.
-- 중복 리소스키는 제거(`Distinct`)되어 한 번만 로드됩니다. 프리로드된 키는 이후 `Play` 시 추가 로드 없이 재생됩니다.
-- 로딩 화면 등에서 `await PreloadAsync()` 후 게임플레이를 시작하면 첫 재생 지연이 사라집니다.
+- `PreloadAsync()`는 `Preload=true` 클립들에 대해 `AudioClip.LoadAudioData()`를 호출하고 **병렬 대기**(`UniTask.WhenAll`)합니다.
+- **전제: 클립 임포트 설정의 "Load In Background"** 가 켜져 있어야 실제로 비동기 디코딩됩니다. 꺼진 상태의 압축 클립은 `LoadAudioData()` 호출 자체가 메인 스레드를 동기 블로킹하므로, 프리로드 대상 클립은 이 옵션을 켜두는 것을 권장합니다.
+- 로딩 화면 등에서 `await PreloadAsync()` 후 게임플레이를 시작하면 첫 재생 시 디코딩 히치가 사라집니다.
 
-### 리소스 로딩 위임
+### 직접 참조라 런타임 로딩 위임 없음
 
-- 클립 로딩은 `IResourceService`에 위임합니다. `SoundService`가 캐시한 리소스키는 `Dispose` 시 각각 `Release`되어 참조 카운팅 짝이 맞습니다.
+- 클립은 `SoundCatalogSO`가 인스펙터에서 연결된 `AudioClip`을 컴파일 타임 직접 참조로 보유합니다. `Resources`/`Addressables`/`IResourceService`를 통한 런타임 로딩이나 참조 카운팅 해제가 없습니다.
 
 ### 볼륨 / 활성화 영속
 
@@ -165,10 +164,10 @@ public static void RegisterSoundService(this IContainerBuilder builder, SoundCat
 
 ### 테스트
 
-- EditMode 단위 테스트(`Tests/SoundServiceTest.cs`, `Tests/SoundCatalogTest.cs`, `Tests/SoundButtonTest.cs`)는 `IResourceService`/`ISoundCatalog`를 NSubstitute로 대체해 위임·엄격 모드·프리로드·재생 배선을 검증합니다.
+- EditMode 단위 테스트(`Tests/SoundServiceTest.cs`, `Tests/SoundCatalogTest.cs`, `Tests/SoundButtonTest.cs`)는 `ISoundCatalog`를 NSubstitute로 대체해 `SoundService`의 재생·엄격 모드·프리로드 배선을 검증하고, `SoundCatalogSO` 자체는 `SerializedObject`로 `_entries`에 클립을 직접 주입해 키→클립 변환·중복 키 처리를 검증합니다.
 
 ### 한계 / 후속 과제
 
-- **에러 처리** — 프리로드 로드 실패 처리는 `IResourceService`의 동작에 위임합니다(현재 로드 예외 처리는 미구현).
+- **에러 처리** — 프리로드가 실제로 비동기인지, 메인 스레드를 블로킹하는지는 클립의 "Load In Background" 임포트 설정에 좌우됩니다(현재 `AudioClip.LoadAudioData()` 실패/예외에 대한 별도 처리는 없음).
 - **스레드 안전성 없음** — Unity 메인 스레드 사용을 전제로 합니다.
 - **카탈로그 정합성** — `SoundButton`의 에디터용 `Catalog`와 DI 등록 `ISoundCatalog`가 동일 에셋인지는 사용자 책임입니다.
