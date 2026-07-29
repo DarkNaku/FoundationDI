@@ -7,18 +7,15 @@ namespace DarkNaku.FoundationDI
     [Serializable]
     public struct SoundEntry
     {
-        public string Key;          // 논리 이름 (Play 인자, 드롭다운 표시)
-        public string ResourceKey;  // (제거 예정) IResourceService 로드 키
-        public AudioClip Clip;      // 직접 참조
-        public bool Preload;        // 프리로드 대상 여부
+        public string Key;        // 논리 이름 (Play 인자, 드롭다운 표시)
+        public AudioClip Clip;    // 직접 참조
+        public bool Preload;      // 첫 재생 디코딩 히치 방지 대상
     }
 
     public interface ISoundCatalog
     {
-        bool TryGetResourceKey(string key, out string resourceKey); // (제거 예정)
         bool TryGetClip(string key, out AudioClip clip);
         IReadOnlyList<string> Keys { get; }
-        IEnumerable<string> PreloadResourceKeys { get; }            // (제거 예정)
         IEnumerable<AudioClip> PreloadClips { get; }
     }
 
@@ -27,8 +24,7 @@ namespace DarkNaku.FoundationDI
     {
         [SerializeField] private List<SoundEntry> _entries = new();
 
-        private Dictionary<string, string> _map;
-        private Dictionary<string, AudioClip> _clipMap;
+        private Dictionary<string, AudioClip> _map;
         private List<string> _keys;
 
         public IReadOnlyList<string> Keys
@@ -37,20 +33,6 @@ namespace DarkNaku.FoundationDI
             {
                 EnsureBuilt();
                 return _keys;
-            }
-        }
-
-        public IEnumerable<string> PreloadResourceKeys
-        {
-            get
-            {
-                foreach (var entry in _entries)
-                {
-                    if (entry.Preload)
-                    {
-                        yield return entry.ResourceKey;
-                    }
-                }
             }
         }
 
@@ -68,24 +50,17 @@ namespace DarkNaku.FoundationDI
             }
         }
 
-        public bool TryGetResourceKey(string key, out string resourceKey)
-        {
-            EnsureBuilt();
-            return _map.TryGetValue(key, out resourceKey);
-        }
-
         public bool TryGetClip(string key, out AudioClip clip)
         {
             EnsureBuilt();
-            return _clipMap.TryGetValue(key, out clip);
+            return _map.TryGetValue(key, out clip);
         }
 
         private void EnsureBuilt()
         {
             if (_map != null) return;
 
-            _map = new Dictionary<string, string>();
-            _clipMap = new Dictionary<string, AudioClip>();
+            _map = new Dictionary<string, AudioClip>();
             _keys = new List<string>();
 
             foreach (var entry in _entries)
@@ -101,8 +76,7 @@ namespace DarkNaku.FoundationDI
                     _keys.Add(entry.Key);
                 }
 
-                _map[entry.Key] = entry.ResourceKey;
-                _clipMap[entry.Key] = entry.Clip;
+                _map[entry.Key] = entry.Clip;
             }
         }
     }
