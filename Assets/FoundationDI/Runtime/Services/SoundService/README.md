@@ -164,7 +164,9 @@ public static void RegisterSoundService(this IContainerBuilder builder, SoundCat
 
 ### 테스트
 
-- EditMode 단위 테스트(`Tests/SoundServiceTest.cs`, `Tests/SoundCatalogTest.cs`, `Tests/SoundButtonTest.cs`)는 `ISoundCatalog`를 NSubstitute로 대체해 `SoundService`의 재생·엄격 모드·프리로드 배선을 검증하고, `SoundCatalogSO` 자체는 `SerializedObject`로 `_entries`에 클립을 직접 주입해 키→클립 변환·중복 키 처리를 검증합니다.
+- `Tests/SoundServiceTest.cs`는 `ISoundCatalog`를 NSubstitute로 대체해 `SoundService`의 재생·엄격 모드·프리로드 배선을 검증합니다.
+- `Tests/SoundCatalogTest.cs`는 `SoundCatalogSO`에 `SerializedObject`로 `_entries`에 클립을 직접 주입해 키→클립 변환·중복 키 처리를 검증합니다.
+- `Tests/SoundButtonTest.cs`는 `ISoundService`를 NSubstitute로 대체해 `SoundButton`의 클릭 → `Play(key)` 배선을 검증합니다.
 
 ### 한계 / 후속 과제
 

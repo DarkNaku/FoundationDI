@@ -56,7 +56,7 @@ NuGet 의존성은 **NuGetForUnity**(`Assets/NuGet/`)가 `Assets/packages.config
 - **PoolService** (`Services/PoolService/`): 키 기반 GameObject 오브젝트 풀. `Resources.Load` 우선, 실패 시 Addressables fallback으로 프리팹을 로드(`Load()`). `ObjectPool<IPoolItem>` 기반이며 `PoolData`가 풀+Addressables 핸들을, `PoolItem`(MonoBehaviour)이 풀 항목 생명주기 콜백(`OnGetItem`/`OnReleaseItem` 등)과 지연 반환(`Release(delay)`)을 담당. **현재 `plan.md`의 활성 개선 대상**(crash/thread-safety/null-safety).
 - **SoundService** (`Services/SoundService/`): SFX/BGM 재생, `PlayerPrefs` 볼륨 영속화, R3 `Observable.EveryUpdate(PostLateUpdate)`로 프레임당 중복 SFX 방지. 클립은 `SoundCatalogSO`가 `AudioClip` 직접 참조로 보유(런타임 로딩 없음).
 
-공통 패턴: 각 서비스는 `Resources.Load<T>()`를 먼저 시도하고 실패 시 `Addressables.LoadAssetAsync<T>().WaitForCompletion()`으로 폴백한 뒤 핸들을 보관해 두었다가 dispose 시 해제한다.
+공통 패턴: 런타임에 리소스를 로드하는 서비스(PoolService, ResourceService 등)는 `Resources.Load<T>()`를 먼저 시도하고 실패 시 `Addressables.LoadAssetAsync<T>().WaitForCompletion()`으로 폴백한 뒤 핸들을 보관해 두었다가 dispose 시 해제한다. SoundService는 `AudioClip`을 컴파일 타임 직접 참조로 보유하므로 이 패턴에 해당하지 않는다.
 
 ### 네임스페이스
 런타임 코드는 `DarkNaku.FoundationDI` 단일 네임스페이스로 통일한다(UIManager 리뉴얼로 구 `FoundationDI` 네임스페이스는 제거됨). 새 코드를 추가할 때 같은 디렉터리의 기존 파일이 쓰는 네임스페이스를 따른다.
