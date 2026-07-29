@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 using Object = UnityEngine.Object;
@@ -73,20 +72,16 @@ namespace DarkNaku.FoundationDI
         private const string SFX_ENABLED = "SFX_ENABLED";
         private const string BGM_ENABLED = "BGM_ENABLED";
         
-        private readonly IResourceService _resourceService;
         private readonly ISoundCatalog _catalog;
         private readonly Transform _root;
-        private readonly Dictionary<string, AudioClip> _table;
         private AudioSource _bgmPlayer;
         private HashSet<AudioSource> _sfxPlayers = new();
         private HashSet<string> _playedClipInThisFrame = new();
         private IDisposable _disposable;
 
-        public SoundService(IResourceService resourceService, ISoundCatalog catalog)
+        public SoundService(ISoundCatalog catalog)
         {
-            _resourceService = resourceService;
             _catalog = catalog;
-            _table = new Dictionary<string, AudioClip>();
 
             var root = new GameObject("[SoundService]");
 
@@ -102,18 +97,11 @@ namespace DarkNaku.FoundationDI
 
             _disposable = Observable.EveryUpdate(UnityFrameProvider.PostLateUpdate).Subscribe(OnPostLateUpdate);
         }
-        
+
         public void Dispose()
         {
             _disposable?.Dispose();
             _disposable = null;
-
-            foreach (var key in _table.Keys)
-            {
-                _resourceService.Release(key);
-            }
-
-            _table.Clear();
 
             // 플레이모드 종료 시 Unity의 오브젝트 파괴와 Container.Dispose 순서가 보장되지 않는다.
             // _root가 먼저 파괴되면 _root.gameObject 접근에서 MissingReferenceException이 나므로
@@ -130,24 +118,19 @@ namespace DarkNaku.FoundationDI
                 }
             }
         }
-        
+
         public void Play(string key)
         {
             if (Mathf.Approximately(VolumeSFX, 0f) || !SFXEnabled) return;
-            // 프레임 중복 차단은 호출 측 논리 키 기준(_table 캐시는 리소스 키 기준).
             if (_playedClipInThisFrame.Contains(key)) return;
 
-            if (!_catalog.TryGetResourceKey(key, out var resourceKey))
+            if (!_catalog.TryGetClip(key, out var clip) || clip == null)
             {
-                Debug.LogError($"[SoundService] Play : Key not found in catalog. ({key})");
+                Debug.LogError($"[SoundService] Play : Clip not found in catalog. ({key})");
                 return;
             }
 
             var player = GetPlayer();
-            var clip = GetClip(resourceKey);
-
-            if (clip == null) return;
-
             player.clip = clip;
             player.loop = false;
             player.volume = VolumeSFX;
@@ -160,15 +143,11 @@ namespace DarkNaku.FoundationDI
         {
             if (Mathf.Approximately(VolumeBGM, 0f) || !BGMEnabled) return;
 
-            if (!_catalog.TryGetResourceKey(key, out var resourceKey))
+            if (!_catalog.TryGetClip(key, out var clip) || clip == null)
             {
-                Debug.LogError($"[SoundService] PlayBGM : Key not found in catalog. ({key})");
+                Debug.LogError($"[SoundService] PlayBGM : Clip not found in catalog. ({key})");
                 return;
             }
-
-            var clip = GetClip(resourceKey);
-
-            if (clip == null) return;
 
             if (_bgmPlayer.isPlaying)
             {
@@ -188,41 +167,31 @@ namespace DarkNaku.FoundationDI
 
         public async UniTask PreloadAsync()
         {
-            var resourceKeys = _catalog.PreloadResourceKeys;
-            if (resourceKeys == null) return;
+            var clips = _catalog.PreloadClips;
+            if (clips == null) return;
 
             var tasks = new List<UniTask>();
 
-            foreach (var resourceKey in resourceKeys.Distinct())
+            foreach (var clip in clips)
             {
-                tasks.Add(PreloadOneAsync(resourceKey));
+                if (clip == null) continue;
+                tasks.Add(LoadAudioDataAsync(clip));
             }
 
             await UniTask.WhenAll(tasks);
         }
 
-        private async UniTask PreloadOneAsync(string resourceKey)
+        private static async UniTask LoadAudioDataAsync(AudioClip clip)
         {
-            if (string.IsNullOrEmpty(resourceKey)) return;
-            if (_table.ContainsKey(resourceKey)) return;
+            // 임포트 설정 "Load In Background"가 켜진 압축 클립만 실제 비동기 로드된다.
+            // 이미 로드된(절차적 클립 포함) 경우 즉시 반환한다.
+            if (clip.loadState == AudioDataLoadState.Loaded) return;
 
-            var clip = await _resourceService.LoadAsync<AudioClip>(resourceKey);
-
-            // await 동안 다른 경로(Play의 동기 Load 또는 동시 Preload)가 이미 캐시했으면
-            // 이번 LoadAsync로 증가한 잉여 참조를 해제한다(refcount 누수 방지).
-            if (_table.ContainsKey(resourceKey))
-            {
-                _resourceService.Release(resourceKey);
-                return;
-            }
-
-            if (clip != null)
-            {
-                _table[resourceKey] = clip;
-            }
+            clip.LoadAudioData();
+            await UniTask.WaitWhile(() => clip.loadState == AudioDataLoadState.Loading);
         }
 
-        private void OnPostLateUpdate(Unit unit) 
+        private void OnPostLateUpdate(Unit unit)
         {
             _playedClipInThisFrame.Clear();
         }
@@ -250,40 +219,14 @@ namespace DarkNaku.FoundationDI
 
             return player;
         }
-
-        private AudioClip GetClip(string key)
-        {
-            if (_table.TryGetValue(key, out var clip))
-            {
-                return clip;
-            }
-
-            if (string.IsNullOrEmpty(key))
-            {
-                Debug.LogError($"[SoundService] GetClip : Key is wrong.");
-                return null;
-            }
-
-            clip = _resourceService.Load<AudioClip>(key);
-
-            if (clip == null)
-            {
-                Debug.LogError($"[SoundService] GetClip : Clip is null. ({key})");
-                return null;
-            }
-
-            _table.Add(key, clip);
-
-            return clip;
-        }
     }
 
     public static class SoundServiceVContainerExtensions
     {
         /// <summary>
         /// SoundService를 컨테이너에 등록한다.
-        /// 전제: 호출 전에 <see cref="IResourceService"/>가 이미 등록되어 있어야 한다
-        /// (SoundService가 클립 로드를 IResourceService에 위임함).
+        /// SoundService는 등록된 <see cref="ISoundCatalog"/>에서 클립을 직접 가져와 재생하므로
+        /// <see cref="IResourceService"/> 등록은 필요하지 않다.
         /// </summary>
         public static void RegisterSoundService(this IContainerBuilder builder, SoundCatalogSO catalog)
         {
