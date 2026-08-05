@@ -46,6 +46,8 @@ namespace DarkNaku.FoundationDI
         // 전용 풀: active 씬 Canvas 아래에 위치하며 씬 전환 시 dispose/재구성된다.
         private PoolManager Pool => _pool ??= new PoolManager(_resource, null, Root.GO.transform);
 
+        public bool IsPopupVisible => _popups.All.Count > 0;
+
         public T Page<T>() where T : UIPresenter
         {
             if (_disposed) throw new ObjectDisposedException(nameof(UIManager));
