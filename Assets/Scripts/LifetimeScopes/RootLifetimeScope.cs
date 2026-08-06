@@ -14,6 +14,7 @@ public class RootLifetimeScope : LifetimeScope
         builder.Register<IResourceService, DefaultResourceService>(Lifetime.Singleton);
         builder.RegisterUIManager(settings);
         builder.RegisterHapticService();
+        builder.RegisterInitializeService();
         builder.RegisterEntryPoint<TestHubBootstrap>();
     }
 }
