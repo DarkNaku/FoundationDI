@@ -177,4 +177,18 @@ public class InitializeServiceTest
 
         Assert.AreEqual(2, a.CallCount);
     });
+
+    [UnityTest]
+    public IEnumerator 카탈로그의_null_아이템은_건너뛴다() => UniTask.ToCoroutine(async () =>
+    {
+        var a = NewItem("A");
+        var b = NewItem("B");
+        var catalog = NewCatalog(a, null, b);
+        var sut = new InitializeService(Substitute.For<IObjectResolver>());
+
+        await sut.InitializeAsync(catalog);
+
+        Assert.AreEqual(1, a.CallCount);
+        Assert.AreEqual(1, b.CallCount);
+    });
 }
