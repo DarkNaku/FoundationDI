@@ -109,4 +109,18 @@ public class InitializeServiceTest
 
         Assert.AreEqual(0, b.CallCount); // 조기 반환 → b는 실행되지 않음
     });
+
+    [UnityTest]
+    public IEnumerator 두_카탈로그에_겹치는_아이템은_한번만_초기화된다() => UniTask.ToCoroutine(async () =>
+    {
+        var shared = NewItem("S");
+        var catalog1 = NewCatalog(shared);
+        var catalog2 = NewCatalog(shared);
+        var sut = new InitializeService(Substitute.For<IObjectResolver>());
+
+        await sut.InitializeAsync(catalog1);
+        await sut.InitializeAsync(catalog2);
+
+        Assert.AreEqual(1, shared.CallCount);
+    });
 }
