@@ -13,6 +13,7 @@ namespace DarkNaku.FoundationDI
     public sealed class InitializeService : IInitializeService
     {
         private readonly IObjectResolver _resolver;
+        private readonly HashSet<InitializeItem> _initializedItems = new();
 
         public InitializeService(IObjectResolver resolver)
         {
@@ -24,7 +25,9 @@ namespace DarkNaku.FoundationDI
             foreach (var item in catalog.Items)
             {
                 if (item == null) continue;
+                if (_initializedItems.Contains(item)) continue;
                 await item.InitializeAsync(_resolver);
+                _initializedItems.Add(item);
             }
         }
 

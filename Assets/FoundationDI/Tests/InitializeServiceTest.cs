@@ -78,4 +78,17 @@ public class InitializeServiceTest
 
         Assert.AreSame(resolver, a.LastResolver);
     });
+
+    [UnityTest]
+    public IEnumerator 이미_초기화된_아이템은_다시_초기화하지_않는다() => UniTask.ToCoroutine(async () =>
+    {
+        var a = NewItem("A");
+        var catalog = NewCatalog(a);
+        var sut = new InitializeService(Substitute.For<IObjectResolver>());
+
+        await sut.InitializeAsync(catalog);
+        await sut.InitializeAsync(catalog);
+
+        Assert.AreEqual(1, a.CallCount);
+    });
 }
