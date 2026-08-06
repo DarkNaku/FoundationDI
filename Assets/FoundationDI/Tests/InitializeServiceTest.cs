@@ -123,4 +123,21 @@ public class InitializeServiceTest
 
         Assert.AreEqual(1, shared.CallCount);
     });
+
+    [UnityTest]
+    public IEnumerator 아이템이_예외를_던지면_중단하고_예외를_전파한다() => UniTask.ToCoroutine(async () =>
+    {
+        var boom = new InvalidOperationException("boom");
+        var a = NewItem("A", throwOn: boom);
+        var b = NewItem("B");
+        var catalog = NewCatalog(a, b);
+        var sut = new InitializeService(Substitute.For<IObjectResolver>());
+
+        Exception caught = null;
+        try { await sut.InitializeAsync(catalog); }
+        catch (Exception e) { caught = e; }
+
+        Assert.AreSame(boom, caught);   // 예외 전파
+        Assert.AreEqual(0, b.CallCount); // 뒤 항목 미실행(즉시 중단)
+    });
 }
