@@ -140,4 +140,27 @@ public class InitializeServiceTest
         Assert.AreSame(boom, caught);   // 예외 전파
         Assert.AreEqual(0, b.CallCount); // 뒤 항목 미실행(즉시 중단)
     });
+
+    [UnityTest]
+    public IEnumerator 실패후_재호출하면_완료된_아이템은_스킵하고_실패지점부터_재개한다() => UniTask.ToCoroutine(async () =>
+    {
+        var a = NewItem("A");
+        var b = NewItem("B", throwOn: new InvalidOperationException("boom"));
+        var c = NewItem("C");
+        var catalog = NewCatalog(a, b, c);
+        var sut = new InitializeService(Substitute.For<IObjectResolver>());
+
+        try { await sut.InitializeAsync(catalog); } catch { /* b에서 중단 */ }
+
+        Assert.AreEqual(1, a.CallCount);
+        Assert.AreEqual(1, b.CallCount);
+        Assert.AreEqual(0, c.CallCount);
+
+        b.ToThrow = null; // b가 이제 성공하도록 수정
+        await sut.InitializeAsync(catalog);
+
+        Assert.AreEqual(1, a.CallCount); // 완료된 A는 스킵
+        Assert.AreEqual(2, b.CallCount); // 실패했던 B부터 재개
+        Assert.AreEqual(1, c.CallCount); // 이어서 C 실행
+    });
 }
