@@ -163,4 +163,18 @@ public class InitializeServiceTest
         Assert.AreEqual(2, b.CallCount); // 실패했던 B부터 재개
         Assert.AreEqual(1, c.CallCount); // 이어서 C 실행
     });
+
+    [UnityTest]
+    public IEnumerator Dispose후에는_세션상태가_초기화되어_다시_실행된다() => UniTask.ToCoroutine(async () =>
+    {
+        var a = NewItem("A");
+        var catalog = NewCatalog(a);
+        var sut = new InitializeService(Substitute.For<IObjectResolver>());
+
+        await sut.InitializeAsync(catalog);
+        sut.Dispose();
+        await sut.InitializeAsync(catalog);
+
+        Assert.AreEqual(2, a.CallCount);
+    });
 }

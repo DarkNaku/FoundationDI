@@ -38,6 +38,8 @@ namespace DarkNaku.FoundationDI
 
         public void Dispose()
         {
+            _initializedItems.Clear();
+            _initializedCatalogs.Clear();
         }
     }
 }
