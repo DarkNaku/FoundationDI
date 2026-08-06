@@ -14,6 +14,7 @@ namespace DarkNaku.FoundationDI
     {
         private readonly IObjectResolver _resolver;
         private readonly HashSet<InitializeItem> _initializedItems = new();
+        private readonly HashSet<InitializeCatalog> _initializedCatalogs = new();
 
         public InitializeService(IObjectResolver resolver)
         {
@@ -22,6 +23,8 @@ namespace DarkNaku.FoundationDI
 
         public async Awaitable InitializeAsync(InitializeCatalog catalog)
         {
+            if (_initializedCatalogs.Contains(catalog)) return;
+
             foreach (var item in catalog.Items)
             {
                 if (item == null) continue;
@@ -29,6 +32,8 @@ namespace DarkNaku.FoundationDI
                 await item.InitializeAsync(_resolver);
                 _initializedItems.Add(item);
             }
+
+            _initializedCatalogs.Add(catalog);
         }
 
         public void Dispose()

@@ -91,4 +91,22 @@ public class InitializeServiceTest
 
         Assert.AreEqual(1, a.CallCount);
     });
+
+    [UnityTest]
+    public IEnumerator 완료된_카탈로그_재호출은_조기반환한다() => UniTask.ToCoroutine(async () =>
+    {
+        var a = NewItem("A");
+        var catalog = NewCatalog(a);
+        var sut = new InitializeService(Substitute.For<IObjectResolver>());
+        await sut.InitializeAsync(catalog);
+
+        // 완료 후 카탈로그에 새 항목을 추가해도, 카탈로그가 완료로 표시되어 순회하지 않는다.
+        var b = NewItem("B");
+        typeof(InitializeCatalog).GetField("_items", BindingFlags.NonPublic | BindingFlags.Instance)
+            .SetValue(catalog, new List<InitializeItem> { a, b });
+
+        await sut.InitializeAsync(catalog);
+
+        Assert.AreEqual(0, b.CallCount); // 조기 반환 → b는 실행되지 않음
+    });
 }
