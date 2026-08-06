@@ -65,4 +65,17 @@ public class InitializeServiceTest
 
         Assert.AreEqual(new[] { "A", "B" }, log.ToArray());
     });
+
+    [UnityTest]
+    public IEnumerator 각_아이템에_resolver를_전달한다() => UniTask.ToCoroutine(async () =>
+    {
+        var resolver = Substitute.For<IObjectResolver>();
+        var a = NewItem("A");
+        var catalog = NewCatalog(a);
+        var sut = new InitializeService(resolver);
+
+        await sut.InitializeAsync(catalog);
+
+        Assert.AreSame(resolver, a.LastResolver);
+    });
 }
