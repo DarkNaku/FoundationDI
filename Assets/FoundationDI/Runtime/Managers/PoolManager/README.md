@@ -87,7 +87,7 @@ public class Bullet : PoolItem
 | --- | --- | --- |
 | `Get` | `GameObject Get(string key, Transform parent = null)` | 키에 해당하는 인스턴스를 풀에서 가져옵니다(없으면 로드·생성). `parent` 생략 시 풀 루트 아래로. |
 | `Get<T>` | `T Get<T>(string key, Transform parent = null) where T : class` | `Get` 후 `GetComponent<T>()` 결과를 반환합니다. |
-| `Release` | `void Release(GameObject item, float delay = 0f)` | 인스턴스를 풀로 되돌립니다. `delay > 0`이면 그 시간 뒤 반환(`UniTask`). |
+| `Release` | `void Release(GameObject item, float delay = 0f)` | 인스턴스를 풀로 되돌립니다. `delay > 0`이면 그 시간 뒤 반환(`Awaitable`). |
 | `Dispose` | `void Dispose()` | 모든 풀을 정리하고, 로드한 에셋을 키마다 `IResourceService.Release`하며, 풀 루트를 파괴합니다. |
 
 ### 생성자

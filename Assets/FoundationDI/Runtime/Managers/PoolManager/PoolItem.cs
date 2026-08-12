@@ -1,6 +1,5 @@
 using System;
 using UnityEngine;
-using Cysharp.Threading.Tasks;
 
 namespace DarkNaku.FoundationDI
 {
@@ -62,7 +61,7 @@ namespace DarkNaku.FoundationDI
         {
             if (delay > 0f)
             {
-                ReleaseAsync(delay, _releaseGeneration).Forget();
+                _ = ReleaseAsync(delay, _releaseGeneration);
             }
             else
             {
@@ -81,11 +80,11 @@ namespace DarkNaku.FoundationDI
             PD.Release(this);
         }
 
-        private async UniTask ReleaseAsync(float delay, int generation)
+        private async Awaitable ReleaseAsync(float delay, int generation)
         {
             try
             {
-                await UniTask.Delay(TimeSpan.FromSeconds(delay), cancellationToken: this.GetCancellationTokenOnDestroy());
+                await Awaitable.WaitForSecondsAsync(delay, destroyCancellationToken);
             }
             catch (OperationCanceledException)
             {
