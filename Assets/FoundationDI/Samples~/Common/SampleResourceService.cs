@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using Cysharp.Threading.Tasks;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
@@ -27,7 +26,13 @@ namespace DarkNaku.FoundationDI.Samples
             }
         }
 
-        public UniTask<T> LoadAsync<T>(string key) where T : Object => UniTask.FromResult(Load<T>(key));
+        public Awaitable<T> LoadAsync<T>(string key) where T : Object
+        {
+            // 즉시 완료된 Awaitable 반환 (동기 매핑을 비동기 표면에 맞춤).
+            var source = new AwaitableCompletionSource<T>();
+            source.SetResult(Load<T>(key));
+            return source.Awaitable;
+        }
 
         public T Load<T>(string key) where T : Object
         {

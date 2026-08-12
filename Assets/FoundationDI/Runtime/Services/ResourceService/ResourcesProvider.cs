@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using Cysharp.Threading.Tasks;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
@@ -17,10 +16,10 @@ namespace DarkNaku.FoundationDI
     {
         private readonly Dictionary<string, Object> _assets = new();
 
-        public async UniTask<T> LoadAsync<T>(string key) where T : Object
+        public async Awaitable<T> LoadAsync<T>(string key) where T : Object
         {
             var request = Resources.LoadAsync<T>(key);
-            await request.ToUniTask();
+            await request;
             var asset = request.asset as T;
             if (asset != null) _assets[key] = asset;
             return asset;

@@ -8,12 +8,21 @@ using UnityEngine.TestTools;
 
 public class ResourceServiceTest
 {
+    // 즉시 완료된 Awaitable을 매 호출마다 새로 만든다. Awaitable은 단일 await만 허용하므로
+    // provider가 같은 키로 여러 번 호출되는 테스트에서도 안전하도록 팩토리로 반환한다.
+    private static Awaitable<GameObject> Completed(GameObject value)
+    {
+        var source = new AwaitableCompletionSource<GameObject>();
+        source.SetResult(value);
+        return source.Awaitable;
+    }
+
     [UnityTest]
     public IEnumerator 첫_로드시_provider를_호출하고_에셋을_반환한다() => UniTask.ToCoroutine(async () =>
     {
         var asset = new GameObject("asset");
         var provider = Substitute.For<IResourceProvider>();
-        provider.LoadAsync<GameObject>("key").Returns(UniTask.FromResult(asset));
+        provider.LoadAsync<GameObject>("key").Returns(_ => Completed(asset));
         var sut = new ResourceService(provider);
 
         var result = await sut.LoadAsync<GameObject>("key");
@@ -27,7 +36,7 @@ public class ResourceServiceTest
     {
         var asset = new GameObject("asset");
         var provider = Substitute.For<IResourceProvider>();
-        provider.LoadAsync<GameObject>("key").Returns(UniTask.FromResult(asset));
+        provider.LoadAsync<GameObject>("key").Returns(_ => Completed(asset));
         var sut = new ResourceService(provider);
 
         var first = await sut.LoadAsync<GameObject>("key");
@@ -43,7 +52,7 @@ public class ResourceServiceTest
     {
         var asset = new GameObject("asset");
         var provider = Substitute.For<IResourceProvider>();
-        provider.LoadAsync<GameObject>("key").Returns(UniTask.FromResult(asset));
+        provider.LoadAsync<GameObject>("key").Returns(_ => Completed(asset));
         var sut = new ResourceService(provider);
 
         await sut.LoadAsync<GameObject>("key");
@@ -58,7 +67,7 @@ public class ResourceServiceTest
     {
         var asset = new GameObject("asset");
         var provider = Substitute.For<IResourceProvider>();
-        provider.LoadAsync<GameObject>("key").Returns(UniTask.FromResult(asset));
+        provider.LoadAsync<GameObject>("key").Returns(_ => Completed(asset));
         var sut = new ResourceService(provider);
 
         await sut.LoadAsync<GameObject>("key");   // RefCount = 1
@@ -72,7 +81,7 @@ public class ResourceServiceTest
     {
         var asset = new GameObject("asset");
         var provider = Substitute.For<IResourceProvider>();
-        provider.LoadAsync<GameObject>("key").Returns(UniTask.FromResult(asset));
+        provider.LoadAsync<GameObject>("key").Returns(_ => Completed(asset));
         var sut = new ResourceService(provider);
 
         await sut.LoadAsync<GameObject>("key");   // RefCount = 1
@@ -87,7 +96,7 @@ public class ResourceServiceTest
     {
         var asset = new GameObject("asset");
         var provider = Substitute.For<IResourceProvider>();
-        provider.LoadAsync<GameObject>("key").Returns(UniTask.FromResult(asset));
+        provider.LoadAsync<GameObject>("key").Returns(_ => Completed(asset));
         var sut = new ResourceService(provider);
 
         await sut.LoadAsync<GameObject>("key");   // RefCount = 1
@@ -103,8 +112,8 @@ public class ResourceServiceTest
         var assetA = new GameObject("assetA");
         var assetB = new GameObject("assetB");
         var provider = Substitute.For<IResourceProvider>();
-        provider.LoadAsync<GameObject>("a").Returns(UniTask.FromResult(assetA));
-        provider.LoadAsync<GameObject>("b").Returns(UniTask.FromResult(assetB));
+        provider.LoadAsync<GameObject>("a").Returns(_ => Completed(assetA));
+        provider.LoadAsync<GameObject>("b").Returns(_ => Completed(assetB));
         var sut = new ResourceService(provider);
 
         await sut.LoadAsync<GameObject>("a");
@@ -119,15 +128,16 @@ public class ResourceServiceTest
     public IEnumerator 로드_진행중_재호출시_provider를_중복_호출하지_않는다() => UniTask.ToCoroutine(async () =>
     {
         var asset = new GameObject("asset");
-        var source = new UniTaskCompletionSource<GameObject>();
+        var source = new AwaitableCompletionSource<GameObject>();
         var provider = Substitute.For<IResourceProvider>();
-        provider.LoadAsync<GameObject>("key").Returns(source.Task);
+        provider.LoadAsync<GameObject>("key").Returns(source.Awaitable);
         var sut = new ResourceService(provider);
 
         var t1 = sut.LoadAsync<GameObject>("key");   // 로드 시작 (in-flight)
-        var t2 = sut.LoadAsync<GameObject>("key");   // 진행 중 task 재사용해야 함
-        source.TrySetResult(asset);
-        await UniTask.WhenAll(t1, t2);
+        var t2 = sut.LoadAsync<GameObject>("key");   // 진행 중 로드에 편승해야 함
+        source.SetResult(asset);
+        await t1;
+        await t2;
 
         _ = provider.Received(1).LoadAsync<GameObject>("key");
     });
@@ -182,7 +192,7 @@ public class ResourceServiceTest
     public IEnumerator 비동기_로드_실패시_캐시하지_않아_다음_로드는_provider를_다시_호출한다() => UniTask.ToCoroutine(async () =>
     {
         var provider = Substitute.For<IResourceProvider>();
-        provider.LoadAsync<GameObject>("missing").Returns(_ => UniTask.FromResult<GameObject>(null));
+        provider.LoadAsync<GameObject>("missing").Returns(_ => Completed(null));
         var sut = new ResourceService(provider);
 
         var first = await sut.LoadAsync<GameObject>("missing");

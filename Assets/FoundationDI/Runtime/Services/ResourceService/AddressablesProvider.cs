@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using Cysharp.Threading.Tasks;
+using UnityEngine;
 using UnityEngine.AddressableAssets;
 using UnityEngine.ResourceManagement.AsyncOperations;
 using Object = UnityEngine.Object;
@@ -10,11 +10,11 @@ namespace DarkNaku.FoundationDI
     {
         private readonly Dictionary<string, AsyncOperationHandle> _handles = new();
 
-        public async UniTask<T> LoadAsync<T>(string key) where T : Object
+        public async Awaitable<T> LoadAsync<T>(string key) where T : Object
         {
             var handle = Addressables.LoadAssetAsync<T>(key);
             _handles[key] = handle;
-            return await handle.ToUniTask();
+            return await handle.Task;
         }
 
         public T Load<T>(string key) where T : Object

@@ -41,7 +41,7 @@ public class Example
 
     public Example(IResourceService resource) => _resource = resource;
 
-    public async UniTask ShowIconAsync(Image target)
+    public async Awaitable ShowIconAsync(Image target)
     {
         // Addressables 주소(또는 키)로 로드
         var sprite = await _resource.LoadAsync<Sprite>("ui_icon_coin");
@@ -78,7 +78,7 @@ _resource.Release("enemy_slime");
 
 | 멤버 | 시그니처 | 설명 |
 | --- | --- | --- |
-| `LoadAsync<T>` | `UniTask<T> LoadAsync<T>(string key) where T : Object` | 키에 해당하는 에셋을 비동기로 로드해 반환합니다. 이미 캐시에 있으면 즉시 캐시본을 반환하고 참조 카운트를 1 증가시킵니다. |
+| `LoadAsync<T>` | `Awaitable<T> LoadAsync<T>(string key) where T : Object` | 키에 해당하는 에셋을 비동기로 로드해 반환합니다. 이미 캐시에 있으면 즉시 캐시본을 반환하고 참조 카운트를 1 증가시킵니다. |
 | `Load<T>` | `T Load<T>(string key) where T : Object` | 동기(`WaitForCompletion`) 로드입니다. 캐싱·참조 카운팅 규약은 `LoadAsync`와 동일합니다. |
 | `Release` | `void Release(string key)` | 키의 참조 카운트를 1 감소시킵니다. 0이 되면 캐시에서 제거하고 실제 Addressables 핸들을 해제합니다. |
 | `Dispose` | `void Dispose()` | 캐시에 남은 모든 키의 핸들을 일괄 해제하고 캐시를 비웁니다. |
@@ -99,7 +99,7 @@ _resource.Release("enemy_slime");
 ```csharp
 public interface IResourceProvider
 {
-    UniTask<T> LoadAsync<T>(string key) where T : Object;
+    Awaitable<T> LoadAsync<T>(string key) where T : Object;
     T Load<T>(string key) where T : Object;
     void Release(string key);
 }
