@@ -2,13 +2,13 @@
 
 **범용 에셋 로더 서비스**입니다. 임의 타입 `T`의 에셋을 키로 로드/해제하는 단일 진입점을 제공하고, **참조 카운팅**으로 생명주기를 안전하게 관리합니다. 로딩 백엔드는 `IResourceProvider` seam 뒤에 두며, 백엔드별 provider를 골라 등록합니다.
 
-- **백엔드 분리** — `AddressableResourceProvider`(Addressables) / `ResourcesProvider`(Resources.Load) 중 선택해 등록
+- **백엔드 분리** — `AddressablesProvider`(Addressables) / `ResourcesProvider`(Resources.Load) 중 선택해 등록
 - **단일 백엔드 내 폴백 없음** — 한 서비스 인스턴스는 한 백엔드만 사용(예: Addressable provider는 `Resources.Load` 폴백 없음)
 - **비동기/동기** 로드 모두 지원 (`LoadAsync<T>` / `Load<T>`)
 - **키 단위 캐싱 + 참조 카운팅** — 참조가 0이 되면 실제 핸들/에셋 해제
 - **진행 중(in-flight) 중복 제거** — 같은 키를 동시에 로드해도 실제 로드는 1회
 
-코어 `ResourceService`는 `IResourceProvider`를 받는 단일 생성자다. 백엔드는 provider 구현(`AddressableResourceProvider` / `ResourcesProvider`) 중 하나를 `IResourceProvider`로 등록해 선택하며, `ResourceService`는 그대로 `IResourceService`로 등록한다. 백엔드 교체는 provider 등록 한 줄만 바꾼다.
+코어 `ResourceService`는 `IResourceProvider`를 받는 단일 생성자다. 백엔드는 provider 구현(`AddressablesProvider` / `ResourcesProvider`) 중 하나를 `IResourceProvider`로 등록해 선택하며, `ResourceService`는 그대로 `IResourceService`로 등록한다. 백엔드 교체는 provider 등록 한 줄만 바꾼다.
 
 ---
 
@@ -25,8 +25,8 @@ public class RootLifetimeScope : LifetimeScope
 {
     protected override void Configure(IContainerBuilder builder)
     {
-        // 백엔드 선택: ResourcesProvider ↔ AddressableResourceProvider 로만 교체
-        builder.Register<IResourceProvider, AddressableResourceProvider>(Lifetime.Singleton);
+        // 백엔드 선택: ResourcesProvider ↔ AddressablesProvider 로만 교체
+        builder.Register<IResourceProvider, AddressablesProvider>(Lifetime.Singleton);
         builder.Register<IResourceService, ResourceService>(Lifetime.Singleton);
     }
 }
@@ -107,9 +107,9 @@ public interface IResourceProvider
 
 `ResourceService`는 **첫 로드(참조 0→1)** 일 때만 `LoadAsync`/`Load`를, **마지막 해제(참조 1→0)** 일 때만 `Release`를 위임합니다.
 
-### `AddressableResourceProvider`
+### `AddressablesProvider`
 
-`IResourceProvider`의 기본 구현(Addressables 어댑터)입니다. `ResourceService()` 기본 생성자가 자동으로 주입합니다.
+`IResourceProvider`의 Addressables 어댑터 구현입니다. `IResourceProvider`로 등록하면 `ResourceService`가 주입받습니다.
 
 - `Addressables.LoadAssetAsync<T>` / `WaitForCompletion()` / `Addressables.Release` 를 감쌉니다.
 - 키→`AsyncOperationHandle` 매핑을 보관하고, `Release` 시 `IsValid()`로 확인 후 핸들을 해제합니다.
@@ -117,8 +117,7 @@ public interface IResourceProvider
 ### 생성자
 
 ```csharp
-public ResourceService();                          // 기본: AddressableResourceProvider 주입
-public ResourceService(IResourceProvider provider); // 테스트/커스텀 백엔드 주입
+public ResourceService(IResourceProvider provider); // 백엔드 provider 주입 (테스트/커스텀 포함)
 ```
 
 ---
@@ -157,7 +156,7 @@ public ResourceService(IResourceProvider provider); // 테스트/커스텀 백�
 ### 테스트
 
 - EditMode 단위 테스트(`Assets/FoundationDI/Tests/ResourceServiceTest.cs`)는 `IResourceProvider`를 NSubstitute로 대체하여, 실제 Addressables 빌드 없이 참조 카운팅·캐싱·중복 제거 로직을 검증합니다.
-- 실제 Addressables 연동(`AddressableResourceProvider`)은 PlayMode 검증 대상입니다.
+- 실제 Addressables 연동(`AddressablesProvider`)은 PlayMode 검증 대상입니다.
 
 ### 한계 / 후속 과제
 

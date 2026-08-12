@@ -6,7 +6,7 @@ using Object = UnityEngine.Object;
 
 namespace DarkNaku.FoundationDI
 {
-    public class AddressableResourceProvider : IResourceProvider
+    public class AddressablesProvider : IResourceProvider
     {
         private readonly Dictionary<string, AsyncOperationHandle> _handles = new();
 
