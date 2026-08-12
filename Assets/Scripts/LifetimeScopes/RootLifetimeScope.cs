@@ -11,7 +11,9 @@ public class RootLifetimeScope : LifetimeScope
     protected override void Configure(IContainerBuilder builder)
     {
         // 프리팹 로드는 Resources 백엔드 ResourceService에 위임한다.
-        builder.Register<IResourceService, DefaultResourceService>(Lifetime.Singleton);
+        // 백엔드 교체는 이 provider 등록 한 줄만 바꾼다 (예: AddressableResourceProvider).
+        builder.Register<IResourceProvider, ResourcesProvider>(Lifetime.Singleton);
+        builder.Register<IResourceService, ResourceService>(Lifetime.Singleton);
         builder.RegisterUIManager(settings);
         builder.RegisterHapticService();
         builder.RegisterInitializeService();

@@ -9,7 +9,8 @@ public class DIRegistrationTests
     public void 컨테이너에서_IUIManager를_해석할_수_있다()
     {
         var builder = new ContainerBuilder();
-        builder.Register<IResourceService, AddressableResourceService>(Lifetime.Singleton);
+        builder.Register<IResourceProvider, AddressableResourceProvider>(Lifetime.Singleton);
+        builder.Register<IResourceService, ResourceService>(Lifetime.Singleton);
         builder.RegisterUIManager(ScriptableObject.CreateInstance<UIManagerSettings>());
 
         var container = builder.Build();
@@ -17,20 +18,22 @@ public class DIRegistrationTests
     }
 
     [Test]
-    public void AddressableResourceService로_등록하면_IResourceProvider_없이_해석된다()
+    public void AddressableResourceProvider를_등록하면_IResourceService를_해석한다()
     {
         var builder = new ContainerBuilder();
-        builder.Register<IResourceService, AddressableResourceService>(Lifetime.Singleton);
+        builder.Register<IResourceProvider, AddressableResourceProvider>(Lifetime.Singleton);
+        builder.Register<IResourceService, ResourceService>(Lifetime.Singleton);
 
         var container = builder.Build();
         Assert.IsNotNull(container.Resolve<IResourceService>());
     }
 
     [Test]
-    public void DefaultResourceService로_등록하면_IResourceProvider_없이_해석된다()
+    public void ResourcesProvider를_등록하면_IResourceService를_해석한다()
     {
         var builder = new ContainerBuilder();
-        builder.Register<IResourceService, DefaultResourceService>(Lifetime.Singleton);
+        builder.Register<IResourceProvider, ResourcesProvider>(Lifetime.Singleton);
+        builder.Register<IResourceService, ResourceService>(Lifetime.Singleton);
 
         var container = builder.Build();
         Assert.IsNotNull(container.Resolve<IResourceService>());
