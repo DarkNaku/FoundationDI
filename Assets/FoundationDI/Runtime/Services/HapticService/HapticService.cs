@@ -87,7 +87,6 @@ namespace DarkNaku.FoundationDI
             return true;
         }
 
-        // Task 4에서 구현.
         public async Awaitable Play(HapticCurve curve)
         {
             if (!Enabled) return;

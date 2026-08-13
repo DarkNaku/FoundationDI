@@ -10,6 +10,12 @@ using UnityEngine.TestTools;
 
 public class HapticServiceTest
 {
+    [SetUp]
+    public void SetUp()
+    {
+        PlayerPrefs.DeleteKey("HAPTIC_ENABLED");
+    }
+
     [Test]
     public void Noop_provider의_프리셋은_예외없이_무동작한다()
     {
@@ -106,5 +112,21 @@ public class HapticServiceTest
         sut.Selection(cooldown: 0.02f);                   // 공유 타임스탬프 → 무시
         provider.Received(1).Impact(HapticImpact.Light);
         provider.DidNotReceive().Selection();
+    }
+
+    [Test]
+    public void 비활성화_호출은_공유_쿨다운_타임스탬프를_소비하지_않는다()
+    {
+        var provider = Substitute.For<IHapticProvider>();
+        float t = 100f;
+        var sut = new HapticService(provider, () => t);
+
+        sut.Enabled = false;
+        sut.Impact(HapticImpact.Medium, cooldown: 0.02f); // 비활성 → 무시, 타임스탬프 미소비
+        sut.Enabled = true;
+        t = 100.005f;                                       // +5ms (쿨다운 창 안)
+        sut.Impact(HapticImpact.Medium, cooldown: 0.02f);   // 직전 소비가 없었으니 발동해야 함
+
+        provider.Received(1).Impact(HapticImpact.Medium);
     }
 }
