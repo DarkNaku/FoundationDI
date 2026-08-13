@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using DarkNaku.FoundationDI;
@@ -129,4 +130,68 @@ public class HapticServiceTest
 
         provider.Received(1).Impact(HapticImpact.Medium);
     }
+
+    [UnityTest]
+    public IEnumerator 활성화시_Play는_provider_PlayAsync에_위임한다() => UniTask.ToCoroutine(async () =>
+    {
+        var provider = Substitute.For<IHapticProvider>();
+        var source = new AwaitableCompletionSource();
+        provider.PlayAsync(Arg.Any<HapticCurve>(), Arg.Any<CancellationToken>()).Returns(source.Awaitable);
+        var sut = new HapticService(provider) { Enabled = true };
+
+        var p = sut.Play(default(HapticCurve));
+        _ = provider.Received(1).PlayAsync(Arg.Any<HapticCurve>(), Arg.Any<CancellationToken>());
+
+        source.SetResult();
+        await p;
+    });
+
+    [UnityTest]
+    public IEnumerator 비활성화시_Play는_provider를_호출하지_않고_즉시완료된다() => UniTask.ToCoroutine(async () =>
+    {
+        var provider = Substitute.For<IHapticProvider>();
+        var sut = new HapticService(provider) { Enabled = false };
+
+        await sut.Play(default(HapticCurve));
+
+        _ = provider.DidNotReceive().PlayAsync(Arg.Any<HapticCurve>(), Arg.Any<CancellationToken>());
+    });
+
+    [UnityTest]
+    public IEnumerator 새_Play는_이전_재생을_취소하고_Stop을_호출한다() => UniTask.ToCoroutine(async () =>
+    {
+        var provider = Substitute.For<IHapticProvider>();
+        var tokens = new List<CancellationToken>();
+        var s1 = new AwaitableCompletionSource();
+        var s2 = new AwaitableCompletionSource();
+        provider.PlayAsync(Arg.Any<HapticCurve>(), Arg.Do<CancellationToken>(tokens.Add))
+                .Returns(s1.Awaitable, s2.Awaitable);
+        var sut = new HapticService(provider) { Enabled = true };
+
+        var p1 = sut.Play(default(HapticCurve));   // in-flight
+        var p2 = sut.Play(default(HapticCurve));   // 이전 취소
+
+        Assert.IsTrue(tokens[0].IsCancellationRequested, "첫 재생의 토큰이 취소되어야 한다");
+        Assert.IsFalse(tokens[1].IsCancellationRequested, "두번째 재생은 진행 중이어야 한다");
+        provider.Received(1).Stop();
+
+        s1.SetResult(); s2.SetResult();
+        await p2;
+    });
+
+    [UnityTest]
+    public IEnumerator Play_중에는_IsPlaying이_true고_완료후_false다() => UniTask.ToCoroutine(async () =>
+    {
+        var provider = Substitute.For<IHapticProvider>();
+        var source = new AwaitableCompletionSource();
+        provider.PlayAsync(Arg.Any<HapticCurve>(), Arg.Any<CancellationToken>()).Returns(source.Awaitable);
+        var sut = new HapticService(provider) { Enabled = true };
+
+        var p = sut.Play(default(HapticCurve));
+        Assert.IsTrue(sut.IsPlaying);
+
+        source.SetResult();
+        await p;
+        Assert.IsFalse(sut.IsPlaying);
+    });
 }
