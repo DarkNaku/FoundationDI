@@ -8,6 +8,7 @@ using NSubstitute;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
+using VContainer;
 
 public class HapticServiceTest
 {
@@ -194,4 +195,17 @@ public class HapticServiceTest
         await p;
         Assert.IsFalse(sut.IsPlaying);
     });
+
+    [Test]
+    public void RegisterHapticService로_등록하면_IHapticService가_해석된다()
+    {
+        var builder = new ContainerBuilder();
+        builder.RegisterHapticService();
+        var container = builder.Build();
+
+        var haptic = container.Resolve<IHapticService>();
+
+        Assert.IsNotNull(haptic);
+        Assert.IsInstanceOf<HapticService>(haptic);
+    }
 }
