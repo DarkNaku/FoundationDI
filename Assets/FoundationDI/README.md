@@ -5,7 +5,7 @@
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Author](https://img.shields.io/badge/author-DarkNaku-orange)
 
-DI(의존성 주입) 기반 Unity 게임 개발 파운데이션 패키지입니다. [VContainer](https://github.com/hadashiA/VContainer)를 코어로 MessagePipe·R3·UniTask·Addressables를 조합한 공통 서비스 계층(메시징·리소스·UI·풀·사운드)을 제공합니다. 각 서비스는 인터페이스(`IXxxService`)로 등록되어 생성자 주입으로 소비되며, 외부 의존(Addressables 등)은 seam으로 분리되어 EditMode 단위 테스트가 가능합니다.
+DI(의존성 주입) 기반 Unity 게임 개발 파운데이션 패키지입니다. [VContainer](https://github.com/hadashiA/VContainer)를 코어로 MessagePipe·R3·UniTask·Addressables를 조합한 공통 서비스 계층(메시징·리소스·UI·풀·사운드·햅틱)을 제공합니다. 각 서비스는 인터페이스(`IXxxService`)로 등록되어 생성자 주입으로 소비되며, 외부 의존(Addressables 등)은 seam으로 분리되어 EditMode 단위 테스트가 가능합니다.
 
 ## 주요 기능
 
@@ -14,6 +14,7 @@ DI(의존성 주입) 기반 Unity 게임 개발 파운데이션 패키지입니�
 - **리소스 로딩** — Addressables 추상화. 키 단위 캐싱 + 참조 카운팅으로 핸들 생명주기를 한 곳에서 관리
 - **UI 시스템** — uGUI 기반 Page/Popup/Overlay 표시·전환, 모달 입력 차단, 트랜지션 추상화
 - **오브젝트 풀 / 사운드** — 키 기반 GameObject 풀링, SFX/BGM 재생. 사운드는 카탈로그(문자열키)·비동기 프리로드·볼륨/활성화 영속화를 제공하고 클립 로딩을 `IResourceService`에 위임
+- **햅틱** — iOS/Android 촉각 피드백. 시맨틱 프리셋(`Impact`/`Notification`/`Selection`, 옵트인 쿨다운) + `AnimationCurve` 커브·커스텀 패턴 재생(`Awaitable`, 단일 활성)과 플랫폼 케이퍼빌리티 폴백. 에디터/데스크톱은 Noop
 - **씬 컴포넌트 DI** — 씬에 배치된 MonoBehaviour에 의존성을 주입하는 인프라(`InjectableBehaviour` + `InjectorService`). 버튼 클릭 사운드용 `SoundButton` 제공
 
 ## 설치 방법
@@ -53,10 +54,11 @@ public class RootLifetimeScope : LifetimeScope
 
     protected override void Configure(IContainerBuilder builder)
     {
-        builder.Register<IResourceService, AddressableResourceService>(Lifetime.Singleton);
+        builder.Register<IResourceProvider, ResourcesProvider>(Lifetime.Singleton);
+        builder.Register<IResourceService, ResourceService>(Lifetime.Singleton);
         builder.RegisterUIManager(_uiSettings);
         builder.RegisterInjector();   // 씬 배치 컴포넌트 주입(SoundButton 등)
-        // 필요한 서비스를 같은 방식으로 추가 등록 (예: builder.RegisterSoundService(_soundCatalog))
+        // 필요한 서비스를 같은 방식으로 추가 등록 (예: builder.RegisterSoundService(_soundCatalog), builder.RegisterHapticService())
     }
 }
 ```
@@ -84,6 +86,7 @@ public class TitleFlow
 | **MessageService** | MessagePipe 래퍼. `IObjectResolver`로 `IPublisher<T>`/`ISubscriber<T>`를 지연 해석해 캐싱하고, 동기/비동기(UniTask) pub-sub을 제공. | — |
 | **PoolService** | 키 기반 GameObject 오브젝트 풀. Resources→Addressables fallback으로 프리팹을 로드하며, 풀 항목 생명주기 콜백과 지연 반환(`Release(delay)`)을 지원. | — |
 | **SoundService** | SFX/BGM 재생. 사운드 카탈로그(문자열키→리소스키)·엄격 모드·비동기 프리로드(`PreloadAsync`)를 제공하고 클립 로딩을 `IResourceService`에 위임. 볼륨/활성화는 `PlayerPrefs`에 영속. 버튼용 `SoundButton` 포함. | [README](Runtime/Services/SoundService/README.md) |
+| **HapticService** | iOS/Android 통합 햅틱. 시맨틱 프리셋(`Impact`/`Notification`/`Selection`, 옵트인 쿨다운) + `AnimationCurve` 커브·커스텀 패턴 재생(`Play`, `Awaitable`, 단일 활성)·케이퍼빌리티 폴백. 에디터/데스크톱은 Noop, `Enabled`는 `PlayerPrefs`에 영속. | [README](Runtime/Services/HapticService/README.md) |
 | **InjectorService** | 씬에 배치된 MonoBehaviour에 의존성을 주입하는 인프라. 정적 요청 큐 + EntryPoint로 위치·계층·순서에 무관하게 주입. `InjectableBehaviour` 베이스 상속으로 사용. | [README](Runtime/Services/InjectorService/README.md) |
 
 > 상세 문서가 아직 없는 구성 요소는 소스(`Runtime/Services/<이름>/`)와 인터페이스(`IXxxService`)를 참고하세요.
