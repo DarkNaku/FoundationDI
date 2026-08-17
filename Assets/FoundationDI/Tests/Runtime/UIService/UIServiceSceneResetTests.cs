@@ -8,7 +8,7 @@ using UnityEngine.TestTools;
 using VContainer;
 using DarkNaku.FoundationDI;
 
-public class UIManagerSceneResetTests
+public class UIServiceSceneResetTests
 {
     public class ResetTrackV : UIView { public static int DestroyCount; protected override void OnDestroyView() => DestroyCount++; }
     [UIPrefab("UI/ResetTrack")]
@@ -39,9 +39,9 @@ public class UIManagerSceneResetTests
         var resource = Substitute.For<IResourceService>();
         resource.Load<GameObject>("UI/ResetTrack").Returns(_prefab);
         var resolver = Substitute.For<IObjectResolver>();
-        var settings = ScriptableObject.CreateInstance<UIManagerSettings>();
+        var settings = ScriptableObject.CreateInstance<UIServiceSettings>();
         var factory = new UIInstanceFactory(resolver);
-        var manager = new UIManager(settings, factory, resource);
+        var manager = new UIService(settings, factory, resource);
 
         var p = manager.Page<ResetTrackP>();
         await UniTask.WaitUntil(() => p.Shown);
@@ -66,9 +66,9 @@ public class UIManagerSceneResetTests
         var resource = Substitute.For<IResourceService>();
         resource.Load<GameObject>("UI/ResetTrack").Returns(_prefab);
         var resolver = Substitute.For<IObjectResolver>();
-        var settings = ScriptableObject.CreateInstance<UIManagerSettings>();
+        var settings = ScriptableObject.CreateInstance<UIServiceSettings>();
         var factory = new UIInstanceFactory(resolver);
-        var manager = new UIManager(settings, factory, resource);
+        var manager = new UIService(settings, factory, resource);
 
         var p1 = manager.Page<ResetTrackP>();
         await UniTask.WaitUntil(() => p1.Shown);
@@ -80,7 +80,7 @@ public class UIManagerSceneResetTests
 
         var p2 = manager.Page<ResetTrackP>();
         await UniTask.WhenAny(UniTask.WaitUntil(() => p2.Shown), UniTask.Delay(3000));
-        Assert.IsTrue(p2.Shown, "씬 전환 후 재구성된 UIManager에서 Page가 표시되어야 한다");
+        Assert.IsTrue(p2.Shown, "씬 전환 후 재구성된 UIService에서 Page가 표시되어야 한다");
         Assert.AreNotSame(p1, p2, "씬 전환 후엔 새 presenter 인스턴스");
 
         SceneManager.SetActiveScene(previous);

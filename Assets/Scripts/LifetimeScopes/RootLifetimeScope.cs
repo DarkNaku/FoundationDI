@@ -5,8 +5,8 @@ using VContainer.Unity;
 
 public class RootLifetimeScope : LifetimeScope
 {
-    // 인스펙터에서 Assets/Settings/UIManagerSettings.asset 을 연결한다.
-    public UIManagerSettings settings;
+    // 인스펙터에서 Assets/Settings/UIServiceSettings.asset 을 연결한다.
+    public UIServiceSettings settings;
 
     protected override void Configure(IContainerBuilder builder)
     {
@@ -14,7 +14,7 @@ public class RootLifetimeScope : LifetimeScope
         // 백엔드 교체는 이 provider 등록 한 줄만 바꾼다 (예: AddressablesProvider).
         builder.Register<IResourceProvider, ResourcesProvider>(Lifetime.Singleton);
         builder.Register<IResourceService, ResourceService>(Lifetime.Singleton);
-        builder.RegisterUIManager(settings);
+        builder.RegisterUIService(settings);
         builder.RegisterHapticService();
         builder.RegisterInitializeService();
         builder.RegisterEntryPoint<TestHubBootstrap>();

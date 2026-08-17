@@ -1,6 +1,6 @@
 namespace DarkNaku.FoundationDI
 {
-    public interface IUIManager
+    public interface IUIService
     {
         bool IsPopupVisible { get; }
         T Page<T>() where T : UIPresenter;

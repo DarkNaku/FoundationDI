@@ -35,7 +35,7 @@ namespace DarkNaku.FoundationDI
             }
             else
             {
-                Debug.LogWarning($"[UIManager] {GetType().Name}이(가) IConfigurable<{typeof(TParams).Name}>를 구현하지 않아 With(...)가 무시됩니다.");
+                Debug.LogWarning($"[UIService] {GetType().Name}이(가) IConfigurable<{typeof(TParams).Name}>를 구현하지 않아 With(...)가 무시됩니다.");
             }
 
             return (TSelf)this;

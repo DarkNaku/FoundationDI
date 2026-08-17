@@ -13,7 +13,7 @@ namespace DarkNaku.FoundationDI
 
             var attr = (UIPrefabAttribute)Attribute.GetCustomAttribute(type, typeof(UIPrefabAttribute));
             if (attr == null)
-                throw new InvalidOperationException($"[UIManager] {type.Name}에 [UIPrefab] 속성이 없습니다.");
+                throw new InvalidOperationException($"[UIService] {type.Name}에 [UIPrefab] 속성이 없습니다.");
 
             _cache[type] = attr.Key;
             return attr.Key;

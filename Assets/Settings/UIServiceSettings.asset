@@ -10,6 +10,6 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: acd0e9c8147914e10b02045a2015d024, type: 3}
-  m_Name: UIManagerSettings
-  m_EditorClassIdentifier: FoundationDI::DarkNaku.FoundationDI.UIManagerSettings
+  m_Name: UIServiceSettings
+  m_EditorClassIdentifier: FoundationDI::DarkNaku.FoundationDI.UIServiceSettings
   _referenceResolution: {x: 1920, y: 1080}

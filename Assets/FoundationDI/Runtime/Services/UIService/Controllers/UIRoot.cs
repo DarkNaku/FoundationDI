@@ -19,7 +19,7 @@ namespace DarkNaku.FoundationDI
             float planeDistance = 100f,
             Func<Camera> cameraProvider = null)
         {
-            GO = new GameObject("[UIManager]", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+            GO = new GameObject("[UIService]", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
             var canvas = GO.GetComponent<Canvas>();
 
             var scaler = GO.GetComponent<CanvasScaler>();
@@ -44,7 +44,7 @@ namespace DarkNaku.FoundationDI
             {
                 // 로딩 화면 등 MainCamera 태그 카메라가 없는 순간엔 최상단 Overlay로 폴백.
                 canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-                Debug.LogWarning("[UIManager] Camera.main이 없어 UI Canvas를 ScreenSpaceOverlay로 폴백합니다. Sorting Layer 정렬이 적용되지 않습니다.");
+                Debug.LogWarning("[UIService] Camera.main이 없어 UI Canvas를 ScreenSpaceOverlay로 폴백합니다. Sorting Layer 정렬이 적용되지 않습니다.");
             }
 
             // 생성 순서 = sibling 순서 = 렌더 순서(아래→위). Overlay는 Popup 기준 Above/Below로 분리된다.

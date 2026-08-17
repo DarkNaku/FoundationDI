@@ -2,8 +2,8 @@ using UnityEngine;
 
 namespace DarkNaku.FoundationDI
 {
-    [CreateAssetMenu(fileName = "UIManagerSettings", menuName = "DarkNaku/UIManagerSettings")]
-    public sealed class UIManagerSettings : ScriptableObject
+    [CreateAssetMenu(fileName = "UIServiceSettings", menuName = "DarkNaku/UIServiceSettings")]
+    public sealed class UIServiceSettings : ScriptableObject
     {
         [SerializeField] private Vector2 _referenceResolution = new Vector2(1920f, 1080f);
 

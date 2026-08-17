@@ -8,9 +8,9 @@ using VContainer;
 
 namespace DarkNaku.FoundationDI
 {
-    public sealed class UIManager : IUIManager, IUIElementHost, IDisposable
+    public sealed class UIService : IUIService, IUIElementHost, IDisposable
     {
-        private readonly UIManagerSettings _settings;
+        private readonly UIServiceSettings _settings;
         private readonly UIInstanceFactory _factory;
         private readonly IResourceService _resource;
         private readonly OperationQueue _queue = new();
@@ -22,7 +22,7 @@ namespace DarkNaku.FoundationDI
         private PoolManager _pool;
         private bool _disposed;
 
-        internal UIManager(UIManagerSettings settings, UIInstanceFactory factory, IResourceService resource)
+        internal UIService(UIServiceSettings settings, UIInstanceFactory factory, IResourceService resource)
         {
             _settings = settings;
             _factory = factory;
@@ -50,7 +50,7 @@ namespace DarkNaku.FoundationDI
 
         public T Page<T>() where T : UIPresenter
         {
-            if (_disposed) throw new ObjectDisposedException(nameof(UIManager));
+            if (_disposed) throw new ObjectDisposedException(nameof(UIService));
             var presenter = (T)_factory.CreatePresenter(typeof(T), this);
             _queue.Enqueue(ct => ShowPageAsync(presenter, ct));
             return presenter;
@@ -58,7 +58,7 @@ namespace DarkNaku.FoundationDI
 
         public T Popup<T>() where T : UIPresenter
         {
-            if (_disposed) throw new ObjectDisposedException(nameof(UIManager));
+            if (_disposed) throw new ObjectDisposedException(nameof(UIService));
             var presenter = (T)_factory.CreatePresenter(typeof(T), this);
             _queue.Enqueue(ct => ShowPopupAsync(presenter, ct));
             return presenter;
@@ -66,7 +66,7 @@ namespace DarkNaku.FoundationDI
 
         public T Overlay<T>() where T : UIPresenter
         {
-            if (_disposed) throw new ObjectDisposedException(nameof(UIManager));
+            if (_disposed) throw new ObjectDisposedException(nameof(UIService));
             var presenter = (T)_factory.CreatePresenter(typeof(T), this);
             _queue.Enqueue(ct => ShowOverlayAsync(presenter, ct));
             return presenter;
@@ -79,7 +79,7 @@ namespace DarkNaku.FoundationDI
             var view = Pool.Get<UIView>(key);
             if (view == null)
                 throw new InvalidOperationException(
-                    $"[UIManager] '{key}' View 로드 실패(프리팹 없음 또는 UIView 부재). ({presenter.GetType().Name})");
+                    $"[UIService] '{key}' View 로드 실패(프리팹 없음 또는 UIView 부재). ({presenter.GetType().Name})");
 
             presenter.BindView(view);
             presenter.OnInitialize();
@@ -231,18 +231,18 @@ namespace DarkNaku.FoundationDI
 
     internal interface IOverlayPlacement { bool Above { get; } }
 
-    public static class UIManagerVContainerExtensions
+    public static class UIServiceVContainerExtensions
     {
         /// <summary>
-        /// UIManager를 컨테이너에 등록한다.
+        /// UIService를 컨테이너에 등록한다.
         /// 전제: 호출 전에 <see cref="IResourceService"/>가 이미 등록되어 있어야 한다
-        /// (UIManager 전용 풀과 UIInstanceFactory가 이를 사용).
+        /// (UIService 전용 풀과 UIInstanceFactory가 이를 사용).
         /// </summary>
-        public static void RegisterUIManager(this IContainerBuilder builder, UIManagerSettings settings)
+        public static void RegisterUIService(this IContainerBuilder builder, UIServiceSettings settings)
         {
             builder.RegisterInstance(settings);
             builder.Register<UIInstanceFactory>(Lifetime.Singleton);
-            builder.Register<UIManager>(Lifetime.Singleton).As<IUIManager>();
+            builder.Register<UIService>(Lifetime.Singleton).As<IUIService>();
         }
     }
 }

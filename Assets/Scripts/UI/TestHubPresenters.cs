@@ -9,7 +9,7 @@ namespace FoundationDI.Host
     [UIPrefab("MainTestPage")]
     public class MainTestPage : UIPagePresenter<MainTestView>
     {
-        [Inject] private IUIManager _ui;
+        [Inject] private IUIService _ui;
 
         protected override void OnInitialize()
         {
@@ -21,7 +21,7 @@ namespace FoundationDI.Host
     [UIPrefab("HapticTestPage")]
     public class HapticTestPage : UIPagePresenter<HapticTestView>
     {
-        [Inject] private IUIManager _ui;
+        [Inject] private IUIService _ui;
         [Inject] private IHapticService _haptic;
 
         protected override void OnInitialize()
@@ -87,9 +87,9 @@ namespace FoundationDI.Host
     /// 앱 시작 시 메인 테스트 페이지를 띄우는 부트스트랩.
     public class TestHubBootstrap : IStartable
     {
-        private readonly IUIManager _ui;
+        private readonly IUIService _ui;
 
-        public TestHubBootstrap(IUIManager ui) => _ui = ui;
+        public TestHubBootstrap(IUIService ui) => _ui = ui;
 
         public void Start() => _ui.Page<MainTestPage>();
     }

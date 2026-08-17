@@ -40,7 +40,7 @@ FoundationDI는 다음 패키지를 전제로 합니다. 먼저 설치되어 있
 
 ## 빠른 시작
 
-VContainer의 루트 `LifetimeScope`에서 서비스를 등록합니다. 등록 순서에 주의합니다 — UIManager는 프리팹 로드를 `IResourceService`에 위임하므로 `RegisterUIManager` **전에** `IResourceService`가 등록되어야 합니다.
+VContainer의 루트 `LifetimeScope`에서 서비스를 등록합니다. 등록 순서에 주의합니다 — UIService는 프리팹 로드를 `IResourceService`에 위임하므로 `RegisterUIService` **전에** `IResourceService`가 등록되어야 합니다.
 
 ```csharp
 using UnityEngine;
@@ -50,13 +50,13 @@ using DarkNaku.FoundationDI;
 
 public class RootLifetimeScope : LifetimeScope
 {
-    [SerializeField] private UIManagerSettings _uiSettings;
+    [SerializeField] private UIServiceSettings _uiSettings;
 
     protected override void Configure(IContainerBuilder builder)
     {
         builder.Register<IResourceProvider, ResourcesProvider>(Lifetime.Singleton);
         builder.Register<IResourceService, ResourceService>(Lifetime.Singleton);
-        builder.RegisterUIManager(_uiSettings);
+        builder.RegisterUIService(_uiSettings);
         builder.RegisterInjector();   // 씬 배치 컴포넌트 주입(SoundButton 등)
         // 필요한 서비스를 같은 방식으로 추가 등록 (예: builder.RegisterSoundService(_soundCatalog), builder.RegisterHapticService())
     }
@@ -68,8 +68,8 @@ public class RootLifetimeScope : LifetimeScope
 ```csharp
 public class TitleFlow
 {
-    private readonly IUIManager _ui;
-    public TitleFlow(IUIManager ui) => _ui = ui;
+    private readonly IUIService _ui;
+    public TitleFlow(IUIService ui) => _ui = ui;
 
     public void Open() => _ui.Page<TitlePresenter>();
 }
@@ -81,7 +81,7 @@ public class TitleFlow
 
 | 구성 요소 | 설명 | 상세 문서 |
 | --- | --- | --- |
-| **UIManager** | uGUI 기반 UI 표시/전환 시스템. Presenter 타입으로 Page(단일 교체)/Popup(LIFO·모달)/Overlay(상주) 모드를 고정하고, 자동-show 빌더 API·모달 입력 차단(`CanvasGroup.interactable`)·트랜지션 추상화를 제공. 프리팹 로딩은 `IResourceService`에 위임. | [README](Runtime/Managers/UIManager/README.md) |
+| **UIService** | uGUI 기반 UI 표시/전환 시스템. Presenter 타입으로 Page(단일 교체)/Popup(LIFO·모달)/Overlay(상주) 모드를 고정하고, 자동-show 빌더 API·모달 입력 차단(`CanvasGroup.interactable`)·트랜지션 추상화를 제공. 프리팹 로딩은 `IResourceService`에 위임. | [README](Runtime/Services/UIService/README.md) |
 | **ResourceService** | Addressables 추상화. `LoadAsync`/`Load`/`Release`/`Dispose` API로 키 단위 캐싱 + 참조 카운팅. 에셋 로딩이 필요한 모든 서비스의 위임 대상. | [README](Runtime/Services/ResourceService/README.md) |
 | **MessageService** | MessagePipe 래퍼. `IObjectResolver`로 `IPublisher<T>`/`ISubscriber<T>`를 지연 해석해 캐싱하고, 동기/비동기(UniTask) pub-sub을 제공. | — |
 | **PoolService** | 키 기반 GameObject 오브젝트 풀. Resources→Addressables fallback으로 프리팹을 로드하며, 풀 항목 생명주기 콜백과 지연 반환(`Release(delay)`)을 지원. | — |
@@ -93,7 +93,7 @@ public class TitleFlow
 
 ## 샘플
 
-Package Manager의 **Samples** 탭에서 UIManager 예제를 import할 수 있습니다.
+Package Manager의 **Samples** 탭에서 UIService 예제를 import할 수 있습니다.
 
 | 샘플 | 내용 |
 | --- | --- |

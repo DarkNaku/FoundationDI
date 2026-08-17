@@ -56,7 +56,7 @@ namespace DarkNaku.FoundationDI
             gameObject.SetActive(false); // 풀 상주 중 비활성
         }
 
-        void IPoolItem.OnGetItem() { } // 활성화는 UIManager show 흐름이 제어
+        void IPoolItem.OnGetItem() { } // 활성화는 UIService show 흐름이 제어
 
         void IPoolItem.OnReleaseItem()
         {
