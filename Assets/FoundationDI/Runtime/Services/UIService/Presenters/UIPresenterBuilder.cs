@@ -21,6 +21,19 @@ namespace DarkNaku.FoundationDI
         }
 
         /// <summary>
+        /// 이 Page/Popup을 표시할 때 오버레이 <typeparamref name="TOverlay"/>를 함께 노출한다.
+        /// 오버레이는 호스트와 동시에 애니메이션되며(호스트 트랜지션 오버라이드를 공유), 호스트가
+        /// 숨겨지면 함께 숨겨진다. <paramref name="configure"/>는 View 바인딩/OnInitialize 전에 호출되므로
+        /// 파라미터 저장 용도로만 쓰고 View에 접근하지 말 것.
+        /// </summary>
+        public TSelf WithOverlay<TOverlay>(Action<TOverlay> configure = null) where TOverlay : UIPresenter
+        {
+            AddOverlayRequest(typeof(TOverlay),
+                configure == null ? null : new Action<UIPresenter>(p => configure((TOverlay)p)));
+            return (TSelf)this;
+        }
+
+        /// <summary>
         /// Presenter가 <see cref="IConfigurable{TParams}"/>를 구현한 경우 <c>Configure(p)</c>를 동기 호출한다.
         /// </summary>
         /// <remarks>

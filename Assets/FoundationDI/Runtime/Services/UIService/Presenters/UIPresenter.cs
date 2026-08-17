@@ -14,6 +14,18 @@ namespace DarkNaku.FoundationDI
 
         private Dictionary<LifecycleEvent, List<Action<UIPresenter>>> _subscribers;
 
+        // WithOverlay로 등록된 오버레이 요청(빌더 시점). Page/Popup 표시 시 함께 노출된다.
+        private List<(Type type, Action<UIPresenter> configure)> _overlayRequests;
+        internal IReadOnlyList<(Type type, Action<UIPresenter> configure)> OverlayRequests => _overlayRequests;
+        internal void AddOverlayRequest(Type type, Action<UIPresenter> configure)
+            => (_overlayRequests ??= new()).Add((type, configure));
+
+        // 표시 시점에 실제로 스폰되어 이 호스트에 종속된 오버레이(호스트 hide 시 함께 hide).
+        private List<UIPresenter> _linkedOverlays;
+        internal IReadOnlyList<UIPresenter> LinkedOverlays => _linkedOverlays;
+        internal void LinkOverlay(UIPresenter overlay) => (_linkedOverlays ??= new()).Add(overlay);
+        internal void ClearLinkedOverlays() => _linkedOverlays?.Clear();
+
         // 뷰를 나중에 바인딩할 때 사용 (Host는 생성 시 미리 설정됨)
         internal void BindHost(IUIElementHost host) => Host = host;
         internal void BindView(UIView view) => ViewBase = view;

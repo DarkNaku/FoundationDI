@@ -89,16 +89,15 @@ namespace DarkNaku.FoundationDI
 
             if (_pages.Current != null && _pages.Current != presenter)
             {
-                await HideAsync(_pages.Current, ct);
+                await HideWithLinkedAsync(_pages.Current, ct);
                 _pages.Clear();
             }
 
             AcquireView(presenter);
             _pages.SetCurrent(presenter);
             AttachTo(presenter, Root.PageLayer);
-            RefreshInputBlocking();
 
-            await ShowAsync(presenter, ct);
+            await ShowHostWithOverlaysAsync(presenter, ct);
         }
 
         private async Awaitable ShowOverlayAsync(UIPresenter presenter, CancellationToken ct)
@@ -120,8 +119,54 @@ namespace DarkNaku.FoundationDI
             AcquireView(presenter);
             _popups.Add(presenter);
             AttachTo(presenter, Root.PopupLayer);
+            await ShowHostWithOverlaysAsync(presenter, ct);
+        }
+
+        // 호스트(Page/Popup)와 WithOverlay로 링크된 오버레이들을 동시에(concurrent) 표시한다.
+        private async Awaitable ShowHostWithOverlaysAsync(UIPresenter host, CancellationToken ct)
+        {
+            var shows = new List<Awaitable>();
+            shows.Add(ShowAsync(host, ct)); // 호스트 표시 시작(첫 await까지 동기 실행 → 이후 프레임루프에서 진행)
+
+            var reqs = host.OverlayRequests;
+            if (reqs != null)
+            {
+                for (int i = 0; i < reqs.Count; i++)
+                {
+                    var (type, configure) = reqs[i];
+                    var overlay = _factory.CreatePresenter(type, this);
+                    configure?.Invoke(overlay); // params만(View 바인딩/OnInitialize 전)
+                    AcquireView(overlay);
+                    var above = (overlay as IOverlayPlacement)?.Above ?? true;
+                    _overlays.Register(overlay, above);
+                    AttachTo(overlay, above ? Root.AboveOverlayLayer : Root.BelowOverlayLayer);
+                    overlay.SetTransitionOverride(host.TransitionOverride); // 호스트와 동일 트랜지션(오버라이드 시)
+                    host.LinkOverlay(overlay);
+                    shows.Add(ShowAsync(overlay, ct)); // 오버레이 표시 시작
+                }
+            }
+
             RefreshInputBlocking();
-            await ShowAsync(presenter, ct);
+            for (int i = 0; i < shows.Count; i++) await shows[i]; // 모두 동시 진행 후 완료 대기
+        }
+
+        // 호스트를 숨기고, WithOverlay로 링크된 오버레이도 함께(concurrent) 숨긴다.
+        private async Awaitable HideWithLinkedAsync(UIPresenter host, CancellationToken ct)
+        {
+            var linked = host.LinkedOverlays;
+
+            var hides = new List<Awaitable>();
+            hides.Add(HideAsync(host, ct));
+            if (linked != null)
+                for (int i = 0; i < linked.Count; i++) hides.Add(HideAsync(linked[i], ct));
+
+            for (int i = 0; i < hides.Count; i++) await hides[i];
+
+            if (linked != null)
+            {
+                for (int i = 0; i < linked.Count; i++) _overlays.Unregister(linked[i]);
+                host.ClearLinkedOverlays();
+            }
         }
 
         private void AttachTo(UIPresenter presenter, Transform layer) => presenter.ViewBase.RectTransform.SetParent(layer, false);
@@ -181,7 +226,7 @@ namespace DarkNaku.FoundationDI
         {
             // 이미 숨겨졌거나 교체된 경우 중복 Hide 무시.
             if (!_active.Contains(presenter)) return;
-            await HideAsync(presenter, ct);
+            await HideWithLinkedAsync(presenter, ct);
             if (_pages.Current == presenter) _pages.Clear();
             _popups.Remove(presenter);
             _overlays.Unregister(presenter);
