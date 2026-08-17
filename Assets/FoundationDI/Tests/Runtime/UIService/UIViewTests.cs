@@ -11,6 +11,14 @@ public class UIViewTests
 {
     private class TestView : UIView { }
 
+    // 즉시 완료된 Awaitable(mock 반환용, 호출마다 새로 생성)
+    private static Awaitable Done()
+    {
+        var s = new AwaitableCompletionSource();
+        s.SetResult();
+        return s.Awaitable;
+    }
+
     [Test]
     public void InputEnabled는_CanvasGroup_interactable을_토글한다()
     {
@@ -32,8 +40,8 @@ public class UIViewTests
         var view = go.AddComponent<TestView>();
 
         var transition = Substitute.For<IUITransition>();
-        transition.ShowAsync(Arg.Any<RectTransform>(), Arg.Any<CancellationToken>()).Returns(UniTask.CompletedTask);
-        transition.HideAsync(Arg.Any<RectTransform>(), Arg.Any<CancellationToken>()).Returns(UniTask.CompletedTask);
+        transition.ShowAsync(Arg.Any<RectTransform>(), Arg.Any<CancellationToken>()).Returns(_ => Done());
+        transition.HideAsync(Arg.Any<RectTransform>(), Arg.Any<CancellationToken>()).Returns(_ => Done());
 
         view.Transition = transition;
         await view.ShowAsync(default);

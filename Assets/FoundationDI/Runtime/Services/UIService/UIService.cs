@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
-using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using VContainer;
@@ -84,9 +83,9 @@ namespace DarkNaku.FoundationDI
             _active.Add(presenter);
         }
 
-        private async UniTask ShowPageAsync(UIPresenter presenter, CancellationToken ct)
+        private async Awaitable ShowPageAsync(UIPresenter presenter, CancellationToken ct)
         {
-            await UniTask.Yield(PlayerLoopTiming.Update, ct);   // 빌더 체인 등록 보장
+            await Awaitable.NextFrameAsync(ct);   // 빌더 체인 등록 보장
 
             if (_pages.Current != null && _pages.Current != presenter)
             {
@@ -102,9 +101,9 @@ namespace DarkNaku.FoundationDI
             await ShowAsync(presenter, ct);
         }
 
-        private async UniTask ShowOverlayAsync(UIPresenter presenter, CancellationToken ct)
+        private async Awaitable ShowOverlayAsync(UIPresenter presenter, CancellationToken ct)
         {
-            await UniTask.Yield(PlayerLoopTiming.Update, ct);
+            await Awaitable.NextFrameAsync(ct);
 
             AcquireView(presenter);
             var above = (presenter as IOverlayPlacement)?.Above ?? true;
@@ -114,9 +113,9 @@ namespace DarkNaku.FoundationDI
             await ShowAsync(presenter, ct);
         }
 
-        private async UniTask ShowPopupAsync(UIPresenter presenter, CancellationToken ct)
+        private async Awaitable ShowPopupAsync(UIPresenter presenter, CancellationToken ct)
         {
-            await UniTask.Yield(PlayerLoopTiming.Update, ct);
+            await Awaitable.NextFrameAsync(ct);
 
             AcquireView(presenter);
             _popups.Add(presenter);
@@ -127,7 +126,7 @@ namespace DarkNaku.FoundationDI
 
         private void AttachTo(UIPresenter presenter, Transform layer) => presenter.ViewBase.RectTransform.SetParent(layer, false);
 
-        private async UniTask ShowAsync(UIPresenter presenter, CancellationToken ct)
+        private async Awaitable ShowAsync(UIPresenter presenter, CancellationToken ct)
         {
             presenter.ViewBase.gameObject.SetActive(true); // 풀에서 나온 비활성 View 활성화
             presenter.ViewBase.Transition = presenter.TransitionOverride;
@@ -138,7 +137,7 @@ namespace DarkNaku.FoundationDI
             presenter.Fire(UIPresenter.LifecycleEvent.AfterShow);
         }
 
-        private async UniTask HideAsync(UIPresenter presenter, CancellationToken ct)
+        private async Awaitable HideAsync(UIPresenter presenter, CancellationToken ct)
         {
             presenter.OnBeforeHide(); presenter.Fire(UIPresenter.LifecycleEvent.BeforeHide);
             await presenter.ViewBase.HideAsync(ct);
@@ -178,7 +177,7 @@ namespace DarkNaku.FoundationDI
 
         void IUIElementHost.RequestHide(UIPresenter presenter) => _queue.Enqueue(ct => HandleHideAsync(presenter, ct));
 
-        private async UniTask HandleHideAsync(UIPresenter presenter, CancellationToken ct)
+        private async Awaitable HandleHideAsync(UIPresenter presenter, CancellationToken ct)
         {
             // 이미 숨겨졌거나 교체된 경우 중복 Hide 무시.
             if (!_active.Contains(presenter)) return;

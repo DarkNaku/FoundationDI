@@ -1,5 +1,4 @@
 using System.Threading;
-using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -32,28 +31,26 @@ namespace DarkNaku.FoundationDI
 
         private RectTransform Content(RectTransform root) => _content != null ? _content : root;
 
-        public override UniTask ShowAsync(RectTransform target, CancellationToken ct)
+        public override Awaitable ShowAsync(RectTransform target, CancellationToken ct)
         {
             CaptureBackground();
             var content = Content(target);
-            var scale = Animate(t => content.localScale = Vector3.one * Mathf.Lerp(_fromScale, 1f, t), ct);
-            if (_background == null) return scale;
-            var fade = Animate(t => SetBackgroundAlpha(_bgAlpha * t), ct);
-            return UniTask.WhenAll(scale, fade);
+            return Animate(t =>
+            {
+                content.localScale = Vector3.one * Mathf.Lerp(_fromScale, 1f, t);
+                if (_background != null) SetBackgroundAlpha(_bgAlpha * t);
+            }, ct);
         }
 
-        public override async UniTask HideAsync(RectTransform target, CancellationToken ct)
+        public override Awaitable HideAsync(RectTransform target, CancellationToken ct)
         {
             CaptureBackground();
             var content = Content(target);
-            var scale = Animate(t => content.localScale = Vector3.one * Mathf.Lerp(1f, _fromScale, t), ct);
-            if (_background == null)
+            return Animate(t =>
             {
-                await scale;
-                return;
-            }
-            var fade = Animate(t => SetBackgroundAlpha(_bgAlpha * (1f - t)), ct);
-            await UniTask.WhenAll(scale, fade);
+                content.localScale = Vector3.one * Mathf.Lerp(1f, _fromScale, t);
+                if (_background != null) SetBackgroundAlpha(_bgAlpha * (1f - t));
+            }, ct);
         }
     }
 }

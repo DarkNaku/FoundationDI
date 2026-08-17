@@ -1,5 +1,4 @@
 using System.Threading;
-using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -46,34 +45,30 @@ namespace DarkNaku.FoundationDI
             };
         }
 
-        public override UniTask ShowAsync(RectTransform target, CancellationToken ct)
+        public override Awaitable ShowAsync(RectTransform target, CancellationToken ct)
         {
             CaptureBackground();
             var content = Content(target);
             var home = content.anchoredPosition;
             var off = home + OffsetFor(content);
-            var slide = Animate(t => content.anchoredPosition = Vector2.Lerp(off, home, t), ct);
-            if (_background == null) return slide;
-            var fade = Animate(t => SetBackgroundAlpha(_bgAlpha * t), ct);
-            return UniTask.WhenAll(slide, fade);
+            return Animate(t =>
+            {
+                content.anchoredPosition = Vector2.Lerp(off, home, t);
+                if (_background != null) SetBackgroundAlpha(_bgAlpha * t);
+            }, ct);
         }
 
-        public override async UniTask HideAsync(RectTransform target, CancellationToken ct)
+        public override async Awaitable HideAsync(RectTransform target, CancellationToken ct)
         {
             CaptureBackground();
             var content = Content(target);
             var home = content.anchoredPosition;
             var off = home + OffsetFor(content);
-            var slide = Animate(t => content.anchoredPosition = Vector2.Lerp(home, off, t), ct);
-            if (_background == null)
+            await Animate(t =>
             {
-                await slide;
-            }
-            else
-            {
-                var fade = Animate(t => SetBackgroundAlpha(_bgAlpha * (1f - t)), ct);
-                await UniTask.WhenAll(slide, fade);
-            }
+                content.anchoredPosition = Vector2.Lerp(home, off, t);
+                if (_background != null) SetBackgroundAlpha(_bgAlpha * (1f - t));
+            }, ct);
             // 휴지 위치를 home으로 복원(캐시 재사용 시 다음 Show가 화면 밖 좌표를 home으로 캡처하는 것 방지).
             content.anchoredPosition = home;
         }

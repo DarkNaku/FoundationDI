@@ -1,5 +1,4 @@
 using System.Threading;
-using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 namespace DarkNaku.FoundationDI
@@ -12,13 +11,13 @@ namespace DarkNaku.FoundationDI
         private CanvasGroup Resolve(RectTransform root)
             => _target != null ? _target : root.GetComponent<CanvasGroup>();
 
-        public override UniTask ShowAsync(RectTransform target, CancellationToken ct)
+        public override Awaitable ShowAsync(RectTransform target, CancellationToken ct)
         {
             var cg = Resolve(target);
             return Animate(t => cg.alpha = t, ct);
         }
 
-        public override UniTask HideAsync(RectTransform target, CancellationToken ct)
+        public override Awaitable HideAsync(RectTransform target, CancellationToken ct)
         {
             var cg = Resolve(target);
             return Animate(t => cg.alpha = 1f - t, ct);

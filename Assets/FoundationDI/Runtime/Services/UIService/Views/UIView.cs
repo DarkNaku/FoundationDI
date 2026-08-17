@@ -1,5 +1,4 @@
 using System.Threading;
-using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 namespace DarkNaku.FoundationDI
@@ -43,8 +42,8 @@ namespace DarkNaku.FoundationDI
         public virtual void OnInitializeView() { }
         protected virtual void OnDestroyView() { }
 
-        public UniTask ShowAsync(CancellationToken ct) => Resolve().ShowAsync(RectTransform, ct);
-        public UniTask HideAsync(CancellationToken ct) => Resolve().HideAsync(RectTransform, ct);
+        public Awaitable ShowAsync(CancellationToken ct) => Resolve().ShowAsync(RectTransform, ct);
+        public Awaitable HideAsync(CancellationToken ct) => Resolve().HideAsync(RectTransform, ct);
 
         // === IPoolItem (풀 세부는 명시적 구현으로 감춘다) ===
         GameObject IPoolItem.GO => this != null ? gameObject : null;

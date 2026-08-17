@@ -1,12 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
-using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 namespace DarkNaku.FoundationDI
 {
-    internal delegate UniTask OperationQueueWork(CancellationToken cancellationToken);
+    internal delegate Awaitable OperationQueueWork(CancellationToken cancellationToken);
 
     internal sealed class OperationQueue
     {
@@ -20,10 +19,11 @@ namespace DarkNaku.FoundationDI
 
             _pending.Enqueue(work);
 
-            if (!_processing) ProcessLoopAsync().Forget();
+            if (!_processing) ProcessLoop();
         }
 
-        private async UniTaskVoid ProcessLoopAsync()
+        // fire-and-forget: 예외는 루프 내부에서 처리하므로 async void가 안전하다.
+        private async void ProcessLoop()
         {
             _processing = true;
 
@@ -33,20 +33,20 @@ namespace DarkNaku.FoundationDI
                 {
                     var next = _pending.Dequeue();
 
-                    try 
-                    { 
-                        await next(_cts.Token); 
+                    try
+                    {
+                        await next(_cts.Token);
                     }
                     catch (OperationCanceledException) { }
-                    catch (Exception e) 
-                    { 
-                        Debug.LogException(e); 
+                    catch (Exception e)
+                    {
+                        Debug.LogException(e);
                     }
                 }
             }
-            finally 
-            { 
-                _processing = false; 
+            finally
+            {
+                _processing = false;
             }
         }
 
