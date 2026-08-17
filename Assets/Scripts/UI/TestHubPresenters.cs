@@ -91,6 +91,6 @@ namespace FoundationDI.Host
 
         public TestHubBootstrap(IUIService ui) => _ui = ui;
 
-        public void Start() => _ui.Page<MainTestPage>();
+        public void Start() => _ui.Page<MenuPage>();
     }
 }
