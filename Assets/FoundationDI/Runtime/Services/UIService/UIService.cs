@@ -34,16 +34,14 @@ namespace DarkNaku.FoundationDI
         {
             get
             {
-                if (_root != null && _root.GO == null) ResetSceneState(); // 씬 파괴로 fake-null → 재구성
-                return _root ??= new UIRoot(
-                    _settings != null ? _settings.ReferenceResolution : default,
-                    _settings != null ? _settings.SortingLayerName : "Default",
-                    _settings != null ? _settings.SortingOrder : 0,
-                    _settings != null ? _settings.PlaneDistance : 100f);
+                // 캔버스는 DontDestroyOnLoad라 정상적으로는 파괴되지 않는다.
+                // 예외적으로 GO가 파괴되면(fake-null) 참조를 버리고 재구성한다.
+                if (_root != null && _root.GO == null) DiscardRoot();
+                return _root ??= new UIRoot(_settings != null ? _settings.ReferenceResolution : default);
             }
         }
 
-        // 전용 풀: active 씬 Canvas 아래에 위치하며 씬 전환 시 dispose/재구성된다.
+        // 전용 풀: 상주 Canvas 아래에 위치한다. 씬 전환 시 dispose되고 다음 표시에서 재구성된다.
         private PoolManager Pool => _pool ??= new PoolManager(_resource, null, Root.GO.transform);
 
         public bool IsPopupVisible => _popups.All.Count > 0;
@@ -194,11 +192,12 @@ namespace DarkNaku.FoundationDI
         private void OnActiveSceneChanged(Scene previous, Scene next)
         {
             if (_disposed || _root == null) return;
-            ResetSceneState();
+            // 캔버스(DontDestroyOnLoad)는 유지하고 자식 UI만 전부 clear한다.
+            ClearContent();
         }
 
-        // 씬 전환/Dispose 공통: 활성 UI teardown + 풀/루트 파괴 후 참조를 비워 다음 접근에 재구성.
-        private void ResetSceneState()
+        // 씬 전환 시: 활성 UI를 전부 teardown하고 풀을 dispose한다. 캔버스는 유지한다.
+        private void ClearContent()
         {
             _queue.CancelAndClear();
 
@@ -213,10 +212,15 @@ namespace DarkNaku.FoundationDI
             _popups.Clear();
             _overlays.Clear();
 
+            _pool?.Dispose(); // 풀은 캔버스 아래에서 재구성되므로 비운다(다음 표시에서 재생성).
+            _pool = null;
+        }
+
+        // GO가 외부에서 파괴된 경우(fake-null): 이미 없는 GO를 Destroy하지 않고 참조만 버린다.
+        private void DiscardRoot()
+        {
             _pool?.Dispose();
             _pool = null;
-
-            if (_root != null && _root.GO != null) UnityEngine.Object.Destroy(_root.GO);
             _root = null;
         }
 
@@ -225,7 +229,11 @@ namespace DarkNaku.FoundationDI
             if (_disposed) return;
             _disposed = true;
             SceneManager.activeSceneChanged -= OnActiveSceneChanged;
-            ResetSceneState();
+
+            // 서비스 종료(=지속 루트 스코프 dispose) 시에만 상주 캔버스를 실제로 파괴한다.
+            ClearContent();
+            if (_root != null && _root.GO != null) UnityEngine.Object.Destroy(_root.GO);
+            _root = null;
         }
     }
 

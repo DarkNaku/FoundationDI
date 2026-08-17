@@ -1,4 +1,3 @@
-using System;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -12,15 +11,14 @@ namespace DarkNaku.FoundationDI
         public Transform PopupLayer { get; }
         public Transform AboveOverlayLayer { get; }
 
-        public UIRoot(
-            Vector2 referenceResolution = default,
-            string sortingLayerName = "Default",
-            int sortingOrder = 0,
-            float planeDistance = 100f,
-            Func<Camera> cameraProvider = null)
+        public UIRoot(Vector2 referenceResolution = default)
         {
             GO = new GameObject("[UIService]", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+
+            // ScreenSpaceOverlay + DontDestroyOnLoad: 캔버스는 카메라에 의존하지 않고
+            // 앱 전체에 1개만 상주한다(씬을 넘어 생존). 씬 전환 시 자식 UI만 clear한다.
             var canvas = GO.GetComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
 
             var scaler = GO.GetComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
@@ -29,23 +27,7 @@ namespace DarkNaku.FoundationDI
                 ? referenceResolution
                 : new Vector2(1920f, 1080f);
 
-            // DontDestroyOnLoad를 하지 않는다 → GO는 생성 시점의 active 씬에 소속되어
-            // 그 씬의 카메라(Screen Space - Camera)와 함께 수명을 같이한다.
-            var camera = cameraProvider != null ? cameraProvider() : Camera.main;
-            if (camera != null)
-            {
-                canvas.renderMode = RenderMode.ScreenSpaceCamera;
-                canvas.worldCamera = camera;
-                canvas.planeDistance = planeDistance;
-                canvas.sortingLayerID = SortingLayer.NameToID(sortingLayerName);
-                canvas.sortingOrder = sortingOrder;
-            }
-            else
-            {
-                // 로딩 화면 등 MainCamera 태그 카메라가 없는 순간엔 최상단 Overlay로 폴백.
-                canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-                Debug.LogWarning("[UIService] Camera.main이 없어 UI Canvas를 ScreenSpaceOverlay로 폴백합니다. Sorting Layer 정렬이 적용되지 않습니다.");
-            }
+            Object.DontDestroyOnLoad(GO);
 
             // 생성 순서 = sibling 순서 = 렌더 순서(아래→위). Overlay는 Popup 기준 Above/Below로 분리된다.
             PageLayer = CreateLayer("[Page]");
