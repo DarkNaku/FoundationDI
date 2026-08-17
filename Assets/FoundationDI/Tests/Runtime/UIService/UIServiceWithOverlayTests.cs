@@ -81,4 +81,58 @@ public class UIServiceWithOverlayTests
 
         manager.Dispose();
     });
+
+    [UnityTest]
+    public IEnumerator persistent_오버레이는_페이지_전환시_동일_인스턴스로_연속유지된다() => UniTask.ToCoroutine(async () =>
+    {
+        var resource = Substitute.For<IResourceService>();
+        resource.Load<GameObject>("UI/WithOvHost").Returns(_hostPrefab);
+        resource.Load<GameObject>("UI/WithOvOverlay").Returns(_ovPrefab);
+        var resolver = Substitute.For<IObjectResolver>();
+        var settings = ScriptableObject.CreateInstance<UIServiceSettings>();
+        var factory = new UIInstanceFactory(resolver);
+        var manager = new UIService(settings, factory, resource);
+
+        var a = manager.Page<HostP>();
+        a.WithOverlay<OvP>(persistent: true);
+        await UniTask.WhenAny(UniTask.WaitUntil(() => a.Shown), UniTask.Delay(3000));
+        var ov1 = (OvP)a.LinkedOverlays[0];
+        Assert.IsTrue(ov1.Shown);
+
+        var b = manager.Page<HostP>();
+        b.WithOverlay<OvP>(persistent: true);
+        await UniTask.WhenAny(UniTask.WaitUntil(() => b.Shown), UniTask.Delay(3000));
+
+        Assert.AreEqual(1, b.LinkedOverlays.Count);
+        Assert.AreSame(ov1, (OvP)b.LinkedOverlays[0], "persistent 오버레이는 전환 시 동일 인스턴스로 이전되어야 한다");
+        Assert.IsFalse(ov1.AfterHideCalled, "연속 유지 오버레이는 전환 중 hide되지 않아야 한다");
+
+        manager.Dispose();
+    });
+
+    [UnityTest]
+    public IEnumerator 기본_오버레이는_페이지_전환시_새_인스턴스로_재생성된다() => UniTask.ToCoroutine(async () =>
+    {
+        var resource = Substitute.For<IResourceService>();
+        resource.Load<GameObject>("UI/WithOvHost").Returns(_hostPrefab);
+        resource.Load<GameObject>("UI/WithOvOverlay").Returns(_ovPrefab);
+        var resolver = Substitute.For<IObjectResolver>();
+        var settings = ScriptableObject.CreateInstance<UIServiceSettings>();
+        var factory = new UIInstanceFactory(resolver);
+        var manager = new UIService(settings, factory, resource);
+
+        var a = manager.Page<HostP>();
+        a.WithOverlay<OvP>(); // 기본(non-persistent)
+        await UniTask.WhenAny(UniTask.WaitUntil(() => a.Shown), UniTask.Delay(3000));
+        var ov1 = (OvP)a.LinkedOverlays[0];
+
+        var b = manager.Page<HostP>();
+        b.WithOverlay<OvP>();
+        await UniTask.WhenAny(UniTask.WaitUntil(() => b.Shown), UniTask.Delay(3000));
+
+        Assert.AreNotSame(ov1, (OvP)b.LinkedOverlays[0], "기본은 호스트별 새 인스턴스로 재생성되어야 한다");
+        Assert.IsTrue(ov1.AfterHideCalled, "기본은 전환 시 이전 오버레이가 hide되어야 한다");
+
+        manager.Dispose();
+    });
 }

@@ -17,6 +17,8 @@ namespace DarkNaku.FoundationDI
         private readonly PopupController _popups = new();
         private readonly OverlayController _overlays = new();
         private readonly HashSet<UIPresenter> _active = new();
+        // persistent WithOverlay로 현재 화면에 상주 중인 오버레이(타입키 단일 인스턴스). 페이지 전환 이전 대상.
+        private readonly Dictionary<Type, UIPresenter> _persistentOverlays = new();
         private UIRoot _root;
         private PoolManager _pool;
         private bool _disposed;
@@ -89,7 +91,8 @@ namespace DarkNaku.FoundationDI
 
             if (_pages.Current != null && _pages.Current != presenter)
             {
-                await HideWithLinkedAsync(_pages.Current, ct);
+                // 새 페이지가 persistent로 재요청하는 오버레이 타입은 teardown하지 않고 이전한다.
+                await HideHostAsync(_pages.Current, CarryOverTypes(presenter), ct);
                 _pages.Clear();
             }
 
@@ -98,6 +101,18 @@ namespace DarkNaku.FoundationDI
             AttachTo(presenter, Root.PageLayer);
 
             await ShowHostWithOverlaysAsync(presenter, ct);
+        }
+
+        // 들어오는 호스트가 persistent로 요청하며 현재 상주 중인 오버레이 타입 집합(전환 시 유지 대상).
+        private HashSet<Type> CarryOverTypes(UIPresenter incoming)
+        {
+            HashSet<Type> set = null;
+            var reqs = incoming.OverlayRequests;
+            if (reqs != null)
+                for (int i = 0; i < reqs.Count; i++)
+                    if (reqs[i].persistent && _persistentOverlays.ContainsKey(reqs[i].type))
+                        (set ??= new()).Add(reqs[i].type);
+            return set;
         }
 
         private async Awaitable ShowOverlayAsync(UIPresenter presenter, CancellationToken ct)
@@ -133,7 +148,15 @@ namespace DarkNaku.FoundationDI
             {
                 for (int i = 0; i < reqs.Count; i++)
                 {
-                    var (type, configure) = reqs[i];
+                    var (type, persistent, configure) = reqs[i];
+
+                    // persistent 이전: 이미 상주 중인 동일 타입 인스턴스를 재사용(재표시/재초기화 없음).
+                    if (persistent && _persistentOverlays.TryGetValue(type, out var existing))
+                    {
+                        host.LinkOverlay(existing); // 소유권만 이전
+                        continue;
+                    }
+
                     var overlay = _factory.CreatePresenter(type, this);
                     configure?.Invoke(overlay); // params만(View 바인딩/OnInitialize 전)
                     AcquireView(overlay);
@@ -142,6 +165,7 @@ namespace DarkNaku.FoundationDI
                     AttachTo(overlay, above ? Root.AboveOverlayLayer : Root.BelowOverlayLayer);
                     overlay.SetTransitionOverride(host.TransitionOverride); // 호스트와 동일 트랜지션(오버라이드 시)
                     host.LinkOverlay(overlay);
+                    if (persistent) _persistentOverlays[type] = overlay;
                     shows.Add(ShowAsync(overlay, ct)); // 오버레이 표시 시작
                 }
             }
@@ -150,21 +174,33 @@ namespace DarkNaku.FoundationDI
             for (int i = 0; i < shows.Count; i++) await shows[i]; // 모두 동시 진행 후 완료 대기
         }
 
-        // 호스트를 숨기고, WithOverlay로 링크된 오버레이도 함께(concurrent) 숨긴다.
-        private async Awaitable HideWithLinkedAsync(UIPresenter host, CancellationToken ct)
+        // 호스트를 숨기고, 링크된 오버레이도 함께(concurrent) 숨긴다.
+        // carryTypes에 속한 타입의 오버레이는 teardown하지 않고 상주시킨다(다음 페이지로 이전).
+        private async Awaitable HideHostAsync(UIPresenter host, HashSet<Type> carryTypes, CancellationToken ct)
         {
             var linked = host.LinkedOverlays;
 
             var hides = new List<Awaitable>();
             hides.Add(HideAsync(host, ct));
             if (linked != null)
-                for (int i = 0; i < linked.Count; i++) hides.Add(HideAsync(linked[i], ct));
+                for (int i = 0; i < linked.Count; i++)
+                {
+                    var ov = linked[i];
+                    if (carryTypes != null && carryTypes.Contains(ov.GetType())) continue; // 이전 대상 → 유지
+                    hides.Add(HideAsync(ov, ct));
+                }
 
             for (int i = 0; i < hides.Count; i++) await hides[i];
 
             if (linked != null)
             {
-                for (int i = 0; i < linked.Count; i++) _overlays.Unregister(linked[i]);
+                for (int i = 0; i < linked.Count; i++)
+                {
+                    var ov = linked[i];
+                    if (carryTypes != null && carryTypes.Contains(ov.GetType())) continue; // 유지된 인스턴스는 정리 안 함
+                    _overlays.Unregister(ov);
+                    _persistentOverlays.Remove(ov.GetType()); // persistent였다면 상주 목록에서 제거(no-op if 없음)
+                }
                 host.ClearLinkedOverlays();
             }
         }
@@ -226,7 +262,8 @@ namespace DarkNaku.FoundationDI
         {
             // 이미 숨겨졌거나 교체된 경우 중복 Hide 무시.
             if (!_active.Contains(presenter)) return;
-            await HideWithLinkedAsync(presenter, ct);
+            // 명시적 hide(교체 아님) → 이전 대상 없음. persistent 오버레이도 함께 숨긴다.
+            await HideHostAsync(presenter, null, ct);
             if (_pages.Current == presenter) _pages.Clear();
             _popups.Remove(presenter);
             _overlays.Unregister(presenter);
@@ -255,6 +292,7 @@ namespace DarkNaku.FoundationDI
             _pages.Clear();
             _popups.Clear();
             _overlays.Clear();
+            _persistentOverlays.Clear();
 
             _pool?.Dispose(); // 풀은 캔버스 아래에서 재구성되므로 비운다(다음 표시에서 재생성).
             _pool = null;
