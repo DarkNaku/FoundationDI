@@ -14,7 +14,7 @@ DI(의존성 주입) 기반 Unity 게임 개발 파운데이션 패키지입니�
 - **DI 컴포지션** — VContainer `LifetimeScope`에서 서비스를 인터페이스로 등록하고 생성자 주입으로 소비
 - **메시징** — MessagePipe 래퍼로 동기/비동기(UniTask) pub-sub, `IPublisher`/`ISubscriber` 지연 해석·캐싱
 - **리소스 로딩** — Addressables 추상화. 키 단위 캐싱 + 참조 카운팅으로 핸들 생명주기를 한 곳에서 관리
-- **UI 시스템** — uGUI 기반 Page/Popup/Overlay 표시·전환, 모달 입력 차단, 트랜지션 추상화
+- **UI 시스템** — 게임 전역 단일 상주 Canvas(ScreenSpaceOverlay·DontDestroyOnLoad) 위에 Page/Popup/Overlay 표시·전환, 모달 입력 차단, `Awaitable` 트랜지션 추상화. Page/Popup에 오버레이를 함께 노출하는 `WithOverlay`(동시 전환·`persistent` 연속 유지 옵션) 제공
 - **오브젝트 풀 / 사운드** — 키 기반 GameObject 풀링, SFX/BGM 재생. 사운드는 카탈로그(문자열키)·비동기 프리로드·볼륨/활성화 영속화를 제공하고 클립 로딩을 `IResourceService`에 위임
 - **햅틱** — iOS/Android 촉각 피드백. 시맨틱 프리셋(`Impact`/`Notification`/`Selection`, 옵트인 쿨다운) + `AnimationCurve` 커브·커스텀 패턴 재생(`Awaitable`, 단일 활성)과 플랫폼 케이퍼빌리티 폴백. 에디터/데스크톱은 Noop
 - **씬 컴포넌트 DI** — 씬에 배치된 MonoBehaviour에 의존성을 주입하는 인프라(`InjectableBehaviour` + `InjectorService`). 버튼 클릭 사운드용 `SoundButton` 제공
@@ -83,7 +83,7 @@ public class TitleFlow
 
 | 구성 요소 | 설명 | 상세 문서 |
 | --- | --- | --- |
-| **UIService** | uGUI 기반 UI 표시/전환 시스템. Presenter 타입으로 Page(단일 교체)/Popup(LIFO·모달)/Overlay(상주) 모드를 고정하고, 자동-show 빌더 API·모달 입력 차단(`CanvasGroup.interactable`)·트랜지션 추상화를 제공. 프리팹 로딩은 `IResourceService`에 위임. | [README](Assets/FoundationDI/Runtime/Services/UIService/README.md) |
+| **UIService** | uGUI 기반 UI 표시/전환 시스템. Presenter 타입으로 Page(단일 교체)/Popup(LIFO·모달)/Overlay(상주 Above/Below) 모드를 고정. **게임 전역 단일 상주 Canvas**(ScreenSpaceOverlay·DontDestroyOnLoad, 씬 전환 시 자식만 clear), Presenter 매 표시 재생성 + **View 풀링**, `Awaitable` 트랜지션, 모달 입력 차단(`CanvasGroup.interactable`). Page/Popup에 `WithOverlay`(오버레이 동시 노출·`persistent` 연속 유지)와 자동-show 빌더 API 제공. 프리팹 로딩은 `IResourceService`(Resources/Addressables)에 위임. | [README](Assets/FoundationDI/Runtime/Services/UIService/README.md) |
 | **ResourceService** | Addressables 추상화. `LoadAsync`/`Load`/`Release`/`Dispose` API로 키 단위 캐싱 + 참조 카운팅. 에셋 로딩이 필요한 모든 서비스의 위임 대상. | [README](Assets/FoundationDI/Runtime/Services/ResourceService/README.md) |
 | **MessageService** | MessagePipe 래퍼. `IObjectResolver`로 `IPublisher<T>`/`ISubscriber<T>`를 지연 해석해 캐싱하고, 동기/비동기(UniTask) pub-sub을 제공. | — |
 | **PoolService** | 키 기반 GameObject 오브젝트 풀. Resources→Addressables fallback으로 프리팹을 로드하며, 풀 항목 생명주기 콜백과 지연 반환(`Release(delay)`)을 지원. | — |
