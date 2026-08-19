@@ -74,13 +74,17 @@ namespace FoundationDI.Host
         private void RefreshEnabledLabel()
         {
             if (View.enabledLabel != null)
+            {
                 View.enabledLabel.text = _haptic.Enabled ? "Haptic: ON" : "Haptic: OFF";
+            }
         }
 
         private void SetStatus(string message)
         {
             if (View.statusLabel != null)
+            {
                 View.statusLabel.text = message;
+            }
         }
     }
 

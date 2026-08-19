@@ -78,8 +78,10 @@ namespace DarkNaku.FoundationDI
             var key = UIPrefabKeyResolver.Resolve(presenter.GetType());
             var view = Pool.Get<UIView>(key);
             if (view == null)
+            {
                 throw new InvalidOperationException(
                     $"[UIService] '{key}' View 로드 실패(프리팹 없음 또는 UIView 부재). ({presenter.GetType().Name})");
+            }
 
             presenter.BindView(view);
             presenter.OnInitialize();
@@ -109,10 +111,18 @@ namespace DarkNaku.FoundationDI
         {
             HashSet<Type> set = null;
             var reqs = incoming.OverlayRequests;
+
             if (reqs != null)
+            {
                 for (int i = 0; i < reqs.Count; i++)
+                {
                     if (reqs[i].persistent && _persistentOverlays.ContainsKey(reqs[i].type))
+                    {
                         (set ??= new()).Add(reqs[i].type);
+                    }
+                }
+            }
+
             return set;
         }
 
@@ -184,12 +194,14 @@ namespace DarkNaku.FoundationDI
             var hides = new List<Awaitable>();
             hides.Add(HideAsync(host, ct));
             if (linked != null)
+            {
                 for (int i = 0; i < linked.Count; i++)
                 {
                     var ov = linked[i];
                     if (carryTypes != null && carryTypes.Contains(ov.GetType())) continue; // 이전 대상 → 유지
                     hides.Add(HideAsync(ov, ct));
                 }
+            }
 
             for (int i = 0; i < hides.Count; i++) await hides[i];
 

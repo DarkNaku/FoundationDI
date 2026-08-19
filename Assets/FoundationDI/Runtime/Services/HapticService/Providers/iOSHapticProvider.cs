@@ -74,7 +74,10 @@ namespace DarkNaku.FoundationDI
             c.Samples = Mathf.Clamp(c.Samples <= 0 ? 16 : c.Samples, 2, 64);
             c.DelayMs = Mathf.Max(0f, c.DelayMs);
             if (c.Intensity == null || c.Intensity.length == 0)
+            {
                 c.Intensity = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
+            }
+
             return c;
         }
 

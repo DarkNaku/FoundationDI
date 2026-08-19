@@ -43,7 +43,9 @@ namespace DarkNaku.FoundationDI.Samples
         protected override void OnAfterHide()
         {
             for (int i = 0; i < View.characterButtons.Length; i++)
+            {
                 View.characterButtons[i].onClick.RemoveAllListeners();
+            }
         }
     }
 
