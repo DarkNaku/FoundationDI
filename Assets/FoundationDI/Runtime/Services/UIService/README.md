@@ -241,6 +241,9 @@ _ui.Page<StagePage>()
 
 - `void RegisterUIService(this IContainerBuilder builder, UIServiceSettings settings)` — UIService 등록 확장(`UIServiceSettings`/`UIInstanceFactory`/`UIService as IUIService` 등록).
   **전제: 호출 전에 `IResourceService`가 등록되어 있어야 합니다.**
+- **주입 대상**: Presenter는 생성 시(`UIInstanceFactory`), View는 프리팹 인스턴스 생성 시 계층 전체의 MonoBehaviour가 주입됩니다(`InjectGameObject`). 둘 다 `[Inject]` 필드를 쓸 수 있습니다.
+  - View 주입은 **풀 인스턴스당 1회**입니다. 풀에서 재사용될 때는 다시 주입되지 않습니다(씬 전환 시 풀이 dispose되므로 다음 표시에서 새로 생성·주입됩니다).
+  - UIService는 루트 스코프에 등록되므로 Presenter/View 모두 **루트 스코프 의존만** 해석됩니다.
 - `UIServiceSettings`(ScriptableObject) — `ReferenceResolution`(기본 1920×1080) **하나만** 제공합니다. CanvasScaler를 **Scale With Screen Size + Screen Match Mode = Expand**로 구성하고 기준 해상도로 사용합니다(설정이 없거나 0 이하면 1920×1080 폴백). sorting-layer/카메라/plane 필드는 ScreenSpaceOverlay 전환과 함께 제거되었습니다.
 
 ---

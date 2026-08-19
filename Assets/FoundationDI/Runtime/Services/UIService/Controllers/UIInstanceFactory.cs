@@ -7,6 +7,9 @@ namespace DarkNaku.FoundationDI
     {
         private readonly IObjectResolver _resolver;
 
+        // UIService 전용 풀도 같은 컨테이너로 View 계층을 주입해야 하므로 노출한다.
+        internal IObjectResolver Resolver => _resolver;
+
         public UIInstanceFactory(IObjectResolver resolver)
         {
             _resolver = resolver;

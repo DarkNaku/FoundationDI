@@ -43,7 +43,8 @@ namespace DarkNaku.FoundationDI
         }
 
         // 전용 풀: 상주 Canvas 아래에 위치한다. 씬 전환 시 dispose되고 다음 표시에서 재구성된다.
-        private PoolManager Pool => _pool ??= new PoolManager(_resource, null, Root.GO.transform);
+        // resolver를 넘겨 View 프리팹 계층의 MonoBehaviour도 인스턴스 생성 시 1회 주입되게 한다.
+        private PoolManager Pool => _pool ??= new PoolManager(_resource, _factory.Resolver, Root.GO.transform);
 
         public bool IsPopupVisible => _popups.All.Count > 0;
 
