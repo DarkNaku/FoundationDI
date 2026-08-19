@@ -3,7 +3,7 @@
 uGUI 기반 UI 표시/전환 시스템입니다. Presenter 타입으로 표시 모드(Page/Popup/Overlay)를 컴파일 타임에 고정하고, 모든 Show/Hide 전환을 단일 큐로 순차 직렬화합니다. 프리팹 로딩은 공용 [`IResourceService`](../ResourceService/README.md)에 위임하며, 백엔드(Resources/Addressables)는 어떤 `IResourceProvider`를 등록했는지로 결정됩니다.
 
 - **3가지 표시 모드** — Page(단일 교체), Popup(LIFO 스택·모달), Overlay(상주, Popup 기준 Above/Below)
-- **빌더 체인** — `Page<T>()` 즉시 인스턴스 반환 + Show 자동 enqueue → 같은 프레임 `.With()/.OnAfterShow()/.WithTransition()/.WithOverlay()` 동기 체인
+- **빌더 체인** — `Page<T>()` 즉시 인스턴스 반환 + Show 자동 enqueue → 같은 프레임 `.WithParams()/.OnAfterShow()/.WithTransition()/.WithOverlay()` 동기 체인
 - **전환 직렬화** — `OperationQueue`로 모든 전환을 순차 처리(race 제거)
 - **Presenter는 매 표시마다 새로 생성, View는 풀 재사용** — Presenter 인스턴스 캐시는 없음. `Page/Popup/Overlay<T>()`마다 새 Presenter 생성 + `OnInitialize` 재실행. View만 프리팹 키로 풀링되어 재사용됨.
 - **상주 캔버스** — 단일 `[UIService]` Canvas(ScreenSpaceOverlay)는 `DontDestroyOnLoad`로 앱 전체에 1개만 상주. 씬 전환 시 자식 UI만 clear하고 캔버스는 유지.
@@ -73,7 +73,7 @@ public class Example
            .OnAfterShow(p => Debug.Log("표시 완료"));
 
         _ui.Popup<ConfirmPresenter>()
-           .With(new ConfirmParams("정말 삭제할까요?"))   // IConfigurable<TParams> 필요
+           .WithParams(new ConfirmParams("정말 삭제할까요?"))   // IConfigurable<TParams> 필요
            .WithTransition(_fadeTransition);               // per-show 트랜지션 오버라이드
     }
 }
@@ -89,7 +89,7 @@ presenter.Hide();    // 숨김 요청(큐에 enqueue) + View 풀 반환
 
 ### 5) 파라미터 전달
 
-`IConfigurable<TParams>`를 Presenter에 구현하면 `.With(params)`로 값을 주입할 수 있습니다.
+`IConfigurable<TParams>`를 Presenter에 구현하면 `.WithParams(params)`로 값을 주입할 수 있습니다.
 
 ```csharp
 public readonly struct ConfirmParams { public readonly string Message; public ConfirmParams(string m) => Message = m; }
@@ -189,7 +189,7 @@ _ui.Page<StagePage>()
 
 | 메서드 | 설명 |
 | --- | --- |
-| `With<TParams>(TParams p)` | Presenter가 `IConfigurable<TParams>`면 `Configure(p)` 호출(아니면 경고 후 무시) |
+| `WithParams<TParams>(TParams p)` | Presenter가 `IConfigurable<TParams>`면 `Configure(p)` 호출(아니면 경고 후 무시) |
 | `OnBeforeShow(Action<TSelf> cb)` | BeforeShow 라이프사이클에 콜백 등록 |
 | `OnAfterShow(Action<TSelf> cb)` | AfterShow 라이프사이클에 콜백 등록 |
 | `OnBeforeHide(Action<TSelf> cb)` | BeforeHide 라이프사이클에 콜백 등록 |
@@ -223,7 +223,7 @@ _ui.Page<StagePage>()
 ### 속성 / 인터페이스
 
 - `[UIPrefab("키")]` — Presenter 클래스에 부착. 프리팹 로드 키. `IResourceService.Load<GameObject>(key)`로 로드.
-- `IConfigurable<TParams>` — Presenter에 구현 시 `.With(params)`로 `Configure(params)` 수신. Configure는 View 바인딩 전에 호출되므로 View 접근 금지.
+- `IConfigurable<TParams>` — Presenter에 구현 시 `.WithParams(params)`로 `Configure(params)` 수신. Configure는 View 바인딩 전에 호출되므로 View 접근 금지.
 
 ### 트랜지션
 

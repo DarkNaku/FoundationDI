@@ -4,13 +4,13 @@
 
 ## 시연 내용
 - **Page 교체**: Title → CharacterList → CharacterDetail. 새 Page를 표시하면 이전 Page는 자동으로 Hide된다.
-- **파라미터 전달**: `IConfigurable<CharacterDetailParams>`를 구현하고 `.With(params)`로 CharacterId 주입.
+- **파라미터 전달**: `IConfigurable<CharacterDetailParams>`를 구현하고 `.WithParams(params)`로 CharacterId 주입.
 - **라이프사이클 콜백 4종**: `OnBeforeShow`/`OnAfterShow`/`OnBeforeHide`/`OnAfterHide`를 빌더로 구독해 Console에 로그.
 
 ## 핵심 코드
 ```csharp
 _ui.Page<CharacterDetailPage>()
-   .With(new CharacterDetailParams { CharacterId = id })
+   .WithParams(new CharacterDetailParams { CharacterId = id })
    .OnBeforeShow(p => Debug.Log("[Lifecycle] OnBeforeShow"))
    .OnAfterShow(p => Debug.Log("[Lifecycle] OnAfterShow"));
 

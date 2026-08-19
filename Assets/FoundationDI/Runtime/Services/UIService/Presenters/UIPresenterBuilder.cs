@@ -48,7 +48,7 @@ namespace DarkNaku.FoundationDI
         /// <b>주의:</b> <c>Configure</c>는 View에 접근하지 말 것 — 호출 시점에 View가 아직 바인딩되지 않았을 수 있다.
         /// 전달 params만 저장하고 View 접근은 <c>OnInitialize</c>/<c>OnBeforeShow</c>에서 수행한다.
         /// </remarks>
-        public TSelf With<TParams>(TParams p)
+        public TSelf WithParams<TParams>(TParams p)
         {
             if (this is IConfigurable<TParams> config)
             {
@@ -56,7 +56,7 @@ namespace DarkNaku.FoundationDI
             }
             else
             {
-                Debug.LogWarning($"[UIService] {GetType().Name}이(가) IConfigurable<{typeof(TParams).Name}>를 구현하지 않아 With(...)가 무시됩니다.");
+                Debug.LogWarning($"[UIService] {GetType().Name}이(가) IConfigurable<{typeof(TParams).Name}>를 구현하지 않아 WithParams(...)가 무시됩니다.");
             }
 
             return (TSelf)this;

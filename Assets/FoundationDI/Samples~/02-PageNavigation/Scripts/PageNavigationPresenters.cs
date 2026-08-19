@@ -32,7 +32,7 @@ namespace DarkNaku.FoundationDI.Samples
                 int id = i + 1;
                 View.characterButtons[i].onClick.AddListener(() =>
                     _ui.Page<CharacterDetailPage>()
-                       .With(new CharacterDetailParams { CharacterId = id })
+                       .WithParams(new CharacterDetailParams { CharacterId = id })
                        .OnBeforeShow(p => Debug.Log("[Lifecycle] OnBeforeShow"))
                        .OnAfterShow(p => Debug.Log("[Lifecycle] OnAfterShow"))
                        .OnBeforeHide(p => Debug.Log("[Lifecycle] OnBeforeHide"))
