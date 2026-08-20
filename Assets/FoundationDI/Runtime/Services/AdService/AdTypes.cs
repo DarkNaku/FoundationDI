@@ -87,6 +87,14 @@ namespace DarkNaku.FoundationDI
             Precision = precision;
             CreativeId = creativeId;
         }
+
+        // 임프레션은 어댑터가 만들지만 배치명은 정책 계층만 안다(ShowAsync 인자).
+        // 재발행 시 스탬프할 수 있도록 배치명만 바꾼 사본을 돌려준다.
+        public AdImpression WithPlacement(string placement)
+        {
+            return new AdImpression(Format, AdPlatform, NetworkName, AdUnitId, NetworkPlacement,
+                                    placement, Revenue, Currency, Precision, CreativeId);
+        }
     }
 
     public readonly struct AdRetryPolicy

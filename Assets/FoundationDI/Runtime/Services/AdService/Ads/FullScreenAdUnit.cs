@@ -146,7 +146,13 @@ namespace DarkNaku.FoundationDI
         }
         private void OnClosed() { }                        // Task 5
         private void OnRewarded(AdReward reward) { }       // Task 5
-        private void OnPaid(AdImpression impression) => Paid?.Invoke(impression);
+        // 어댑터는 배치명을 모른다. 표시 중인 광고의 배치명을 여기서 채워 넣는다.
+        private void OnPaid(AdImpression impression)
+        {
+            Paid?.Invoke(string.IsNullOrEmpty(_activePlacement)
+                ? impression
+                : impression.WithPlacement(_activePlacement));
+        }
 
         public void Dispose()
         {

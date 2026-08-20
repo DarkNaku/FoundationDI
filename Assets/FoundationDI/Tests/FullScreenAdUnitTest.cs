@@ -154,4 +154,61 @@ public class FullScreenAdUnitTest
         adapter.RaiseDisplayFailed(new AdError(0, "cleanup"));
         await first;
     });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 표시_중인_배치명이_Paid_임프레션에_찍힌다() => UniTask.ToCoroutine(async () =>
+    {
+        var adapter = new FakeFullScreenAdapter();
+        var dispatcher = new FakeAdDispatcher();
+        var sut = NewUnit(adapter, dispatcher);
+
+        adapter.RaiseLoaded();
+
+        AdImpression? received = null;
+        sut.Paid += impression => received = impression;
+
+        // Awaitable을 먼저 잡아두고 이벤트를 발화시킨 뒤 await 한다.
+        var pending = sut.ShowAsync("some_placement");
+
+        var raised = new AdImpression(AdFormat.Interstitial, "AdMob", "Meta", "unit-1", "network-placement",
+                                      null, 1.23, "USD", AdRevenuePrecision.Exact, "creative-9");
+        adapter.RaisePaid(raised);
+
+        Assert.IsTrue(received.HasValue, "Paid 이벤트가 발화되지 않았다");
+        Assert.AreEqual("some_placement", received.Value.Placement);
+        Assert.AreEqual(raised.Format, received.Value.Format);
+        Assert.AreEqual(raised.AdPlatform, received.Value.AdPlatform);
+        Assert.AreEqual(raised.NetworkName, received.Value.NetworkName);
+        Assert.AreEqual(raised.AdUnitId, received.Value.AdUnitId);
+        Assert.AreEqual(raised.NetworkPlacement, received.Value.NetworkPlacement);
+        Assert.AreEqual(raised.Revenue, received.Value.Revenue, 0.0001);
+        Assert.AreEqual(raised.Currency, received.Value.Currency);
+        Assert.AreEqual(raised.Precision, received.Value.Precision);
+        Assert.AreEqual(raised.CreativeId, received.Value.CreativeId);
+
+        // 정리: 표시 중 발화를 남기지 않는다.
+        LogAssert.Expect(UnityEngine.LogType.Warning,
+                         new System.Text.RegularExpressions.Regex("표시 실패"));
+        adapter.RaiseDisplayFailed(new AdError(0, "cleanup"));
+        await pending;
+    });
+
+    [Test]
+    public void 표시_중이_아닐_때는_어댑터가_채운_배치명을_그대로_보존한다()
+    {
+        var adapter = new FakeFullScreenAdapter();
+        var dispatcher = new FakeAdDispatcher();
+        var sut = NewUnit(adapter, dispatcher);
+
+        AdImpression? received = null;
+        sut.Paid += impression => received = impression;
+
+        var raised = new AdImpression(AdFormat.Interstitial, "AdMob", "Meta", "unit-1", "network-placement",
+                                      "adapter-own-placement", 1.23, "USD", AdRevenuePrecision.Exact, "creative-9");
+        adapter.RaisePaid(raised);
+
+        Assert.IsTrue(received.HasValue, "Paid 이벤트가 발화되지 않았다");
+        Assert.AreEqual("adapter-own-placement", received.Value.Placement);
+    }
 }

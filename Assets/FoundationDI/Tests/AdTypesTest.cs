@@ -66,4 +66,24 @@ public class AdTypesTest
         Assert.IsTrue(string.IsNullOrEmpty(id.Current));
 #endif
     }
+
+    [Test]
+    public void WithPlacement은_배치명만_바꾸고_나머지_필드는_그대로_보존한다()
+    {
+        var original = new AdImpression(AdFormat.Rewarded, "AdMob", "Meta", "unit-1", "network-placement",
+                                        "original-placement", 1.23, "USD", AdRevenuePrecision.Exact, "creative-9");
+
+        var stamped = original.WithPlacement("new-placement");
+
+        Assert.AreEqual("new-placement", stamped.Placement);
+        Assert.AreEqual(original.Format, stamped.Format);
+        Assert.AreEqual(original.AdPlatform, stamped.AdPlatform);
+        Assert.AreEqual(original.NetworkName, stamped.NetworkName);
+        Assert.AreEqual(original.AdUnitId, stamped.AdUnitId);
+        Assert.AreEqual(original.NetworkPlacement, stamped.NetworkPlacement);
+        Assert.AreEqual(original.Revenue, stamped.Revenue, 0.0001);
+        Assert.AreEqual(original.Currency, stamped.Currency);
+        Assert.AreEqual(original.Precision, stamped.Precision);
+        Assert.AreEqual(original.CreativeId, stamped.CreativeId);
+    }
 }
