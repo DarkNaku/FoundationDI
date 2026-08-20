@@ -63,7 +63,18 @@ namespace DarkNaku.FoundationDI
 
             if (warning != null) Debug.LogWarning(warning);
 
-            // Resolve가 고른 effective를 실제로 소비한다. 3사 어댑터가 추가되면 여기에 case가 늘어난다.
+            return Build(effective, dummyOptions);
+        }
+
+        // effective(이미 결정된 provider)를 실제 인스턴스로 소비하는 부분만 분리했다.
+        // internal인 이유: Resolve가 어떤 심볼도 없이는 Dummy 외의 값을 절대 돌려주지 않아
+        // Create를 통해서는 default 분기에 도달할 방법이 없다 — 이 프로젝트에는 아직
+        // FOUNDATIONDI_* 심볼이 하나도 정의돼 있지 않다. 그래서 이 분기만 별도로 잘라내
+        // 테스트 어셈블리(InternalsVisibleTo)가 이미 "사용 가능하다고 판단된" 상태를
+        // 직접 넣어 default 분기를 검증할 수 있게 한다.
+        internal IAdProvider Build(AdProviderType effective, DummyAdOptions dummyOptions)
+        {
+            // 3사 어댑터가 추가되면 여기에 case가 늘어난다.
             switch (effective)
             {
                 case AdProviderType.Dummy:
