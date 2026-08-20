@@ -9,13 +9,14 @@ public class FullScreenAdUnitTest
 {
     private static readonly AdRetryPolicy Policy = new(maxAttempts: 3, baseSeconds: 2f, maxDelaySeconds: 64f);
 
-    // 테스트마다 반복되는 조립을 한 곳으로 모은다. adsRemoved 기본은 false.
+    // 테스트마다 반복되는 조립을 한 곳으로 모은다. adsRemoved 기본은 false, cooldownSeconds 기본은 0(쿨다운 없음).
     private static FullScreenAdUnit NewUnit(FakeFullScreenAdapter adapter, FakeAdDispatcher dispatcher,
                                            AdFormat format = AdFormat.Interstitial,
                                            int rewardGraceFrames = 1,
+                                           float cooldownSeconds = 0f,
                                            Func<bool> adsRemoved = null)
     {
-        return new FullScreenAdUnit(adapter, dispatcher, format, Policy, rewardGraceFrames, adsRemoved);
+        return new FullScreenAdUnit(adapter, dispatcher, format, Policy, rewardGraceFrames, cooldownSeconds, adsRemoved);
     }
 
     [Test]
@@ -690,4 +691,153 @@ public class FullScreenAdUnitTest
         var result = await pending;
         Assert.AreEqual(AdShowOutcome.Rewarded, result.Outcome);
     });
+
+    // ---- 전면 쿨다운 게이트 ----
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 전면광고는_표시_후_쿨다운_동안_재표시가_Blocked된다() => UniTask.ToCoroutine(async () =>
+    {
+        var adapter = new FakeFullScreenAdapter();
+        var dispatcher = new FakeAdDispatcher();
+        var sut = NewUnit(adapter, dispatcher, AdFormat.Interstitial, cooldownSeconds: 120f);
+
+        adapter.RaiseLoaded();
+        var pending = sut.ShowAsync();
+        adapter.RaiseDisplayed();
+        adapter.RaiseClosed();
+        dispatcher.TickFrames(1);
+        await pending;
+
+        adapter.RaiseLoaded();   // 닫힘 후 자동 재로드가 완료됐다고 가정한다
+        var result = await sut.ShowAsync();
+
+        Assert.AreEqual(AdShowOutcome.Blocked, result.Outcome);
+        Assert.AreEqual(1, adapter.ShowCount, "쿨다운 중인데 Show가 다시 호출됐다");
+    });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 쿨다운이_지나면_전면광고가_다시_표시된다() => UniTask.ToCoroutine(async () =>
+    {
+        var adapter = new FakeFullScreenAdapter();
+        var dispatcher = new FakeAdDispatcher();
+        var sut = NewUnit(adapter, dispatcher, AdFormat.Interstitial, cooldownSeconds: 120f);
+
+        adapter.RaiseLoaded();
+        var pending = sut.ShowAsync();
+        adapter.RaiseDisplayed();
+        adapter.RaiseClosed();
+        dispatcher.TickFrames(1);
+        await pending;
+
+        adapter.RaiseLoaded();
+        dispatcher.Advance(120f);
+
+        var showCountBefore = adapter.ShowCount;
+        var second = sut.ShowAsync();
+
+        Assert.AreEqual(showCountBefore + 1, adapter.ShowCount, "쿨다운이 지났는데도 Show가 호출되지 않았다");
+
+        // 정리: 표시 중 발화를 남기지 않는다.
+        LogAssert.Expect(UnityEngine.LogType.Warning,
+                         new System.Text.RegularExpressions.Regex("표시 실패"));
+        adapter.RaiseDisplayFailed(new AdError(0, "cleanup"));
+        await second;
+    });
+
+    // "보상형은 쿨다운 대상이 아니다"는 이 클래스가 보장하지 않는다 — FullScreenAdUnit은
+    // cooldownSeconds를 포맷과 무관하게 그대로 적용한다(생성자에 120을 주면 Rewarded든
+    // Interstitial이든 똑같이 쿨다운이 걸린다). 포맷별 면제는 AdService.BuildAdUnits가
+    // 보상형에 0을 조립해 넣어서 만든다 — 그 보장은 AdServiceTest의
+    // "설정된_전면_쿨다운은_보상형에는_적용되지_않는다"가 실제 조립 경로로 검증한다.
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator CanShow은_쿨다운_동안_거짓이고_지나면_참이다() => UniTask.ToCoroutine(async () =>
+    {
+        var adapter = new FakeFullScreenAdapter();
+        var dispatcher = new FakeAdDispatcher();
+        var sut = NewUnit(adapter, dispatcher, AdFormat.Interstitial, cooldownSeconds: 120f);
+
+        adapter.RaiseLoaded();
+        Assert.IsTrue(sut.CanShow, "로드 직후에는 표시 가능해야 한다");
+
+        var pending = sut.ShowAsync();
+        adapter.RaiseDisplayed();
+
+        Assert.IsFalse(sut.CanShow, "표시 직후 쿨다운 중인데 CanShow가 참이다");
+
+        adapter.RaiseClosed();
+        dispatcher.TickFrames(1);
+        await pending;
+
+        adapter.RaiseLoaded();
+        Assert.IsFalse(sut.CanShow, "쿨다운이 남아있는데 CanShow가 참이다");
+
+        dispatcher.Advance(120f);
+        Assert.IsTrue(sut.CanShow, "쿨다운이 끝났는데도 CanShow가 거짓이다");
+    });
+
+    [Test]
+    public void CanShow은_광고제거_상태의_전면광고에서_거짓이다()
+    {
+        var adapter = new FakeFullScreenAdapter();
+        var dispatcher = new FakeAdDispatcher();
+        var sut = NewUnit(adapter, dispatcher, AdFormat.Interstitial, adsRemoved: () => true);
+
+        adapter.RaiseLoaded();
+
+        Assert.IsFalse(sut.CanShow, "광고제거 상태인데 CanShow가 참이다");
+    }
+
+    [Test]
+    public void CanShow은_준비되지_않았으면_거짓이다()
+    {
+        var adapter = new FakeFullScreenAdapter { IsReady = false };
+        var dispatcher = new FakeAdDispatcher();
+        var sut = NewUnit(adapter, dispatcher);
+
+        Assert.IsFalse(sut.CanShow, "준비 안 됐는데 CanShow가 참이다");
+    }
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 쿨다운이_0이면_표시_직후에도_다시_표시할_수_있다() => UniTask.ToCoroutine(async () =>
+    {
+        var adapter = new FakeFullScreenAdapter();
+        var dispatcher = new FakeAdDispatcher();
+        var sut = NewUnit(adapter, dispatcher, AdFormat.Interstitial, cooldownSeconds: 0f);
+
+        adapter.RaiseLoaded();
+        var pending = sut.ShowAsync();
+        adapter.RaiseDisplayed();
+        adapter.RaiseClosed();
+        dispatcher.TickFrames(1);
+        await pending;
+
+        adapter.RaiseLoaded();
+
+        Assert.IsTrue(sut.CanShow, "쿨다운이 0인데도 CanShow가 거짓이다");
+        Assert.AreEqual(0, dispatcher.PendingCount, "쿨다운이 0인데 타이머가 예약됐다");
+    });
+
+    [Test]
+    public void Dispose는_쿨다운_타이머를_취소한다()
+    {
+        var adapter = new FakeFullScreenAdapter();
+        var dispatcher = new FakeAdDispatcher();
+        var sut = NewUnit(adapter, dispatcher, AdFormat.Interstitial, cooldownSeconds: 120f);
+
+        adapter.RaiseLoaded();
+        _ = sut.ShowAsync();
+        adapter.RaiseDisplayed();   // 쿨다운 타이머가 예약된다
+
+        sut.Dispose();
+
+        Assert.AreEqual(0, dispatcher.PendingCount, "Dispose가 쿨다운 타이머를 취소하지 않았다");
+
+        Assert.DoesNotThrow(() => dispatcher.Advance(200f),
+                            "취소되지 않은 쿨다운 콜백이 해제된 유닛을 건드려 예외를 던졌다");
+    }
 }

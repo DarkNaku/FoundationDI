@@ -15,7 +15,7 @@ public class AdServiceTest
         public void Save(bool removed) { Value = removed; SaveCount++; }
     }
 
-    private static AdServiceOptions NewOptions(bool autoLoad = true)
+    private static AdServiceOptions NewOptions(bool autoLoad = true, float interstitialCooldownSeconds = 0f)
     {
         return new AdServiceOptions(
             banner: new AdUnitId("banner-a", "banner-i"),
@@ -25,6 +25,7 @@ public class AdServiceTest
             providerContext: new AdProviderContext("app-key", false, false, new List<string>()),
             retryPolicy: new AdRetryPolicy(3, 2f, 64f),
             rewardGraceFrames: 1,
+            interstitialCooldownSeconds: interstitialCooldownSeconds,
             autoLoadOnInitialize: autoLoad);
     }
 
@@ -313,6 +314,7 @@ public class AdServiceTest
             providerContext: new AdProviderContext("app-key", false, false, new List<string>()),
             retryPolicy: new AdRetryPolicy(3, 2f, 64f),
             rewardGraceFrames: 1,
+            interstitialCooldownSeconds: 0f,
             autoLoadOnInitialize: false);
         var sut = new AdService(provider, new FakeAdDispatcher(), options, new FakeRemovalStorage());
 
@@ -337,6 +339,7 @@ public class AdServiceTest
             providerContext: new AdProviderContext(null, false, false, new List<string>()),
             retryPolicy: new AdRetryPolicy(3, 2f, 64f),
             rewardGraceFrames: 1,
+            interstitialCooldownSeconds: 0f,
             autoLoadOnInitialize: false);
         var sut = new AdService(provider, new FakeAdDispatcher(), options, new FakeRemovalStorage());
 
@@ -372,5 +375,38 @@ public class AdServiceTest
         Assert.IsNotNull(sut.Interstitial, "재시도 후에도 전면 광고 유닛이 만들어지지 않았다");
         Assert.IsNotNull(sut.Rewarded, "재시도 후에도 보상 광고 유닛이 만들어지지 않았다");
         Assert.IsNotNull(sut.Banner, "재시도 후에도 배너 유닛이 만들어지지 않았다");
+    });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 설정된_전면_쿨다운은_보상형에는_적용되지_않는다() => UniTask.ToCoroutine(async () =>
+    {
+        // BuildAdUnits이 옵션의 쿨다운을 전면에만 흘려보내고 보상에는 0을 넘기는지 확인한다.
+        var provider = new FakeAdProvider();
+        var dispatcher = new FakeAdDispatcher();
+        var sut = new AdService(provider, dispatcher,
+                                NewOptions(interstitialCooldownSeconds: 120f), new FakeRemovalStorage());
+        await sut.InitializeAsync();
+
+        provider.InterstitialAdapter.RaiseLoaded();
+        var interstitialPending = sut.Interstitial.ShowAsync();
+        provider.InterstitialAdapter.RaiseDisplayed();
+
+        Assert.IsFalse(sut.Interstitial.CanShow, "설정된 쿨다운이 전면광고에 적용되지 않았다");
+
+        provider.RewardedAdapter.RaiseLoaded();
+        var rewardedPending = sut.Rewarded.ShowAsync();
+        provider.RewardedAdapter.RaiseDisplayed();
+
+        Assert.IsTrue(sut.Rewarded.CanShow, "전면 쿨다운이 보상형에도 적용됐다");
+
+        // 정리
+        provider.InterstitialAdapter.RaiseClosed();
+        dispatcher.TickFrames(1);
+        await interstitialPending;
+
+        provider.RewardedAdapter.RaiseClosed();
+        dispatcher.TickFrames(1);
+        await rewardedPending;
     });
 }

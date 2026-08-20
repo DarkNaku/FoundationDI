@@ -15,11 +15,13 @@ namespace DarkNaku.FoundationDI
         public AdProviderContext ProviderContext { get; }
         public AdRetryPolicy RetryPolicy { get; }
         public int RewardGraceFrames { get; }
+        public float InterstitialCooldownSeconds { get; }
         public bool AutoLoadOnInitialize { get; }
 
         public AdServiceOptions(AdUnitId banner, AdUnitId interstitial, AdUnitId rewarded,
                                 BannerOptions bannerOptions, AdProviderContext providerContext,
-                                AdRetryPolicy retryPolicy, int rewardGraceFrames, bool autoLoadOnInitialize)
+                                AdRetryPolicy retryPolicy, int rewardGraceFrames,
+                                float interstitialCooldownSeconds, bool autoLoadOnInitialize)
         {
             Banner = banner;
             Interstitial = interstitial;
@@ -28,6 +30,7 @@ namespace DarkNaku.FoundationDI
             ProviderContext = providerContext;
             RetryPolicy = retryPolicy;
             RewardGraceFrames = rewardGraceFrames;
+            InterstitialCooldownSeconds = interstitialCooldownSeconds;
             AutoLoadOnInitialize = autoLoadOnInitialize;
         }
     }
@@ -148,11 +151,14 @@ namespace DarkNaku.FoundationDI
 
             _interstitial = new FullScreenAdUnit(
                 _provider.CreateInterstitial(_options.Interstitial.Current), _dispatcher,
-                AdFormat.Interstitial, _options.RetryPolicy, _options.RewardGraceFrames, () => _adsRemoved);
+                AdFormat.Interstitial, _options.RetryPolicy, _options.RewardGraceFrames,
+                _options.InterstitialCooldownSeconds, () => _adsRemoved);
 
+            // 보상형은 유저가 자발적으로 보는 것이라 쿨다운 대상이 아니다 — 0을 넘겨 게이트를 무력화한다.
             _rewarded = new FullScreenAdUnit(
                 _provider.CreateRewarded(_options.Rewarded.Current), _dispatcher,
-                AdFormat.Rewarded, _options.RetryPolicy, _options.RewardGraceFrames, () => _adsRemoved);
+                AdFormat.Rewarded, _options.RetryPolicy, _options.RewardGraceFrames,
+                0f, () => _adsRemoved);
 
             _banner = new BannerAdUnit(
                 () => _provider.CreateBanner(_options.Banner.Current, _options.BannerOptions),

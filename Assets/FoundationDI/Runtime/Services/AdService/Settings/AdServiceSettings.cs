@@ -49,6 +49,11 @@ namespace DarkNaku.FoundationDI
                  "0으로 두면 닫힘이 보상보다 먼저 오는 네트워크에서 보상을 잃는다.")]
         [SerializeField] private int _rewardGraceFrames = 1;
 
+        [Tooltip("전면광고가 표시된 뒤 다음 전면광고를 다시 표시할 수 있을 때까지의 최소 간격(초). " +
+                 "쿨다운은 요청/닫힘이 아니라 표시 시점에 시작된다. 0이면 게이트가 꺼진다. " +
+                 "보상형에는 적용되지 않는다.")]
+        [SerializeField, Min(0)] private float _interstitialCooldownSeconds = 120f;
+
         [Header("Debug")]
         [SerializeField] private bool _verboseLogging;
         [SerializeField] private bool _testMode;
@@ -68,6 +73,7 @@ namespace DarkNaku.FoundationDI
             var maxRetryAttempts = Mathf.Max(0, _maxRetryAttempts);
             var retryBaseSeconds = Mathf.Max(MinRetryBaseSeconds, _retryBaseSeconds);
             var maxRetryDelaySeconds = Mathf.Max(MinRetryDelaySeconds, _maxRetryDelaySeconds);
+            var interstitialCooldownSeconds = Mathf.Max(0f, _interstitialCooldownSeconds);
 
             return new AdServiceOptions(
                 banner: _bannerUnitId,
@@ -77,6 +83,7 @@ namespace DarkNaku.FoundationDI
                 providerContext: new AdProviderContext(_appKey.Current, _verboseLogging, _testMode, _testDeviceIds),
                 retryPolicy: new AdRetryPolicy(maxRetryAttempts, retryBaseSeconds, maxRetryDelaySeconds),
                 rewardGraceFrames: _rewardGraceFrames,
+                interstitialCooldownSeconds: interstitialCooldownSeconds,
                 autoLoadOnInitialize: _autoLoadOnInitialize);
         }
     }

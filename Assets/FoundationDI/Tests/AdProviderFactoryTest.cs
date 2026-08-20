@@ -48,6 +48,24 @@ public class AdProviderFactoryTest
         Assert.AreEqual(1, options.RewardGraceFrames);
         Assert.IsTrue(options.AutoLoadOnInitialize);
         Assert.AreEqual(BannerPosition.Bottom, options.BannerOptions.Position);
+        Assert.AreEqual(120f, options.InterstitialCooldownSeconds, 0.001f,
+                        "전면 쿨다운 기본값은 120초여야 한다");
+
+        UnityEngine.ScriptableObject.DestroyImmediate(settings);
+    }
+
+    [Test]
+    public void 전면_쿨다운_설정값이_음수여도_ToOptions는_0으로_클램프한다()
+    {
+        // [Min(0)]은 인스펙터 편집만 막는다 — 손으로 고친 .asset의 음수 값은 그대로 들어온다.
+        // 음수 쿨다운이 새어나오면 Delay(음수, ...)가 즉시(또는 과거로) 발화해 게이트가 무력화된다.
+        var settings = UnityEngine.ScriptableObject.CreateInstance<AdServiceSettings>();
+        UnityEngine.JsonUtility.FromJsonOverwrite("{\"_interstitialCooldownSeconds\":-30}", settings);
+
+        var options = settings.ToOptions();
+
+        Assert.AreEqual(0f, options.InterstitialCooldownSeconds, 0.001f,
+                        "음수 쿨다운이 0으로 클램프되지 않았다");
 
         UnityEngine.ScriptableObject.DestroyImmediate(settings);
     }

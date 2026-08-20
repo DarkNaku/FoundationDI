@@ -13,6 +13,7 @@ namespace DarkNaku.FoundationDI
         private readonly AdFormat _format;
         private readonly AdRetryPolicy _retryPolicy;
         private readonly int _rewardGraceFrames;
+        private readonly float _cooldownSeconds;
         private readonly Func<bool> _adsRemoved;
 
         // 전면은 광고제거 시 차단, 보상은 항상 허용. format에서 유도해 호출자가 틀릴 여지를 없앤다.
@@ -21,6 +22,9 @@ namespace DarkNaku.FoundationDI
         private int _retryAttempt;
         private IDisposable _scheduledRetry;
         private bool _isDisposed;
+
+        private bool _isCoolingDown;
+        private IDisposable _scheduledCooldown;
 
         private AwaitableCompletionSource<AdShowResult> _showCompletion;
         private string _activePlacement;
@@ -33,13 +37,15 @@ namespace DarkNaku.FoundationDI
         public event Action<AdImpression> Paid;
 
         public FullScreenAdUnit(IFullScreenAdapter adapter, IAdDispatcher dispatcher, AdFormat format,
-                                AdRetryPolicy retryPolicy, int rewardGraceFrames, Func<bool> adsRemoved)
+                                AdRetryPolicy retryPolicy, int rewardGraceFrames, float cooldownSeconds,
+                                Func<bool> adsRemoved)
         {
             _adapter = adapter;
             _dispatcher = dispatcher;
             _format = format;
             _retryPolicy = retryPolicy;
             _rewardGraceFrames = Mathf.Max(0, rewardGraceFrames);
+            _cooldownSeconds = Mathf.Max(0f, cooldownSeconds);
             _adsRemoved = adsRemoved ?? (() => false);
             _blockWhenAdsRemoved = format == AdFormat.Interstitial;
 
@@ -53,6 +59,14 @@ namespace DarkNaku.FoundationDI
         }
 
         public bool IsReady => !_isDisposed && _adapter.IsReady;
+
+        // 지금 ShowAsync를 부르면 실제로 표시될지: 해제 안 됐고, AdsRemoved에 막히지 않았고,
+        // 쿨다운 중이 아니고, 준비됐다. "이미 표시 중이다"는 여기 포함하지 않는다 —
+        // ShowAsync 재진입 가드가 별도로 다루는 다른 종류의 상태이기 때문이다.
+        public bool CanShow => !_isDisposed
+                               && !(_blockWhenAdsRemoved && _adsRemoved())
+                               && !_isCoolingDown
+                               && _adapter.IsReady;
 
         public void Load()
         {
@@ -75,6 +89,10 @@ namespace DarkNaku.FoundationDI
             if (_blockWhenAdsRemoved && _adsRemoved()) return Immediate(AdShowResult.Blocked());
 
             if (_showCompletion != null) return Immediate(AdShowResult.Failed(new AdError(-2, "이미 표시 중이다")));
+
+            // 쿨다운은 표시 시점에 시작된다(OnDisplayed). 재진입 가드 다음, NotReady 가드
+            // 앞에 둔다 — 차단된 호출은 로드조차 트리거하지 않아야 한다.
+            if (_isCoolingDown) return Immediate(AdShowResult.Blocked());
 
             if (!_adapter.IsReady)
             {
@@ -152,7 +170,29 @@ namespace DarkNaku.FoundationDI
             _scheduledRetry = null;
         }
 
-        private void OnDisplayed() => Displayed?.Invoke();
+        private void OnDisplayed()
+        {
+            StartCooldown();
+            Displayed?.Invoke();
+        }
+
+        // 쿨다운은 요청 시점도 닫힘 시점도 아니라 표시 시점에 시작한다 — "마지막으로 실제
+        // 유저 화면에 뜬 순간"을 기준으로 다음 광고까지의 최소 간격을 두는 것이 정책의 의도다.
+        // 보상형은 여기 오지 않게 하는 게 아니라 cooldownSeconds를 0으로 조립해 무력화한다
+        // (AdService.BuildAdUnits 참고) — 이 클래스 자신은 포맷을 판단해 게이트를 켜고 끄지 않는다.
+        private void StartCooldown()
+        {
+            if (_cooldownSeconds <= 0f) return;
+
+            _isCoolingDown = true;
+            _scheduledCooldown?.Dispose();
+            _scheduledCooldown = _dispatcher.Delay(_cooldownSeconds, () =>
+            {
+                _scheduledCooldown = null;
+                _isCoolingDown = false;
+            });
+        }
+
         private void OnDisplayFailed(AdError error)
         {
             Debug.LogWarning($"[AdService] {_format} 표시 실패: {error}");
@@ -229,6 +269,8 @@ namespace DarkNaku.FoundationDI
             CancelScheduledRetry();
             _scheduledClose?.Dispose();
             _scheduledClose = null;
+            _scheduledCooldown?.Dispose();
+            _scheduledCooldown = null;
 
             try
             {
