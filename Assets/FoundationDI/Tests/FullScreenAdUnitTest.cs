@@ -319,4 +319,128 @@ public class FullScreenAdUnitTest
 
         Assert.AreEqual(AdShowOutcome.Rewarded, result.Outcome);
     });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 늦게_도착한_보상이_다음_쇼로_새지_않는다() => UniTask.ToCoroutine(async () =>
+    {
+        var adapter = new FakeFullScreenAdapter();
+        var dispatcher = new FakeAdDispatcher();
+        var sut = NewUnit(adapter, dispatcher, AdFormat.Rewarded, rewardGraceFrames: 1);
+
+        // 첫 번째 쇼: 보상 없이 닫힘 → Dismissed로 확정되고 래치가 비워진다.
+        adapter.RaiseLoaded();
+        var firstPending = sut.ShowAsync();
+
+        adapter.RaiseDisplayed();
+        adapter.RaiseClosed();
+        dispatcher.TickFrames(1);
+
+        var firstResult = await firstPending;
+        Assert.AreEqual(AdShowOutcome.Dismissed, firstResult.Outcome);
+
+        // 확정 이후 뒤늦게 도착하는 보상 — 유예 프레임을 노리는 바로 그 SDK 오동작이다.
+        adapter.RaiseRewarded(new AdReward("coins", 999));
+
+        // 두 번째 쇼: 보상 없이 닫힌다. ShowAsync가 래치를 리셋하지 않으면 이 쇼가
+        // 첫 번째 쇼의 늦은 보상을 가로채 Rewarded로 잘못 확정된다.
+        adapter.RaiseLoaded();
+        var secondPending = sut.ShowAsync();
+
+        adapter.RaiseDisplayed();
+        adapter.RaiseClosed();
+        dispatcher.TickFrames(1);
+
+        var secondResult = await secondPending;
+
+        Assert.AreEqual(AdShowOutcome.Dismissed, secondResult.Outcome,
+                         "이전 쇼의 늦은 보상이 다음 쇼로 샜다");
+    });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 표시_실패_전에_래치된_보상이_다음_쇼로_새지_않는다() => UniTask.ToCoroutine(async () =>
+    {
+        var adapter = new FakeFullScreenAdapter();
+        var dispatcher = new FakeAdDispatcher();
+        var sut = NewUnit(adapter, dispatcher, AdFormat.Rewarded, rewardGraceFrames: 1);
+
+        // 첫 번째 쇼: 보상이 래치된 뒤 표시 실패 — Closed가 오지 않으므로 래치를
+        // 쓸어낼 기회가 FinalizeClose 경로에는 없다.
+        adapter.RaiseLoaded();
+        var firstPending = sut.ShowAsync();
+
+        adapter.RaiseDisplayed();
+        adapter.RaiseRewarded(new AdReward("coins", 50));
+        LogAssert.Expect(UnityEngine.LogType.Warning,
+                         new System.Text.RegularExpressions.Regex("표시 실패"));
+        adapter.RaiseDisplayFailed(new AdError(7, "no ad to show"));
+
+        var firstResult = await firstPending;
+        Assert.AreEqual(AdShowOutcome.Failed, firstResult.Outcome);
+
+        // 두 번째 쇼: 보상 없이 닫힌다. 래치가 새면 Rewarded가 잘못 나온다.
+        adapter.RaiseLoaded();
+        var secondPending = sut.ShowAsync();
+
+        adapter.RaiseDisplayed();
+        adapter.RaiseClosed();
+        dispatcher.TickFrames(1);
+
+        var secondResult = await secondPending;
+
+        Assert.AreEqual(AdShowOutcome.Dismissed, secondResult.Outcome,
+                         "표시 실패 전에 래치된 보상이 다음 쇼로 샜다");
+    });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 중복된_Closed는_Closed_이벤트를_한_번만_발화한다() => UniTask.ToCoroutine(async () =>
+    {
+        var adapter = new FakeFullScreenAdapter();
+        var dispatcher = new FakeAdDispatcher();
+        var sut = NewUnit(adapter, dispatcher, AdFormat.Interstitial, rewardGraceFrames: 1);
+
+        var closedCount = 0;
+        sut.Closed += () => closedCount++;
+
+        adapter.RaiseLoaded();
+        var pending = sut.ShowAsync();
+
+        adapter.RaiseDisplayed();
+        adapter.RaiseClosed();
+        dispatcher.TickFrames(1);           // 첫 확정 — Closed가 1회 발화해야 한다
+
+        var result = await pending;
+        Assert.AreEqual(AdShowOutcome.Shown, result.Outcome);
+
+        adapter.RaiseClosed();              // 중복 Closed — 어댑터/네트워크 오동작
+        dispatcher.TickFrames(1);           // 두 번째 확정 시도 — Complete가 false를 반환해야 한다
+
+        Assert.AreEqual(1, closedCount, "중복 Closed가 Closed 이벤트를 다시 발화시켰다");
+    });
+
+    [Test]
+    public void Dispose_중_예약된_닫힘_확정을_취소한다()
+    {
+        var adapter = new FakeFullScreenAdapter();
+        var dispatcher = new FakeAdDispatcher();
+        var sut = NewUnit(adapter, dispatcher, AdFormat.Interstitial, rewardGraceFrames: 1);
+
+        var closedFired = false;
+        sut.Closed += () => closedFired = true;
+
+        adapter.RaiseLoaded();
+        _ = sut.ShowAsync();
+
+        adapter.RaiseDisplayed();
+        adapter.RaiseClosed();   // 유예 예약, 아직 틱은 안 했다
+
+        sut.Dispose();
+
+        dispatcher.TickFrames(1);
+
+        Assert.IsFalse(closedFired, "Dispose 후에도 예약된 확정이 발화했다");
+        Assert.AreEqual(0, dispatcher.PendingCount, "Dispose가 예약된 확정을 취소하지 않았다");
+    }
 }

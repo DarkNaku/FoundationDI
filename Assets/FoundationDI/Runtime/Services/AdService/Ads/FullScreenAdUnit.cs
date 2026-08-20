@@ -79,6 +79,7 @@ namespace DarkNaku.FoundationDI
 
             _activePlacement = placement;
             _showCompletion = new AwaitableCompletionSource<AdShowResult>();
+            _pendingReward = null;
 
             var awaitable = _showCompletion.Awaitable;
             _adapter.Show();
@@ -94,14 +95,16 @@ namespace DarkNaku.FoundationDI
         }
 
         // 완료는 반드시 이 한 곳을 거친다. 이중 완료를 막고 상태를 함께 청소한다.
-        private void Complete(AdShowResult result)
+        // 실제로 완료시켰는지 돌려준다. 중복 Closed에서 Closed 이벤트가 두 번 나가는 것을 막는다.
+        private bool Complete(AdShowResult result)
         {
             var completion = _showCompletion;
-            if (completion == null) return;
+            if (completion == null) return false;
 
             _showCompletion = null;
             _activePlacement = null;
             completion.SetResult(result);
+            return true;
         }
 
         private void OnLoaded()
@@ -157,15 +160,24 @@ namespace DarkNaku.FoundationDI
         {
             // 닫힘이 보상보다 먼저 오는 SDK/네트워크가 있다. 유예 프레임을 두고 기다린다.
             _scheduledClose?.Dispose();
-            _scheduledClose = _dispatcher.NextFrames(_rewardGraceFrames, () =>
+
+            // 유예 0이면 NextFrames가 콜백을 동기 실행하고 돌아온다. 그때 핸들을 다시
+            // 넣으면 이미 발화한 스케줄이 남아 "대기 중" 신호가 거짓이 된다.
+            var fired = false;
+            var handle = _dispatcher.NextFrames(_rewardGraceFrames, () =>
             {
+                fired = true;
                 _scheduledClose = null;
                 FinalizeClose();
             });
+
+            if (!fired) _scheduledClose = handle;
         }
 
         private void FinalizeClose()
         {
+            if (_isDisposed) return;
+
             var reward = _pendingReward;
             _pendingReward = null;
 
@@ -174,7 +186,7 @@ namespace DarkNaku.FoundationDI
             else if (_format == AdFormat.Rewarded) result = AdShowResult.Dismissed();
             else result = AdShowResult.Shown();
 
-            Complete(result);
+            if (!Complete(result)) return;
             Closed?.Invoke();
         }
 
