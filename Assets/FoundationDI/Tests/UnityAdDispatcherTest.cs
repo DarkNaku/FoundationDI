@@ -21,4 +21,94 @@ public class UnityAdDispatcherTest
         sut.Pump(0.016f);
         Assert.AreEqual(1, ran, "한 번 실행된 작업이 다시 실행됐다");
     }
+
+    [Test]
+    public void 지연작업은_누적_deltaTime이_지연시간에_도달하면_실행된다()
+    {
+        var sut = NewDispatcher();
+        var ran = 0;
+
+        sut.Delay(0.1f, () => ran++);
+
+        sut.Pump(0.04f);
+        sut.Pump(0.04f);
+        Assert.AreEqual(0, ran, "0.08초에 실행됐다");
+
+        sut.Pump(0.04f);
+        Assert.AreEqual(1, ran, "0.12초인데 실행되지 않았다");
+    }
+
+    [Test]
+    public void 취소된_지연작업은_실행되지_않는다()
+    {
+        var sut = NewDispatcher();
+        var ran = 0;
+
+        sut.Delay(0.1f, () => ran++).Dispose();
+
+        sut.Pump(1f);
+
+        Assert.AreEqual(0, ran);
+    }
+
+    [Test]
+    public void 프레임_기반_작업은_지정_펌프_횟수_후_실행된다()
+    {
+        var sut = NewDispatcher();
+        var ran = 0;
+
+        sut.NextFrames(2, () => ran++);
+
+        sut.Pump(0.016f);
+        Assert.AreEqual(0, ran);
+
+        sut.Pump(0.016f);
+        Assert.AreEqual(1, ran);
+    }
+
+    [Test]
+    public void 실행중에_예약된_작업은_같은_펌프에서_실행되지_않는다()
+    {
+        var sut = NewDispatcher();
+        var inner = 0;
+
+        sut.Delay(0.01f, () => sut.Delay(0.01f, () => inner++));
+
+        sut.Pump(1f);
+        Assert.AreEqual(0, inner, "중첩 예약이 같은 펌프에서 실행됐다");
+
+        sut.Pump(1f);
+        Assert.AreEqual(1, inner);
+    }
+
+    [Test]
+    public void 한_작업이_예외를_던져도_나머지_작업은_실행된다()
+    {
+        var sut = NewDispatcher();
+        var ran = 0;
+
+        sut.Post(() => throw new System.InvalidOperationException("boom"));
+        sut.Post(() => ran++);
+
+        UnityEngine.TestTools.LogAssert.Expect(UnityEngine.LogType.Exception,
+            new System.Text.RegularExpressions.Regex("InvalidOperationException"));
+        sut.Pump(0.016f);
+
+        Assert.AreEqual(1, ran, "앞 작업의 예외가 뒤 작업을 막았다");
+    }
+
+    [Test]
+    public void Dispose하면_예약된_작업이_더_이상_실행되지_않는다()
+    {
+        var sut = NewDispatcher();
+        var ran = 0;
+
+        sut.Delay(0.1f, () => ran++);
+        sut.Post(() => ran++);
+
+        sut.Dispose();
+        sut.Pump(1f);
+
+        Assert.AreEqual(0, ran);
+    }
 }
