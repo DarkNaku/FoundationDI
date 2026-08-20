@@ -12,7 +12,7 @@ namespace DarkNaku.FoundationDI
         }
 
         // SDK가 설치되고 스크립팅 심볼이 정의됐는지. 3사 어댑터를 추가할 때
-        // 여기와 CreateReal만 손대면 된다.
+        // 여기와 Create만 손대면 된다.
         public static bool IsAvailable(AdProviderType type)
         {
             switch (type)
@@ -63,8 +63,19 @@ namespace DarkNaku.FoundationDI
 
             if (warning != null) Debug.LogWarning(warning);
 
-            // 3사 어댑터가 추가되면 여기에 분기가 생긴다. 지금은 Dummy만 존재한다.
-            return new DummyAdProvider(_dispatcher, dummyOptions);
+            // Resolve가 고른 effective를 실제로 소비한다. 3사 어댑터가 추가되면 여기에 case가 늘어난다.
+            switch (effective)
+            {
+                case AdProviderType.Dummy:
+                    return new DummyAdProvider(_dispatcher, dummyOptions);
+                default:
+                    // IsAvailable이 참(SDK 심볼 있음)이라 Resolve가 요청 그대로를 돌려줬는데
+                    // 여기에 아직 분기가 없는 경우. 조용히 Dummy로 대체하면 이 상태를 아무도
+                    // 알아채지 못한다 — 반드시 에러로 남긴다.
+                    Debug.LogError($"[AdService] {effective} provider는 사용 가능하다고 판단됐지만 " +
+                                  "AdProviderFactory.Create에 아직 구현되지 않았다. Dummy provider로 대체한다.");
+                    return new DummyAdProvider(_dispatcher, dummyOptions);
+            }
         }
     }
 }
