@@ -614,4 +614,40 @@ public class FullScreenAdUnitTest
         Assert.AreEqual(AdShowOutcome.Failed, result.Outcome);
         Assert.AreEqual(loadCountBefore + 1, adapter.LoadCount, "중복된 표시 실패가 재로드를 두 번 트리거했다");
     });
+
+    [UnityTest]
+    public IEnumerator 광고제거_상태에서_전면광고는_Blocked를_반환한다() => UniTask.ToCoroutine(async () =>
+    {
+        var adapter = new FakeFullScreenAdapter();
+        var dispatcher = new FakeAdDispatcher();
+        var sut = NewUnit(adapter, dispatcher, AdFormat.Interstitial, adsRemoved: () => true);
+
+        adapter.RaiseLoaded();
+        var result = await sut.ShowAsync();
+
+        Assert.AreEqual(AdShowOutcome.Blocked, result.Outcome);
+        Assert.AreEqual(0, adapter.ShowCount, "차단됐는데 Show가 호출됐다");
+        Assert.IsFalse(result.WasShown);
+    });
+
+    [UnityTest]
+    public IEnumerator 광고제거_상태에서도_보상형_광고는_정상_표시된다() => UniTask.ToCoroutine(async () =>
+    {
+        // 보상형은 유저가 자발적으로 보는 것이라 광고제거 대상이 아니다.
+        var adapter = new FakeFullScreenAdapter();
+        var dispatcher = new FakeAdDispatcher();
+        var sut = NewUnit(adapter, dispatcher, AdFormat.Rewarded, adsRemoved: () => true);
+
+        adapter.RaiseLoaded();
+        var pending = sut.ShowAsync();
+
+        Assert.AreEqual(1, adapter.ShowCount, "보상형이 차단됐다");
+
+        adapter.RaiseRewarded(new AdReward("coins", 5));
+        adapter.RaiseClosed();
+        dispatcher.TickFrames(1);
+
+        var result = await pending;
+        Assert.AreEqual(AdShowOutcome.Rewarded, result.Outcome);
+    });
 }

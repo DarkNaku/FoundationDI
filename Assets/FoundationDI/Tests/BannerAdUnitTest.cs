@@ -99,4 +99,78 @@ public class BannerAdUnitTest
         Assert.AreEqual("TestNetwork", received.Value.NetworkName);
         Assert.AreEqual(0.004, received.Value.Revenue, 0.0001);
     }
+
+    [Test]
+    public void 광고제거_상태에서는_배너를_표시하지_않고_어댑터도_만들지_않는다()
+    {
+        // 어댑터를 만들면 SDK가 배너를 요청하고 임프레션이 발생해 수익 리포트가 오염된다.
+        var factory = new AdapterFactory();
+        var sut = new BannerAdUnit(factory.Create, () => true);
+
+        sut.Show();
+
+        Assert.AreEqual(0, factory.Created.Count, "광고제거 상태인데 어댑터를 만들었다");
+        Assert.IsFalse(sut.IsVisible);
+        Assert.AreEqual(0f, sut.Height, 0.001f);
+    }
+
+    [Test]
+    public void 광고제거가_켜지면_표시중인_배너를_해제하고_높이를_0으로_알린다()
+    {
+        var adsRemoved = false;
+        var factory = new AdapterFactory();
+        var sut = new BannerAdUnit(factory.Create, () => adsRemoved);
+
+        sut.Show();
+        factory.Last.SetHeight(120f);
+        var first = factory.Last;
+
+        var reported = -1f;
+        sut.HeightChanged += h => reported = h;
+
+        adsRemoved = true;
+        sut.OnAdsRemovedChanged(true);
+
+        Assert.IsTrue(first.IsDisposed, "배너 어댑터가 해제되지 않았다");
+        Assert.IsFalse(sut.IsVisible);
+        Assert.AreEqual(0f, sut.Height, 0.001f);
+        Assert.AreEqual(0f, reported, 0.001f);
+    }
+
+    [Test]
+    public void 광고제거가_해제되면_원래_표시중이던_배너를_다시_띄운다()
+    {
+        var adsRemoved = false;
+        var factory = new AdapterFactory();
+        var sut = new BannerAdUnit(factory.Create, () => adsRemoved);
+
+        sut.Show();
+        adsRemoved = true;
+        sut.OnAdsRemovedChanged(true);
+
+        adsRemoved = false;
+        sut.OnAdsRemovedChanged(false);
+
+        Assert.AreEqual(2, factory.Created.Count, "배너가 복구되지 않았다");
+        Assert.IsTrue(sut.IsVisible);
+        Assert.AreEqual(1, factory.Last.ShowCount);
+    }
+
+    [Test]
+    public void 숨긴_상태에서_광고제거가_해제돼도_배너를_띄우지_않는다()
+    {
+        var adsRemoved = false;
+        var factory = new AdapterFactory();
+        var sut = new BannerAdUnit(factory.Create, () => adsRemoved);
+
+        sut.Show();
+        sut.Hide();                       // 게임이 명시적으로 숨겼다
+        adsRemoved = true;
+        sut.OnAdsRemovedChanged(true);
+
+        adsRemoved = false;
+        sut.OnAdsRemovedChanged(false);
+
+        Assert.IsFalse(sut.IsVisible, "게임이 숨긴 배너가 멋대로 복구됐다");
+    }
 }
