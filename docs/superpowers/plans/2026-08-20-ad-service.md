@@ -18,6 +18,7 @@
 - **`Awaitable`은 단일 사용이다.** `await` 이후 같은 인스턴스의 `.IsCompleted` 등에 접근하지 않는다. 호출자마다 `AwaitableCompletionSource`를 새로 만든다.
 - 테스트는 `Assets/FoundationDI/Tests/` 에 두고 어셈블리는 기존 **`FoundationDI.Tests`**(EditMode, `overrideReferences: true`)를 그대로 쓴다. 새 asmdef를 만들지 않는다.
 - 테스트 함수 이름은 **한국어**, `should~` 의도. 형식은 `[UnityTest] public IEnumerator 이름() => UniTask.ToCoroutine(async () => { ... });`
+- **모든 `[UnityTest]` 메서드에 `[Timeout(5000)]`을 함께 붙인다.** 완료되지 않는 `Awaitable`을 `await` 하면 EditMode 러너가 무한 대기하며 Unity Editor를 붙잡는다 — 이 계획의 여러 "실패를 확인한다" 단계가 정확히 그 상황을 의도적으로 만든다. `using NUnit.Framework;`에 포함된 `TimeoutAttribute`를 쓴다.
 - **구조적 변경과 행동적 변경을 같은 커밋에 섞지 않는다.** 커밋 제목에 `[STRUCTURAL]` 또는 `[BEHAVIORAL]` 접두어를 단다.
 - 한 번에 하나의 테스트만 작성하고, 매번 전체 테스트를 돌린다.
 - 컴파일·테스트는 **UnityMCP**로만 가능하다. Unity Editor가 떠 있어야 하고 `.mcp.json`의 `http://127.0.0.1:8086/mcp`에 연결되어 있어야 한다. CLI 빌드 명령은 없다.
@@ -1364,7 +1365,7 @@ git commit -m "[BEHAVIORAL] ShowAsync 중복 호출과 표시 실패 동작 검�
 - [ ] **Step 2: 실패를 확인한다**
 
 Run: `run_tests(mode="EditMode", testFilter="FullScreenAdUnitTest")`
-Expected: FAIL — 테스트가 타임아웃되거나 멈춘다. Task 4의 `OnClosed`가 비어 있어 `pending`이 영원히 완료되지 않기 때문이다.
+Expected: FAIL — `[Timeout(5000)]`에 걸려 5초 후 타임아웃. Task 4의 `OnClosed`가 비어 있어 `pending`이 영원히 완료되지 않기 때문이다. **Timeout 속성이 없으면 여기서 Unity Editor가 멈춘다.**
 
 - [ ] **Step 3: 보상 래치와 닫힘 확정을 구현한다**
 
