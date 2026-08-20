@@ -548,4 +548,42 @@ public class FullScreenAdUnitTest
 
         Assert.AreEqual(loadCountBefore + 1, adapter.LoadCount, "표시 실패 후 재로드가 없었다");
     });
+
+    [Test]
+    public void Dispose는_어댑터를_정리하고_예약된_재시도를_취소한다()
+    {
+        var adapter = new FakeFullScreenAdapter();
+        var dispatcher = new FakeAdDispatcher();
+        var sut = NewUnit(adapter, dispatcher);
+
+        sut.Load();
+        adapter.RaiseLoadFailed(new AdError(3, "no fill"));
+        Assert.AreEqual(1, dispatcher.PendingCount, "재시도가 예약되지 않았다");
+
+        sut.Dispose();
+
+        Assert.IsTrue(adapter.IsDisposed, "어댑터가 해제되지 않았다");
+        Assert.AreEqual(0, dispatcher.PendingCount, "예약된 재시도가 취소되지 않았다");
+
+        var loadCountBefore = adapter.LoadCount;
+        dispatcher.Advance(200f);
+        Assert.AreEqual(loadCountBefore, adapter.LoadCount, "해제 후에도 재시도가 실행됐다");
+    }
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 해제된_뒤의_ShowAsync는_Failed를_반환한다() => UniTask.ToCoroutine(async () =>
+    {
+        var adapter = new FakeFullScreenAdapter();
+        var dispatcher = new FakeAdDispatcher();
+        var sut = NewUnit(adapter, dispatcher);
+
+        adapter.RaiseLoaded();
+        sut.Dispose();
+
+        var result = await sut.ShowAsync();
+
+        Assert.AreEqual(AdShowOutcome.Failed, result.Outcome);
+        Assert.AreEqual(0, adapter.ShowCount);
+    });
 }
