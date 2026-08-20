@@ -191,6 +191,17 @@ public string Placement { get; }  // 게임이 ShowAsync에 넘긴 배치명
 띄워 두는 것이 전제이므로 "이 배치명으로 보여 달라"는 개념이 없습니다. 배너 임프레션의
 `Placement`가 `null`인 것은 결함이 아니라 정상입니다.
 
+**provider 전역 경로(`IAdProvider.ImpressionPaid`)로 온 임프레션도 `Placement`가 항상
+`null`입니다 — 전면·보상이어도 마찬가지입니다.** `Placement` 스탬핑은 `FullScreenAdUnit.OnPaid`
+(4.2절의 "어댑터별 `Paid`" 경로)에만 있습니다. `AdService.cs`는 `_provider.ImpressionPaid`를
+그대로 공개 `Paid`로 흘려보낼 뿐 어떤 배치명도 채우지 않습니다(`AdService.cs:163,174`).
+이 경로는 LevelPlay를 위해 존재하는데, LevelPlay 실제 어댑터가 붙으면 **전면·보상 임프레션이
+게임이 `ShowAsync`에 넘긴 배치명을 넘겼더라도 `Placement`가 `null`로 옵니다.** 의도적으로
+고치지 않았습니다 — "지금 표시 중인 유닛"을 provider 레벨에서 추적하려면 두 포맷이 겹쳐
+표시되는 상황(예: 전면이 뜬 채로 보상 로드가 끝나는 경우)에서 어떤 유닛의 배치명을 찍어야
+하는지 오귀속 위험이 생기고, 실제 LevelPlay 어댑터 없이는 그 설계를 검증할 방법이 없습니다.
+**LevelPlay 어댑터를 붙이는 작업이 이 결정을 다시 검토해야 합니다.**
+
 ---
 
 ## 5. 3사 어댑터를 추가하는 방법
@@ -205,8 +216,17 @@ public string Placement { get; }  // 게임이 ShowAsync에 넘긴 배치명
    구현하는 `AdMobProvider`/`AdMobFullScreenAdapter`/`AdMobBannerAdapter`를 작성한다.
    구현 시 `docs/superpowers/specs/2026-08-20-adservice-design.md`의 **"3사 매핑표"**(6절)를
    대조하며 작성하고, 실제 SDK의 필드명이 표와 어긋나면 표를 갱신한다.
-4. `AdProviderFactory.Create`(내부적으로 `Build`)의 `switch`에 새 `case`를 추가한다.
-5. 필요하면 `Consent/`에 provider별 동의 구현(`UmpAdConsent` 등)을 추가해 `IAdProvider.Consent`로 노출한다.
+4. **SDK 콜백을 메인 스레드로 마샬링한다.** `IFullScreenAdapter`/`IBannerAdapter`는 이벤트가
+   메인 스레드에서 발화된다고 전제하는 계약입니다(`IFullScreenAdapter.cs`/`IBannerAdapter.cs`
+   인터페이스 주석 참고) — `AdService`도 `Ads/` 정책 계층도 이걸 대신 해주지 않습니다.
+   AdMob/LevelPlay/AppLovin 모두 네이티브 스레드에서 콜백을 올릴 수 있으므로, SDK 콜백
+   핸들러 안에서 이벤트를 직접 발화시키지 말고 `_dispatcher.Post(() => Loaded?.Invoke())`처럼
+   `IAdDispatcher.Post`로 감싸 메인 스레드 큐에 넣은 뒤 발화시킵니다. Dummy provider가 이
+   단계를 생략하는 이유는 `DummyAdCanvas`/`DummyAdTicker`가 처음부터 Unity 메인 스레드
+   (`MonoBehaviour.Update`)에서만 콜백을 만들어내기 때문입니다 — 실제 SDK 어댑터는 이
+   전제가 없습니다.
+5. `AdProviderFactory.Create`(내부적으로 `Build`)의 `switch`에 새 `case`를 추가한다.
+6. 필요하면 `Consent/`에 provider별 동의 구현(`UmpAdConsent` 등)을 추가해 `IAdProvider.Consent`로 노출한다.
 
 `FullScreenAdUnit`을 수정해야만 어댑터가 붙는다면 seam 설계가 잘못됐다는 신호입니다 — 멈추고
 재검토합니다.
@@ -263,5 +283,11 @@ AdService/
 - **AppOpen / MREC / Native 광고 포맷** — `AdFormat`은 `Banner`/`Interstitial`/`Rewarded` 셋뿐입니다.
 - **리모트 컨피그 연동**(광고 단위 ID·재시도 정책을 서버에서 갱신) — `AdServiceSettings`는
   에디터에서 편집하는 정적 값입니다.
-- **`AdService`의 스레드 안전성** — `IAdDispatcher`로 콜백을 메인 스레드로 마샬링하지만, `AdService`
-  자신의 상태(`_initializing`, `_adsRemoved` 등)는 메인 스레드 단독 접근을 전제합니다.
+- **`AdService`의 스레드 안전성** — `AdService`/`FullScreenAdUnit`/`BannerAdUnit`은 어댑터가
+  올려주는 이벤트가 이미 메인 스레드에서 온다고 가정합니다. **서비스 자신은 어떤 콜백도
+  메인 스레드로 마샬링하지 않습니다** — `IAdDispatcher.Post`는 어댑터가 쓰라고 있는
+  도구일 뿐, `Ads/`나 `AdService.cs` 어디에서도 호출하지 않습니다(실제로 `Post`를 호출하는
+  곳은 테스트뿐입니다). 세 SDK 모두 네이티브 스레드에서 콜백을 올릴 수 있으므로, **메인
+  스레드로 마샬링하는 책임은 3사 어댑터 구현체에 있습니다** — 자세한 내용은 5절을 참고하세요.
+  `AdService` 자신의 상태(`_initializing`, `_adsRemoved` 등) 역시 메인 스레드 단독 접근을
+  전제합니다.

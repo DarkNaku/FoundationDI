@@ -64,7 +64,7 @@ NuGet 의존성은 **NuGetForUnity**(`Assets/NuGet/`)가 `Assets/packages.config
   - 상세: `Assets/FoundationDI/Runtime/Services/SoundService/README.md`.
 - **AdService** (`Services/AdService/`): 광고 네트워크 중립 서비스. AdMob/LevelPlay/AppLovin 중 무엇을 붙이더라도 게임 코드는 `IAdService` 하나로 전면·보상·배너를 다룬다.
   - **3계층**: `Providers/`(SDK seam, `IAdProvider`/`IFullScreenAdapter`/`IBannerAdapter`) → `Ads/`(정책 계층, `FullScreenAdUnit`/`BannerAdUnit` — 재시도 백오프·보상 래치·자동 재로드·광고제거 게이트) → `AdService`(조립 + 이벤트 합류). 어댑터를 추가해도 정책 계층은 건드리지 않는 것이 설계 원칙.
-  - **`ShowAsync`는 `Awaitable<AdShowResult>`**. `UnityAdDispatcher`가 `[AdService] Runner`(`HideAndDontSave`)를 통해 메인스레드 마샬링·지연·프레임 대기를 펌프한다.
+  - **`ShowAsync`는 `Awaitable<AdShowResult>`**. `UnityAdDispatcher`가 `[AdService] Runner`(`HideAndDontSave`)를 통해 지연·프레임 대기를 펌프한다. `IAdDispatcher.Post`(메인스레드 마샬링)는 서비스 어디서도 쓰지 않는다 — **SDK 콜백을 메인 스레드로 마샬링하는 책임은 3사 어댑터 구현체에 있다.**
   - **`AdsRemoved`는 포맷별로 다르게 게이트한다**: 전면·배너는 차단, 보상형은 계속 동작. `IAdRemovalStorage`(기본 `PlayerPrefsAdRemovalStorage`)로 영속화된다.
   - **현재 Dummy provider만 구현됨** — 3사 실제 어댑터는 각각 별도 계획.
   - 상세: `Assets/FoundationDI/Runtime/Services/AdService/README.md`.

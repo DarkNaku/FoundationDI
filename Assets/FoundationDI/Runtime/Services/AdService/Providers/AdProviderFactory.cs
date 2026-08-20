@@ -84,7 +84,7 @@ namespace DarkNaku.FoundationDI
                     // 여기에 아직 분기가 없는 경우. 조용히 Dummy로 대체하면 이 상태를 아무도
                     // 알아채지 못한다 — 반드시 에러로 남긴다.
                     Debug.LogError($"[AdService] {effective} provider는 사용 가능하다고 판단됐지만 " +
-                                  "AdProviderFactory.Create에 아직 구현되지 않았다. Dummy provider로 대체한다.");
+                                  "AdProviderFactory.Build에 아직 구현되지 않았다. Dummy provider로 대체한다.");
                     return new DummyAdProvider(_dispatcher, dummyOptions);
             }
         }
