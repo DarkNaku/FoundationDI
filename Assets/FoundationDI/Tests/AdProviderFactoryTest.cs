@@ -53,6 +53,57 @@ public class AdProviderFactoryTest
     }
 
     [Test]
+    public void 설정의_광고단위ID가_포맷별로_섞이지_않고_각자의_슬롯에_들어간다()
+    {
+        // interstitial:/rewarded: 인자가 뒤바뀌어도 숫자 기본값만 보는 테스트는 여전히
+        // 통과한다 — 실기에서는 전면이 보상 유닛 ID를 요청하고 반대도 마찬가지가 되어
+        // 필당·수익 귀속이 깨진다. 세 슬롯에 서로 다른 값을 넣고 각자 제자리에 있는지 본다.
+        var settings = UnityEngine.ScriptableObject.CreateInstance<AdServiceSettings>();
+
+        var json = "{" +
+                   "\"_bannerUnitId\":{\"_android\":\"ban-a\",\"_ios\":\"ban-i\"}," +
+                   "\"_interstitialUnitId\":{\"_android\":\"int-a\",\"_ios\":\"int-i\"}," +
+                   "\"_rewardedUnitId\":{\"_android\":\"rew-a\",\"_ios\":\"rew-i\"}" +
+                   "}";
+        UnityEngine.JsonUtility.FromJsonOverwrite(json, settings);
+
+        var options = settings.ToOptions();
+
+        Assert.AreEqual("ban-a", options.Banner.Android);
+        Assert.AreEqual("ban-i", options.Banner.iOS);
+        Assert.AreEqual("int-a", options.Interstitial.Android);
+        Assert.AreEqual("int-i", options.Interstitial.iOS);
+        Assert.AreEqual("rew-a", options.Rewarded.Android);
+        Assert.AreEqual("rew-i", options.Rewarded.iOS);
+
+        UnityEngine.ScriptableObject.DestroyImmediate(settings);
+    }
+
+    [Test]
+    public void 재시도_설정값이_0이나_음수여도_ToOptions는_붕괴하지_않는_값으로_클램프한다()
+    {
+        // [Min] 어트리뷰트는 인스펙터 편집만 막는다 — 스크립트로 만들었거나 손으로 고친
+        // .asset은 그대로 통과한다. retryBaseSeconds=0이면 Mathf.Pow(0, n)이 항상 0이라
+        // 지수 백오프가 즉시재시도 5연발로 무너지고, maxRetryDelaySeconds가 음수면
+        // Mathf.Min이 모든 지연을 그 음수로 눌러버린다.
+        var settings = UnityEngine.ScriptableObject.CreateInstance<AdServiceSettings>();
+
+        var json = "{\"_maxRetryAttempts\":-3,\"_retryBaseSeconds\":0,\"_maxRetryDelaySeconds\":-5}";
+        UnityEngine.JsonUtility.FromJsonOverwrite(json, settings);
+
+        var options = settings.ToOptions();
+
+        Assert.GreaterOrEqual(options.RetryPolicy.MaxAttempts, 0, "음수 시도 횟수가 그대로 새어나왔다");
+        Assert.Greater(options.RetryPolicy.BaseSeconds, 0f, "0인 base가 그대로 새어나와 백오프가 무너진다");
+        Assert.Greater(options.RetryPolicy.MaxDelaySeconds, 0f, "음수 상한이 그대로 새어나왔다");
+
+        // 클램프된 값으로 실제 지연을 계산해도 0이나 음수가 나오면 안 된다.
+        Assert.Greater(options.RetryPolicy.DelayFor(1), 0f);
+
+        UnityEngine.ScriptableObject.DestroyImmediate(settings);
+    }
+
+    [Test]
     public void Create는_Resolve가_고른_effective를_실제로_소비해서_Dummy_provider를_반환한다()
     {
         // Create가 effective를 무시하고 항상 DummyAdProvider를 새로 만들기만 해도 이 값 자체는
