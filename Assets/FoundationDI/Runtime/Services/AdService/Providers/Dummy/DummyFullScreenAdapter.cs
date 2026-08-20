@@ -74,9 +74,18 @@ namespace DarkNaku.FoundationDI
             EmitImpression();
 
             _screen.ShowFullScreen(_format, _options.AdDurationSeconds,
-                onSkip: () => Closed?.Invoke(),
+                onSkip: () =>
+                {
+                    // 화면 콜백은 이 어댑터가 Dispose된 뒤에도 늦게 도착할 수 있다
+                    // (예: DummyAdCanvas.ShowFullScreen이 다음 광고를 위해 이전 소유자의
+                    // onSkip을 흘려보내는 경로). Dispose 이후에는 이벤트를 발화시키지 않는다.
+                    if (_isDisposed) return;
+                    Closed?.Invoke();
+                },
                 onComplete: () =>
                 {
+                    if (_isDisposed) return;
+
                     // 보상은 닫힘보다 먼저 보낸다 — AdMob/MAX의 일반적인 순서를 흉내낸다.
                     if (_format == AdFormat.Rewarded) Rewarded?.Invoke(new AdReward("dummy_reward", 1));
                     Closed?.Invoke();
@@ -103,6 +112,16 @@ namespace DarkNaku.FoundationDI
             _pendingLoad?.Dispose();
             _pendingLoad = null;
             IsReady = false;
+
+            // 구독자를 놓아준다. onSkip/onComplete는 위에서 _isDisposed로 막지만,
+            // 이 어댑터를 직접 구독한 외부 코드가 남아있다면 여기서도 끊어야 한다.
+            Loaded = null;
+            LoadFailed = null;
+            Displayed = null;
+            DisplayFailed = null;
+            Closed = null;
+            Rewarded = null;
+            Paid = null;
         }
     }
 }
