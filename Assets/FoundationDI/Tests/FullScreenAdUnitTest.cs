@@ -109,4 +109,49 @@ public class FullScreenAdUnitTest
         Assert.AreEqual(0, adapter.ShowCount, "준비도 안 됐는데 Show를 호출했다");
         Assert.AreEqual(1, adapter.LoadCount, "NotReady일 때 로드를 트리거하지 않았다");
     });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 표시에_실패하면_Failed와_에러를_반환한다() => UniTask.ToCoroutine(async () =>
+    {
+        var adapter = new FakeFullScreenAdapter();
+        var dispatcher = new FakeAdDispatcher();
+        var sut = NewUnit(adapter, dispatcher);
+
+        adapter.RaiseLoaded();
+
+        // Awaitable을 먼저 잡아두고 이벤트를 발화시킨 뒤 await 한다.
+        var pending = sut.ShowAsync();
+        LogAssert.Expect(UnityEngine.LogType.Warning,
+                         new System.Text.RegularExpressions.Regex("표시 실패"));
+        adapter.RaiseDisplayFailed(new AdError(7, "no ad to show"));
+
+        var result = await pending;
+
+        Assert.AreEqual(AdShowOutcome.Failed, result.Outcome);
+        Assert.AreEqual(7, result.Error.Code);
+    });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 표시_중에_ShowAsync를_다시_호출하면_Failed를_반환한다() => UniTask.ToCoroutine(async () =>
+    {
+        var adapter = new FakeFullScreenAdapter();
+        var dispatcher = new FakeAdDispatcher();
+        var sut = NewUnit(adapter, dispatcher);
+
+        adapter.RaiseLoaded();
+
+        var first = sut.ShowAsync();
+        var second = await sut.ShowAsync();   // 아직 첫 번째가 안 끝났다
+
+        Assert.AreEqual(AdShowOutcome.Failed, second.Outcome);
+        Assert.AreEqual(1, adapter.ShowCount, "중복 호출이 Show를 두 번 불렀다");
+
+        // 첫 번째를 정리해서 테스트가 미완료 Awaitable을 남기지 않게 한다.
+        LogAssert.Expect(UnityEngine.LogType.Warning,
+                         new System.Text.RegularExpressions.Regex("표시 실패"));
+        adapter.RaiseDisplayFailed(new AdError(0, "cleanup"));
+        await first;
+    });
 }
