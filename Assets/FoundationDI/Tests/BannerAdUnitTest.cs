@@ -173,4 +173,90 @@ public class BannerAdUnitTest
 
         Assert.IsFalse(sut.IsVisible, "게임이 숨긴 배너가 멋대로 복구됐다");
     }
+
+    [Test]
+    public void 숨긴_뒤_어댑터가_스스로_높이를_바꿔도_0으로_중계된다()
+    {
+        var factory = new AdapterFactory();
+        var sut = new BannerAdUnit(factory.Create, () => false);
+
+        sut.Show();
+        factory.Last.SetHeight(120f);
+        sut.Hide();
+
+        var reported = -1f;
+        sut.HeightChanged += h => reported = h;
+        factory.Last.SetHeight(90f); // SDK가 숨긴 뒤에도 스스로 배너를 갱신하는 상황 재현
+
+        Assert.AreEqual(0f, reported, 0.001f, "숨긴 상태에서 어댑터의 높이 변경이 그대로 중계됐다");
+        Assert.AreEqual(0f, sut.Height, 0.001f);
+    }
+
+    [Test]
+    public void 파괴하면_현재_어댑터를_해제하고_비표시_상태가_된다()
+    {
+        var factory = new AdapterFactory();
+        var sut = new BannerAdUnit(factory.Create, () => false);
+
+        sut.Show();
+        var adapter = factory.Last;
+
+        sut.Dispose();
+
+        Assert.IsTrue(adapter.IsDisposed, "Dispose가 어댑터를 해제하지 않았다");
+        Assert.IsFalse(sut.IsVisible);
+        Assert.AreEqual(0f, sut.Height, 0.001f);
+    }
+
+    [Test]
+    public void Dispose를_두번_호출해도_어댑터는_한번만_해제된다()
+    {
+        var factory = new AdapterFactory();
+        var sut = new BannerAdUnit(factory.Create, () => false);
+
+        sut.Show();
+        var adapter = factory.Last;
+
+        Assert.DoesNotThrow(() =>
+        {
+            sut.Dispose();
+            sut.Dispose();
+        });
+
+        Assert.IsTrue(adapter.IsDisposed);
+        Assert.AreEqual(1, factory.Created.Count, "두번째 Dispose에서 어댑터가 다시 만들어졌다");
+    }
+
+    [Test]
+    public void 파괴된_뒤_Show를_호출해도_새_어댑터를_만들지_않는다()
+    {
+        var factory = new AdapterFactory();
+        var sut = new BannerAdUnit(factory.Create, () => false);
+
+        sut.Show();
+        sut.Dispose();
+
+        sut.Show();
+
+        Assert.AreEqual(1, factory.Created.Count, "Dispose 이후 Show가 새 어댑터를 만들었다");
+        Assert.IsFalse(sut.IsVisible);
+    }
+
+    [Test]
+    public void 파괴된_뒤에는_Hide와_Destroy가_조용하다()
+    {
+        var factory = new AdapterFactory();
+        var sut = new BannerAdUnit(factory.Create, () => false);
+
+        sut.Show();
+        sut.Dispose();
+
+        var invoked = false;
+        sut.HeightChanged += _ => invoked = true;
+
+        sut.Hide();
+        sut.Destroy();
+
+        Assert.IsFalse(invoked, "Dispose 이후 Hide/Destroy가 HeightChanged를 발화시켰다");
+    }
 }

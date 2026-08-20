@@ -43,6 +43,8 @@ namespace DarkNaku.FoundationDI
 
         public void Hide()
         {
+            if (_isDisposed) return;
+
             _wantsVisible = false;
             _adapter?.Hide();
             HeightChanged?.Invoke(0f);
@@ -50,6 +52,8 @@ namespace DarkNaku.FoundationDI
 
         public void Destroy()
         {
+            if (_isDisposed) return;
+
             _wantsVisible = false;
             DetachAdapter();
             HeightChanged?.Invoke(0f);
