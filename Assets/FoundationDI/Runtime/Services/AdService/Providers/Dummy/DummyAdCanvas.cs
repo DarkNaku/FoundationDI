@@ -77,7 +77,7 @@ namespace DarkNaku.FoundationDI
         {
             var canClose = _remaining <= 0f;
             _countdown.text = canClose ? "" : $"{Mathf.CeilToInt(_remaining)}";
-            _closeButton.gameObject.SetActive(true);
+            _closeButton.gameObject.SetActive(canClose);
         }
 
         private void OnCloseClicked()

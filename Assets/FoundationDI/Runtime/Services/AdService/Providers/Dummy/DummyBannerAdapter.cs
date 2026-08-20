@@ -5,6 +5,7 @@ namespace DarkNaku.FoundationDI
     public class DummyBannerAdapter : IBannerAdapter
     {
         private readonly IDummyAdScreen _screen;
+        private readonly string _adUnitId;
         private readonly BannerOptions _bannerOptions;
         private readonly DummyAdOptions _options;
         private bool _isDisposed;
@@ -14,9 +15,11 @@ namespace DarkNaku.FoundationDI
         public event Action<float> HeightChanged;
         public event Action<AdImpression> Paid;
 
-        public DummyBannerAdapter(IDummyAdScreen screen, BannerOptions bannerOptions, DummyAdOptions options)
+        public DummyBannerAdapter(IDummyAdScreen screen, string adUnitId, BannerOptions bannerOptions,
+                                  DummyAdOptions options)
         {
             _screen = screen;
+            _adUnitId = adUnitId;
             _bannerOptions = bannerOptions;
             _options = options;
         }
@@ -30,7 +33,7 @@ namespace DarkNaku.FoundationDI
             Height = _options.BannerHeight;
             HeightChanged?.Invoke(Height);
 
-            Paid?.Invoke(new AdImpression(AdFormat.Banner, "Dummy", "DummyNetwork", "dummy-banner",
+            Paid?.Invoke(new AdImpression(AdFormat.Banner, "Dummy", "DummyNetwork", _adUnitId,
                                           "dummy-instance", null, 0.002, "USD",
                                           AdRevenuePrecision.Estimated, "dummy-creative"));
         }

@@ -18,8 +18,11 @@ namespace DarkNaku.FoundationDI
         public string Name => "Dummy";
         public IAdConsent Consent { get; } = new NoopAdConsent();
 
-        // Dummy는 어댑터별 Paid만 쓴다. 전역 경로는 LevelPlay 어댑터를 위한 자리다.
-        public event Action<AdImpression> ImpressionPaid;
+        // 이 provider에는 provider-전역 임프레션 경로가 없다 — 더미 임프레션은 전부
+        // 어댑터별 Paid로 온다. 여기서 진짜로 전달하면 AdService.BuildAdUnits가 어댑터 Paid와
+        // 이 이벤트를 둘 다 구독해 같은 임프레션이 두 번 집계된다(Task 9에서 고친 결함과 동일 패턴).
+        // 그래서 인터페이스 계약은 지키되 아무 일도 하지 않는 no-op으로 둔다.
+        public event Action<AdImpression> ImpressionPaid { add { } remove { } }
 
         public DummyAdProvider(IAdDispatcher dispatcher, DummyAdOptions options,
                                IDummyAdScreen screen = null, Func<float> random = null)
@@ -43,13 +46,13 @@ namespace DarkNaku.FoundationDI
         }
 
         public IFullScreenAdapter CreateInterstitial(string adUnitId) =>
-            new DummyFullScreenAdapter(AdFormat.Interstitial, _dispatcher, _screen, _options, _random);
+            new DummyFullScreenAdapter(AdFormat.Interstitial, adUnitId, _dispatcher, _screen, _options, _random);
 
         public IFullScreenAdapter CreateRewarded(string adUnitId) =>
-            new DummyFullScreenAdapter(AdFormat.Rewarded, _dispatcher, _screen, _options, _random);
+            new DummyFullScreenAdapter(AdFormat.Rewarded, adUnitId, _dispatcher, _screen, _options, _random);
 
         public IBannerAdapter CreateBanner(string adUnitId, BannerOptions options) =>
-            new DummyBannerAdapter(_screen, options, _options);
+            new DummyBannerAdapter(_screen, adUnitId, options, _options);
 
         public void Dispose()
         {
@@ -59,7 +62,6 @@ namespace DarkNaku.FoundationDI
             // 외부에서 받은 화면은 소유권이 없으므로 해제하지 않는다.
             if (_ownsScreen) _screen?.Dispose();
             _screen = null;
-            ImpressionPaid = null;
         }
     }
 }
