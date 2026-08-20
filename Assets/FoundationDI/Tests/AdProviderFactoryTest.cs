@@ -75,4 +75,19 @@ public class AdProviderFactoryTest
 
         Assert.IsInstanceOf<DummyAdProvider>(provider);
     }
+
+    [Test]
+    public void Build은_사용가능하다고_판단됐지만_구현되지_않은_타입이면_에러를_로그로_남기고_Dummy로_대체한다()
+    {
+        // Create를 거쳐서는 이 상태(effective가 Dummy가 아닌 채로 Build에 들어옴)에 닿을 수
+        // 없다 — Resolve가 심볼 없이는 Dummy 외의 값을 절대 돌려주지 않기 때문이다. Build를
+        // internal로 분리해 "이미 사용 가능하다고 판단된" 상태를 직접 주입해 default 분기
+        // (에러 로그 + Dummy 대체)를 검증한다.
+        var factory = new AdProviderFactory(new FakeAdDispatcher());
+
+        LogAssert.Expect(UnityEngine.LogType.Error, new System.Text.RegularExpressions.Regex("AdMob"));
+        var provider = factory.Build(AdProviderType.AdMob, DummyAdOptions.Default);
+
+        Assert.IsInstanceOf<DummyAdProvider>(provider);
+    }
 }
