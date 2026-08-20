@@ -175,6 +175,26 @@ public class BannerAdUnitTest
     }
 
     [Test]
+    public void 광고제거_상태에서_Show를_호출하면_의도만_기록했다가_해제되면_배너가_나타난다()
+    {
+        var adsRemoved = true;
+        var factory = new AdapterFactory();
+        var sut = new BannerAdUnit(factory.Create, () => adsRemoved);
+
+        sut.Show();
+
+        Assert.AreEqual(0, factory.Created.Count, "광고제거 상태인데 어댑터를 만들었다");
+        Assert.IsFalse(sut.IsVisible);
+
+        adsRemoved = false;
+        sut.OnAdsRemovedChanged(false);
+
+        Assert.AreEqual(1, factory.Created.Count, "광고제거 해제 후 배너가 나타나지 않았다");
+        Assert.AreEqual(1, factory.Last.ShowCount);
+        Assert.IsTrue(sut.IsVisible);
+    }
+
+    [Test]
     public void 숨긴_뒤_어댑터가_스스로_높이를_바꿔도_0으로_중계된다()
     {
         var factory = new AdapterFactory();

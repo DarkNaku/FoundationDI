@@ -616,6 +616,7 @@ public class FullScreenAdUnitTest
     });
 
     [UnityTest]
+    [Timeout(5000)]
     public IEnumerator 광고제거_상태에서_전면광고는_Blocked를_반환한다() => UniTask.ToCoroutine(async () =>
     {
         var adapter = new FakeFullScreenAdapter();
@@ -631,6 +632,7 @@ public class FullScreenAdUnitTest
     });
 
     [UnityTest]
+    [Timeout(5000)]
     public IEnumerator 광고제거_상태에서도_보상형_광고는_정상_표시된다() => UniTask.ToCoroutine(async () =>
     {
         // 보상형은 유저가 자발적으로 보는 것이라 광고제거 대상이 아니다.
