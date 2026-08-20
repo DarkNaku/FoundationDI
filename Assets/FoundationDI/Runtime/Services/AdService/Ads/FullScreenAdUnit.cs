@@ -151,7 +151,10 @@ namespace DarkNaku.FoundationDI
         private void OnDisplayFailed(AdError error)
         {
             Debug.LogWarning($"[AdService] {_format} 표시 실패: {error}");
-            Complete(AdShowResult.Failed(error));
+
+            // 이미 완료된 쇼에 대한 중복/지연 DisplayFailed면 재로드하지 않는다.
+            // FinalizeClose와 같은 보호 — 중복 로드는 세 SDK 모두 에러로 취급한다.
+            if (!Complete(AdShowResult.Failed(error))) return;
 
             // 표시 실패는 대개 만료되거나 소진된 광고가 원인이다. 새로 받아온다.
             Load();

@@ -586,4 +586,32 @@ public class FullScreenAdUnitTest
         Assert.AreEqual(AdShowOutcome.Failed, result.Outcome);
         Assert.AreEqual(0, adapter.ShowCount);
     });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 중복된_표시_실패는_재로드를_한_번만_한다() => UniTask.ToCoroutine(async () =>
+    {
+        var adapter = new FakeFullScreenAdapter();
+        var dispatcher = new FakeAdDispatcher();
+        var sut = NewUnit(adapter, dispatcher, AdFormat.Interstitial);
+
+        adapter.RaiseLoaded();
+        var loadCountBefore = adapter.LoadCount;
+
+        var pending = sut.ShowAsync();
+
+        LogAssert.Expect(UnityEngine.LogType.Warning,
+                         new System.Text.RegularExpressions.Regex("표시 실패"));
+        adapter.RaiseDisplayFailed(new AdError(7, "expired"));
+
+        // 중복/지연 DisplayFailed — 어댑터/네트워크 오동작. 경고 로그는 두 번 다 찍혀야 한다.
+        LogAssert.Expect(UnityEngine.LogType.Warning,
+                         new System.Text.RegularExpressions.Regex("표시 실패"));
+        adapter.RaiseDisplayFailed(new AdError(7, "expired"));
+
+        var result = await pending;
+
+        Assert.AreEqual(AdShowOutcome.Failed, result.Outcome);
+        Assert.AreEqual(loadCountBefore + 1, adapter.LoadCount, "중복된 표시 실패가 재로드를 두 번 트리거했다");
+    });
 }
