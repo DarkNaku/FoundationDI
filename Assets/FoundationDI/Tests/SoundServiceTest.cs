@@ -1,177 +1,122 @@
-using System.Collections;
-using System.Linq;
-using Cysharp.Threading.Tasks;
+using System.Collections.Generic;
 using DarkNaku.FoundationDI;
-using NSubstitute;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
 
 public class SoundServiceTest
 {
-    private static AudioClip MakeClip() => AudioClip.Create("clip", 1, 1, 1000, false);
-
-    private static ISoundCatalog Catalog(params (string key, AudioClip clip)[] entries)
+    private sealed class FakeVolumeStorage : ISoundVolumeStorage
     {
-        var catalog = Substitute.For<ISoundCatalog>();
-        foreach (var (key, clip) in entries)
-        {
-            var captured = clip;
-            catalog.TryGetClip(key, out Arg.Any<AudioClip>())
-                .Returns(call => { call[1] = captured; return true; });
-        }
-        catalog.Keys.Returns(entries.Select(e => e.key).ToList());
-        return catalog;
+        public readonly Dictionary<string, float> Values = new();
+        public int SaveCount;
+
+        public bool HasKey(string key) => Values.ContainsKey(key);
+
+        public float GetFloat(string key, float defaultValue) =>
+            Values.TryGetValue(key, out float value) ? value : defaultValue;
+
+        public void SetFloat(string key, float value) => Values[key] = value;
+
+        public void Save() => SaveCount++;
     }
+
+    private SoundServiceSettings _settings;
+    private FakeVolumeStorage _storage;
+    private SoundService _service;
 
     [SetUp]
     public void SetUp()
     {
-        PlayerPrefs.DeleteKey("SFX_ENABLED");
-        PlayerPrefs.DeleteKey("BGM_ENABLED");
+        _settings = ScriptableObject.CreateInstance<SoundServiceSettings>();
+        _settings.SoundDataCollection = ScriptableObject.CreateInstance<SoundDataCollection>();
+        _settings.MusicDataCollection = ScriptableObject.CreateInstance<MusicDataCollection>();
+        _settings.OutputDataCollection = ScriptableObject.CreateInstance<OutputDataCollection>();
+
+        _storage = new FakeVolumeStorage();
+        _service = new SoundService(_settings, _storage);
+    }
+
+    [TearDown]
+    public void TearDown()
+    {
+        _service.Dispose();
+
+        Object.DestroyImmediate(_settings.SoundDataCollection);
+        Object.DestroyImmediate(_settings.MusicDataCollection);
+        Object.DestroyImmediate(_settings.OutputDataCollection);
+        Object.DestroyImmediate(_settings);
     }
 
     [Test]
-    public void SFX_재생시_카탈로그에서_클립을_가져온다()
+    public void 저장된_적_없는_Output_볼륨은_1로_초기화된다()
     {
-        var catalog = Catalog(("sfx", MakeClip()));
-        var sut = new SoundService(catalog) { SFXEnabled = true };
+        float volume = _service.GetSavedOutputVolume("Master");
 
-        sut.Play("sfx");
-
-        catalog.Received(1).TryGetClip("sfx", out Arg.Any<AudioClip>());
-
-        sut.Dispose();
+        Assert.AreEqual(1f, volume);
+        Assert.AreEqual(1f, _storage.GetFloat("Master", -1f));
     }
 
     [Test]
-    public void 같은_프레임_SFX는_클립을_한번만_조회한다()
+    public void 저장된_Output_볼륨을_그대로_반환한다()
     {
-        var catalog = Catalog(("sfx", MakeClip()));
-        var sut = new SoundService(catalog) { SFXEnabled = true };
+        _storage.SetFloat("BGM", 0.42f);
 
-        sut.Play("sfx");
-        sut.Play("sfx");
-
-        // 프레임 중복 차단이 카탈로그 조회 전에 걸리므로 조회는 1회.
-        catalog.Received(1).TryGetClip("sfx", out Arg.Any<AudioClip>());
-
-        sut.Dispose();
+        Assert.AreEqual(0.42f, _service.GetSavedOutputVolume("BGM"), 0.0001f);
     }
 
     [Test]
-    public void BGM_재생시_카탈로그에서_클립을_가져온다()
+    public void 없는_Output_볼륨을_바꾸면_에러를_남기고_저장하지_않는다()
     {
-        var catalog = Catalog(("bgm", MakeClip()));
-        var sut = new SoundService(catalog) { BGMEnabled = true };
+        LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex(".*Missing.*"));
+        LogAssert.Expect(LogType.Error, new System.Text.RegularExpressions.Regex(".*Missing.*"));
 
-        sut.PlayBGM("bgm");
+        _service.ChangeOutputVolume("Missing", 0.5f);
 
-        catalog.Received(1).TryGetClip("bgm", out Arg.Any<AudioClip>());
-
-        sut.Dispose();
+        Assert.IsFalse(_storage.HasKey("Missing"));
     }
 
     [Test]
-    public void 카탈로그에_없는_SFX키는_재생하지_않고_에러를_남긴다()
+    public void 팩토리는_각각_새_빌더를_돌려준다()
     {
-        var catalog = Catalog();
-        var sut = new SoundService(catalog) { SFXEnabled = true };
+        var sound = _service.CreateSound("Jump");
+        var music = _service.CreateMusic("Theme");
+        var playlist = _service.CreatePlaylist("A", "B");
+        var dynamicMusic = _service.CreateDynamicMusic("A", "B");
 
-        LogAssert.Expect(LogType.Error,
-            new System.Text.RegularExpressions.Regex("not found in catalog"));
-
-        sut.Play("missing");
-
-        sut.Dispose();
+        Assert.IsNotNull(sound);
+        Assert.IsNotNull(music);
+        Assert.IsNotNull(playlist);
+        Assert.IsNotNull(dynamicMusic);
+        Assert.AreNotSame(sound, _service.CreateSound("Jump"));
     }
 
     [Test]
-    public void 카탈로그에_없는_BGM키는_재생하지_않고_에러를_남긴다()
+    public void 재생하지_않은_빌더는_사용중이_아니다()
     {
-        var catalog = Catalog();
-        var sut = new SoundService(catalog) { BGMEnabled = true };
+        var sound = _service.CreateSound("Jump");
 
-        LogAssert.Expect(LogType.Error,
-            new System.Text.RegularExpressions.Regex("not found in catalog"));
-
-        sut.PlayBGM("missing");
-
-        sut.Dispose();
+        Assert.IsFalse(sound.Using);
+        Assert.IsFalse(sound.Playing);
+        Assert.IsFalse(sound.Paused);
+        Assert.AreEqual(0f, sound.PlayingTime);
     }
 
     [Test]
-    public void 생성_직후_SFX는_활성화_상태다()
+    public void 없는_id를_정지하면_경고만_남긴다()
     {
-        var sut = new SoundService(Catalog());
-        Assert.IsTrue(sut.SFXEnabled);
-        sut.Dispose();
+        LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex(".*ghost.*"));
+
+        Assert.DoesNotThrow(() => _service.Stop("ghost"));
     }
 
     [Test]
-    public void 생성_직후_BGM은_활성화_상태다()
+    public void Dispose는_여러_번_호출해도_안전하다()
     {
-        var sut = new SoundService(Catalog());
-        Assert.IsTrue(sut.BGMEnabled);
-        sut.Dispose();
+        Assert.DoesNotThrow(() =>
+        {
+            _service.Dispose();
+            _service.Dispose();
+        });
     }
-
-    [Test]
-    public void 생성_직후_BGM은_재생중이_아니다()
-    {
-        var sut = new SoundService(Catalog());
-        Assert.IsFalse(sut.IsPlayingBGM);
-        sut.Dispose();
-    }
-
-    [Test]
-    public void SFX_활성화_상태는_PlayerPrefs에_영속된다()
-    {
-        var sut = new SoundService(Catalog());
-        sut.SFXEnabled = false;
-        sut.Dispose();
-
-        var reloaded = new SoundService(Catalog());
-        Assert.IsFalse(reloaded.SFXEnabled);
-        reloaded.Dispose();
-    }
-
-    [Test]
-    public void BGM_활성화_상태는_PlayerPrefs에_영속된다()
-    {
-        var sut = new SoundService(Catalog());
-        sut.BGMEnabled = false;
-        sut.Dispose();
-
-        var reloaded = new SoundService(Catalog());
-        Assert.IsFalse(reloaded.BGMEnabled);
-        reloaded.Dispose();
-    }
-
-    [Test]
-    public void BGM_재생중이면_IsPlayingBGM이_true다()
-    {
-        var catalog = Catalog(("bgm", MakeClip()));
-        var sut = new SoundService(catalog);
-
-        sut.PlayBGM("bgm");
-
-        Assert.IsTrue(sut.IsPlayingBGM);
-
-        sut.Dispose();
-    }
-
-    [UnityTest]
-    public IEnumerator PreloadAsync는_카탈로그의_PreloadClips를_열거한다() => UniTask.ToCoroutine(async () =>
-    {
-        var catalog = Substitute.For<ISoundCatalog>();
-        catalog.PreloadClips.Returns(new[] { MakeClip(), MakeClip() });
-        var sut = new SoundService(catalog);
-
-        await sut.PreloadAsync();
-
-        _ = catalog.Received(1).PreloadClips;
-
-        sut.Dispose();
-    });
 }
