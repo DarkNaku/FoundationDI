@@ -22,6 +22,9 @@ namespace DarkNaku.FoundationDI
         private IDisposable _scheduledRetry;
         private bool _isDisposed;
 
+        private AwaitableCompletionSource<AdShowResult> _showCompletion;
+        private string _activePlacement;
+
         public event Action Loaded;
         public event Action Displayed;
         public event Action Closed;
@@ -59,10 +62,44 @@ namespace DarkNaku.FoundationDI
 
         public Awaitable<AdShowResult> ShowAsync(string placement = null)
         {
-            // Task 4에서 구현한다.
+            if (_isDisposed) return Immediate(AdShowResult.Failed(new AdError(-1, "서비스가 이미 해제됐다")));
+
+            // 순서가 중요하다. 광고제거는 로드조차 트리거하지 않아야 하므로 가장 먼저 본다.
+            if (_blockWhenAdsRemoved && _adsRemoved()) return Immediate(AdShowResult.Blocked());
+
+            if (_showCompletion != null) return Immediate(AdShowResult.Failed(new AdError(-2, "이미 표시 중이다")));
+
+            if (!_adapter.IsReady)
+            {
+                Load();   // 다음 기회를 위해 미리 채워둔다
+                return Immediate(AdShowResult.NotReady());
+            }
+
+            _activePlacement = placement;
+            _showCompletion = new AwaitableCompletionSource<AdShowResult>();
+
+            var awaitable = _showCompletion.Awaitable;
+            _adapter.Show();
+            return awaitable;
+        }
+
+        // Awaitable은 단일 사용이므로 호출자마다 새 completion source를 만든다.
+        private static Awaitable<AdShowResult> Immediate(AdShowResult result)
+        {
             var source = new AwaitableCompletionSource<AdShowResult>();
-            source.SetResult(AdShowResult.NotReady());
+            source.SetResult(result);
             return source.Awaitable;
+        }
+
+        // 완료는 반드시 이 한 곳을 거친다. 이중 완료를 막고 상태를 함께 청소한다.
+        private void Complete(AdShowResult result)
+        {
+            var completion = _showCompletion;
+            if (completion == null) return;
+
+            _showCompletion = null;
+            _activePlacement = null;
+            completion.SetResult(result);
         }
 
         private void OnLoaded()
@@ -102,7 +139,11 @@ namespace DarkNaku.FoundationDI
         }
 
         private void OnDisplayed() => Displayed?.Invoke();
-        private void OnDisplayFailed(AdError error) { }   // Task 4
+        private void OnDisplayFailed(AdError error)
+        {
+            Debug.LogWarning($"[AdService] {_format} 표시 실패: {error}");
+            Complete(AdShowResult.Failed(error));
+        }
         private void OnClosed() { }                        // Task 5
         private void OnRewarded(AdReward reward) { }       // Task 5
         private void OnPaid(AdImpression impression) => Paid?.Invoke(impression);

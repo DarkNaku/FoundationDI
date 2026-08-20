@@ -93,4 +93,20 @@ public class FullScreenAdUnitTest
         Assert.AreEqual(loadCountBefore + 1, adapter.LoadCount,
                         "카운터가 리셋되지 않아 지연이 2초가 아니었다");
     }
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 준비되지_않은_상태의_ShowAsync는_NotReady를_반환하고_로드를_시작한다() =>
+        UniTask.ToCoroutine(async () =>
+    {
+        var adapter = new FakeFullScreenAdapter { IsReady = false };
+        var dispatcher = new FakeAdDispatcher();
+        var sut = NewUnit(adapter, dispatcher);
+
+        var result = await sut.ShowAsync();
+
+        Assert.AreEqual(AdShowOutcome.NotReady, result.Outcome);
+        Assert.AreEqual(0, adapter.ShowCount, "준비도 안 됐는데 Show를 호출했다");
+        Assert.AreEqual(1, adapter.LoadCount, "NotReady일 때 로드를 트리거하지 않았다");
+    });
 }
