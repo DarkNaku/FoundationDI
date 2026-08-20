@@ -32,4 +32,22 @@ public class AdProviderFactoryTest
         Assert.AreEqual(AdProviderType.Dummy, effective);
         Assert.IsNull(warning);
     }
+
+    [Test]
+    public void 설정은_인스펙터_값을_그대로_서비스_옵션으로_옮긴다()
+    {
+        var settings = UnityEngine.ScriptableObject.CreateInstance<AdServiceSettings>();
+
+        var options = settings.ToOptions();
+
+        // 기본값이 스펙과 일치하는지 확인한다. 여기가 어긋나면 재시도 동작이 조용히 달라진다.
+        Assert.AreEqual(5, options.RetryPolicy.MaxAttempts);
+        Assert.AreEqual(2f, options.RetryPolicy.BaseSeconds, 0.001f);
+        Assert.AreEqual(64f, options.RetryPolicy.MaxDelaySeconds, 0.001f);
+        Assert.AreEqual(1, options.RewardGraceFrames);
+        Assert.IsTrue(options.AutoLoadOnInitialize);
+        Assert.AreEqual(BannerPosition.Bottom, options.BannerOptions.Position);
+
+        UnityEngine.ScriptableObject.DestroyImmediate(settings);
+    }
 }
