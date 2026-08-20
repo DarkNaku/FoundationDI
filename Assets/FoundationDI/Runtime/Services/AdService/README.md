@@ -25,6 +25,7 @@
 
 ```csharp
 using DarkNaku.FoundationDI;
+using UnityEngine;
 using VContainer;
 using VContainer.Unity;
 
@@ -146,7 +147,7 @@ _ads.Paid += impression =>
 | `AdUnitId` | `ad_unit_name` | |
 | `Revenue` | `value` | |
 | `Currency` | `currency` | |
-| `Format` | (게임이 직접 매핑) | `Banner`/`Interstitial`/`Rewarded` |
+| `Format` | `ad_format` | `Banner`/`Interstitial`/`Rewarded` |
 | `Placement` | (게임이 직접 매핑, 보통 커스텀 파라미터) | 아래 4.3 참고 |
 
 > **`Currency`를 무시하고 USD로 가정하면 AdMob에서 틀립니다.** AdMob(GMA)의 임프레션 수익은
@@ -233,7 +234,7 @@ AdService/
 │   └── Dummy/                    SDK 없이 흐름을 검증하는 provider 구현
 ├── Dispatch/
 │   ├── IAdDispatcher.cs          메인스레드 마샬링 + 지연 + 프레임 대기 seam
-│   ├── UnityAdDispatcher.cs      실제 구현. Runner 프리팹을 HideAndDontSave로 생성해 펌프한다
+│   ├── UnityAdDispatcher.cs      실제 구현. `HideAndDontSave` GameObject를 코드로 만들어 펌프한다(프리팹 아님)
 │   └── AdServiceRunner.cs        Update에서 큐를 퍼내는 MonoBehaviour(직접 배치하지 않는다)
 ├── Consent/                      IAdConsent seam + NoopAdConsent(Dummy용)
 ├── Storage/                      IAdRemovalStorage seam + PlayerPrefsAdRemovalStorage

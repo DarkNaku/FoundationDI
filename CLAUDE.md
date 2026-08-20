@@ -32,7 +32,7 @@ Unity 프로젝트이므로 CLI 빌드 명령은 없다. **모든 컴파일·테
 - 스크립트 생성/수정 후에는 `read_console`로 **컴파일 에러를 먼저 확인**한다. 컴파일이 끝나야(`editor_state.isCompiling == false`) 새 타입을 쓸 수 있다.
 - 테스트는 Unity Test Framework로 실행한다: UnityMCP의 `run_tests` 사용 (EditMode/PlayMode).
 - 모킹은 **NSubstitute 5.3.0** (`Assets/Packages/`, NuGetForUnity로 관리)을 사용한다.
-- 테스트 코드는 아직 없다. 추가 시 Tests용 asmdef를 만들고 `FoundationDI` 런타임 asmdef와 NSubstitute/NUnit을 참조해야 한다.
+- 테스트는 `Assets/FoundationDI/Tests/`의 `FoundationDI.Tests`(EditMode) asmdef에 있다. `FoundationDI` 런타임 asmdef와 NSubstitute/NUnit을 참조한다.
 
 NuGet 의존성은 **NuGetForUnity**(`Assets/NuGet/`)가 `Assets/packages.config`로 관리하며, `Assets/Packages/`에 풀린다. UPM 의존성은 `Packages/manifest.json`에 있다 (VContainer, MessagePipe, R3, UniTask, Director 등은 git URL로 참조).
 
