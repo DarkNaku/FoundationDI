@@ -142,6 +142,10 @@ namespace DarkNaku.FoundationDI
 
         private void BuildAdUnits()
         {
+            ValidateUnitId(_options.Interstitial, AdFormat.Interstitial);
+            ValidateUnitId(_options.Rewarded, AdFormat.Rewarded);
+            ValidateUnitId(_options.Banner, AdFormat.Banner);
+
             _interstitial = new FullScreenAdUnit(
                 _provider.CreateInterstitial(_options.Interstitial.Current), _dispatcher,
                 AdFormat.Interstitial, _options.RetryPolicy, _options.RewardGraceFrames, () => _adsRemoved);
@@ -161,6 +165,23 @@ namespace DarkNaku.FoundationDI
 
             // 어댑터별 Paid와 provider 전역 ImpressionPaid를 하나의 공개 이벤트로 합류시킨다.
             _provider.ImpressionPaid += OnPaid;
+        }
+
+        // AdUnitId.IsValid는 Current(빌드 타깃에 따라 Android/iOS 중 하나)를 본다 — 에디터의
+        // 활성 빌드 타깃이 모바일이 아니면(예: 이 리포지토리의 기본 Standalone 타깃) 항상
+        // 빈 값을 돌려주므로, 여기서는 그 값을 쓰지 않는다. 대신 Android/iOS 둘 다 비어
+        // 있는지만 본다 — "둘 중 하나도 설정한 적이 없다"는 명백한 설정 누락만 잡고,
+        // "현재 타깃엔 없지만 다른 플랫폼엔 있다"는 정상 상태를 오탐하지 않기 위함이다.
+        private void ValidateUnitId(AdUnitId unitId, AdFormat format)
+        {
+            // Dummy provider는 광고단위 ID가 없어도 정상 동작하도록 설계됐다(README/스펙
+            // 참고). 여기서 걸러내지 않으면 실기 스모크 테스트마다 매번 에러 로그가 찍힌다.
+            if (_provider.Name == "Dummy") return;
+
+            if (!string.IsNullOrEmpty(unitId.Android) || !string.IsNullOrEmpty(unitId.iOS)) return;
+
+            Debug.LogError($"[AdService] {format} 광고단위 ID가 설정되지 않았다. " +
+                           $"{_provider.Name} provider에 빈 ID로 광고를 요청하면 로드가 실패한다.");
         }
 
         private void Wire(FullScreenAdUnit unit, AdFormat format)

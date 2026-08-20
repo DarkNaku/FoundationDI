@@ -299,6 +299,55 @@ public class AdServiceTest
 
     [UnityTest]
     [Timeout(5000)]
+    public IEnumerator 초기화_시_비어있는_광고단위ID는_포맷명과_함께_에러_로그를_남긴다() =>
+        UniTask.ToCoroutine(async () =>
+    {
+        // AdUnitId.IsValid가 있어도 아무도 부르지 않으면 빈 ID가 그대로 SDK로 넘어가
+        // 원인이 안 보이는 로드 에러로만 드러난다. 여기서 미리 잡아 포맷명을 남긴다.
+        var provider = new FakeAdProvider();
+        var options = new AdServiceOptions(
+            banner: new AdUnitId("banner-a", "banner-i"),
+            interstitial: new AdUnitId("", ""),   // 설정 누락
+            rewarded: new AdUnitId("reward-a", "reward-i"),
+            bannerOptions: new BannerOptions(BannerPosition.Bottom, BannerSize.Adaptive, true),
+            providerContext: new AdProviderContext("app-key", false, false, new List<string>()),
+            retryPolicy: new AdRetryPolicy(3, 2f, 64f),
+            rewardGraceFrames: 1,
+            autoLoadOnInitialize: false);
+        var sut = new AdService(provider, new FakeAdDispatcher(), options, new FakeRemovalStorage());
+
+        LogAssert.Expect(UnityEngine.LogType.Error,
+                         new System.Text.RegularExpressions.Regex("Interstitial"));
+        await sut.InitializeAsync();
+    });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator Dummy_provider는_비어있는_광고단위ID여도_에러를_남기지_않는다() =>
+        UniTask.ToCoroutine(async () =>
+    {
+        // Dummy provider는 미설정 ID로 정상 동작하도록 설계됐다 — 실기 스모크마다
+        // 매번 에러 로그가 찍히면 안 된다.
+        var provider = new FakeAdProvider { Name = "Dummy" };
+        var options = new AdServiceOptions(
+            banner: new AdUnitId("", ""),
+            interstitial: new AdUnitId("", ""),
+            rewarded: new AdUnitId("", ""),
+            bannerOptions: new BannerOptions(BannerPosition.Bottom, BannerSize.Adaptive, true),
+            providerContext: new AdProviderContext(null, false, false, new List<string>()),
+            retryPolicy: new AdRetryPolicy(3, 2f, 64f),
+            rewardGraceFrames: 1,
+            autoLoadOnInitialize: false);
+        var sut = new AdService(provider, new FakeAdDispatcher(), options, new FakeRemovalStorage());
+
+        var ok = await sut.InitializeAsync();   // 예기치 못한 에러 로그가 있으면 LogAssert가 실패시킨다
+
+        Assert.IsTrue(ok);
+        Assert.IsTrue(sut.IsInitialized);
+    });
+
+    [UnityTest]
+    [Timeout(5000)]
     public IEnumerator 초기화에_실패한_뒤_다시_호출하면_새로_시도한다() => UniTask.ToCoroutine(async () =>
     {
         var provider = new FakeAdProvider { DeferInitialize = true };

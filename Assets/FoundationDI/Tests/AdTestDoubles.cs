@@ -133,7 +133,9 @@ public class FakeBannerAdapter : IBannerAdapter
 
 public class FakeAdProvider : IAdProvider
 {
-    public string Name => "Fake";
+    // set 가능한 이유: AdService.ValidateUnitId가 provider.Name으로 Dummy를 가려낸다.
+    // 그 게이트를 테스트하려면 "Dummy"라는 이름의 provider를 흉내낼 수 있어야 한다.
+    public string Name { get; set; } = "Fake";
     public bool InitializeResult { get; set; } = true;
     public bool IsDisposed { get; private set; }
     public AdProviderContext ReceivedContext { get; private set; }
