@@ -13,9 +13,9 @@ DI(의존성 주입) 기반 Unity 게임 개발 파운데이션 패키지입니�
 - **메시징** — MessagePipe 래퍼로 동기/비동기(UniTask) pub-sub, `IPublisher`/`ISubscriber` 지연 해석·캐싱
 - **리소스 로딩** — Addressables 추상화. 키 단위 캐싱 + 참조 카운팅으로 핸들 생명주기를 한 곳에서 관리
 - **UI 시스템** — 게임 전역 단일 상주 Canvas(ScreenSpaceOverlay·DontDestroyOnLoad) 위에 Page/Popup/Overlay 표시·전환, 모달 입력 차단, `Awaitable` 트랜지션 추상화. Page/Popup에 오버레이를 함께 노출하는 `WithOverlay`(동시 전환·`persistent` 연속 유지 옵션) 제공
-- **오브젝트 풀 / 사운드** — 키 기반 GameObject 풀링, SFX/BGM 재생. 사운드는 카탈로그(문자열키)·비동기 프리로드·볼륨/활성화 영속화를 제공하고 클립 로딩을 `IResourceService`에 위임
+- **오브젝트 풀 / 사운드** — 키 기반 GameObject 풀링과 태그 기반 오디오. 사운드는 SFX/음악/플레이리스트/다이내믹 뮤직 빌더, AudioSource 풀링, 페이드·루프·콜백, AudioMixer Output 볼륨 영속화, 3D 오클루전, 전용 에디터 창(Audio Creator/Collection/Output Manager)을 제공
 - **햅틱** — iOS/Android 촉각 피드백. 시맨틱 프리셋(`Impact`/`Notification`/`Selection`, 옵트인 쿨다운) + `AnimationCurve` 커브·커스텀 패턴 재생(`Awaitable`, 단일 활성)과 플랫폼 케이퍼빌리티 폴백. 에디터/데스크톱은 Noop
-- **씬 컴포넌트 DI** — 씬에 배치된 MonoBehaviour에 의존성을 주입하는 인프라(`InjectableBehaviour` + `InjectorService`). 버튼 클릭 사운드용 `SoundButton` 제공
+- **씬 컴포넌트 DI** — 씬에 배치된 MonoBehaviour에 의존성을 주입하는 인프라(`InjectableBehaviour` + `InjectorService`). `SoundButton`/`MusicZone`/`OutputVolumeSlider` 등이 이를 사용
 
 ## 설치 방법
 
@@ -58,7 +58,7 @@ public class RootLifetimeScope : LifetimeScope
         builder.Register<IResourceService, ResourceService>(Lifetime.Singleton);
         builder.RegisterUIService(_uiSettings);
         builder.RegisterInjector();   // 씬 배치 컴포넌트 주입(SoundButton 등)
-        // 필요한 서비스를 같은 방식으로 추가 등록 (예: builder.RegisterSoundService(_soundCatalog), builder.RegisterHapticService())
+        // 필요한 서비스를 같은 방식으로 추가 등록 (예: builder.RegisterSoundService(_soundSettings), builder.RegisterHapticService())
     }
 }
 ```
@@ -85,7 +85,7 @@ public class TitleFlow
 | **ResourceService** | Addressables 추상화. `LoadAsync`/`Load`/`Release`/`Dispose` API로 키 단위 캐싱 + 참조 카운팅. 에셋 로딩이 필요한 모든 서비스의 위임 대상. | [README](Runtime/Services/ResourceService/README.md) |
 | **MessageService** | MessagePipe 래퍼. `IObjectResolver`로 `IPublisher<T>`/`ISubscriber<T>`를 지연 해석해 캐싱하고, 동기/비동기(UniTask) pub-sub을 제공. | — |
 | **PoolService** | 키 기반 GameObject 오브젝트 풀. Resources→Addressables fallback으로 프리팹을 로드하며, 풀 항목 생명주기 콜백과 지연 반환(`Release(delay)`)을 지원. | — |
-| **SoundService** | SFX/BGM 재생. 사운드 카탈로그(문자열키→리소스키)·엄격 모드·비동기 프리로드(`PreloadAsync`)를 제공하고 클립 로딩을 `IResourceService`에 위임. 볼륨/활성화는 `PlayerPrefs`에 영속. 버튼용 `SoundButton` 포함. | [README](Runtime/Services/SoundService/README.md) |
+| **SoundService** | 태그 기반 오디오 시스템. `Sound`/`Music`/`Playlist`/`DynamicMusic` 빌더, AudioSource 풀링, 페이드 인·아웃, 루프/트랙 콜백, id 기반 일괄 제어, AudioMixer Output 볼륨(`PlayerPrefs` 영속, `ISoundVolumeStorage`로 교체 가능), 레이캐스트 3D 오클루전. Audio Creator/Collection/Output Manager/Settings 에디터 창과 `SoundButton`/`MusicZone`/`OutputVolumeSlider`/`VolumeSlider` 컴포넌트 포함. | [README](Runtime/Services/SoundService/README.md) |
 | **HapticService** | iOS/Android 통합 햅틱. 시맨틱 프리셋(`Impact`/`Notification`/`Selection`, 옵트인 쿨다운) + `AnimationCurve` 커브·커스텀 패턴 재생(`Play`, `Awaitable`, 단일 활성)·케이퍼빌리티 폴백. 에디터/데스크톱은 Noop, `Enabled`는 `PlayerPrefs`에 영속. | [README](Runtime/Services/HapticService/README.md) |
 | **InjectorService** | 씬에 배치된 MonoBehaviour에 의존성을 주입하는 인프라. 정적 요청 큐 + EntryPoint로 위치·계층·순서에 무관하게 주입. `InjectableBehaviour` 베이스 상속으로 사용. | [README](Runtime/Services/InjectorService/README.md) |
 
