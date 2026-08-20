@@ -4439,7 +4439,7 @@ public class AdServiceSmokeTest : MonoBehaviour
 - **빠른 시작**: `builder.RegisterAdService(settings)` → `await _ads.InitializeAsync()` → `await _ads.Rewarded.ShowAsync("placement")`
 - **`AdShowOutcome` 6종의 의미와 `IsRewarded`/`WasShown`을 언제 쓰는지**
 - **`AdsRemoved`의 포맷별 동작**: 전면·배너는 차단, 보상은 계속 동작. IAP는 범위 밖이고 게임 코드가 값을 넣는다는 것
-- **수익 추적**: `Paid` 이벤트 구독 예시와 Firebase `ad_impression` 파라미터 매핑. **`Currency`를 무시하고 USD로 가정하면 AdMob에서 틀린다**는 경고
+- **수익 추적**: `Paid` 이벤트 구독 예시와 Firebase `ad_impression` 파라미터 매핑. **`Currency`를 무시하고 USD로 가정하면 AdMob에서 틀린다**는 경고. 그리고 **`Placement`는 어댑터가 아니라 정책 계층이 채운다** — 어댑터는 `ShowAsync`에 넘어온 배치명을 알 수 없으므로 `FullScreenAdUnit.OnPaid`가 `AdImpression.WithPlacement`로 스탬프한다. 배너는 호출 배치가 없으므로 null이 정상
 - **3사 어댑터를 추가하는 방법**: `IAdProvider`/`IFullScreenAdapter`/`IBannerAdapter` 구현 + `AdProviderFactory.IsAvailable`/`Create`에 분기 추가 + 스크립팅 심볼(`FOUNDATIONDI_ADMOB` 등) 정의. spec의 매핑표를 참조하라고 링크
 - **알려진 범위 밖**: 3사 실제 어댑터, IAP, 전면 쿨다운 게이트, AppOpen/MREC/Native, 리모트 컨피그
 
