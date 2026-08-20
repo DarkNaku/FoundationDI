@@ -8,12 +8,11 @@ namespace DarkNaku.FoundationDI.Editor
     /// <summary>
     /// 에디터 도구가 <see cref="SoundServiceSettings"/>와 데이터 에셋을 찾고, 없으면 만들어 주는 헬퍼.
     /// 런타임은 DI로 설정을 받으므로 Resources에 의존하지 않는다.
-    /// 에디터 스크립트에서 오디오 데이터를 일괄 등록할 때도 이 클래스를 진입점으로 쓴다.
     /// </summary>
-    public static class SoundServiceAssetLocator
+    internal static class SoundServiceAssetLocator
     {
-        public const string DefaultDataRootPath = "Assets/FoundationDI.Data/SoundService/";
-        public const string RuntimeAssemblyName = "FoundationDI";
+        internal const string DefaultDataRootPath = "Assets/FoundationDI.Data/SoundService/";
+        internal const string RuntimeAssemblyName = "FoundationDI";
 
         private const string GeneratedSuffix = "_Generated.cs";
 
@@ -25,7 +24,7 @@ namespace DarkNaku.FoundationDI.Editor
         /// (예: 샘플이 자체 설정을 들고 올 때) 무엇을 편집할지 명시적으로 고른다.
         /// EditorPrefs에 프로젝트별로 저장된다.
         /// </summary>
-        public static SoundServiceSettings ActiveSettings
+        internal static SoundServiceSettings ActiveSettings
         {
             get
             {
@@ -59,7 +58,7 @@ namespace DarkNaku.FoundationDI.Editor
             $"DarkNaku.FoundationDI.SoundService.ActiveSettings.{Application.dataPath.GetHashCode():X}";
 
         /// <summary>프로젝트에 있는 모든 설정 에셋을 경로 순으로 반환한다.</summary>
-        public static SoundServiceSettings[] FindAllSettings()
+        internal static SoundServiceSettings[] FindAllSettings()
         {
             var guids = AssetDatabase.FindAssets($"t:{nameof(SoundServiceSettings)}");
             var settings = new List<SoundServiceSettings>(guids.Length);
@@ -83,7 +82,7 @@ namespace DarkNaku.FoundationDI.Editor
         /// <see cref="ActiveSettings"/>가 지정되어 있으면 그것을, 아니면 프로젝트에 하나뿐인 것을 쓴다.
         /// 여러 개인데 고르지 않았다면 첫 번째를 쓰고 한 번만 안내를 남긴다.
         /// </summary>
-        public static SoundServiceSettings FindSettings()
+        internal static SoundServiceSettings FindSettings()
         {
             if (_cachedSettings != null) return _cachedSettings;
 
@@ -114,7 +113,7 @@ namespace DarkNaku.FoundationDI.Editor
         }
 
         /// <summary>설정 에셋을 찾고, 없으면 기본 경로에 설정과 데이터 에셋 일체를 생성한다.</summary>
-        public static SoundServiceSettings GetOrCreateSettings()
+        internal static SoundServiceSettings GetOrCreateSettings()
         {
             var settings = FindSettings();
 
@@ -144,7 +143,7 @@ namespace DarkNaku.FoundationDI.Editor
         }
 
         /// <summary>설정이 참조하는 컬렉션 에셋이 없으면 만들어 연결한다.</summary>
-        public static void EnsureCollections(SoundServiceSettings settings)
+        internal static void EnsureCollections(SoundServiceSettings settings)
         {
             string root = settings.GetNormalizedDataRootPath();
             string collectionsPath = root + "Collections/";
@@ -185,7 +184,7 @@ namespace DarkNaku.FoundationDI.Editor
         /// 유사 enum은 partial struct라 프로젝트 전체에 한 벌만 존재할 수 있으므로,
         /// 다른 위치에 남아 있는 생성 폴더는 정리한다.
         /// </summary>
-        public static string GetGeneratedFolder(SoundServiceSettings settings)
+        internal static string GetGeneratedFolder(SoundServiceSettings settings)
         {
             string generatedPath = settings.GetNormalizedDataRootPath() + "Generated/";
 
@@ -243,7 +242,7 @@ namespace DarkNaku.FoundationDI.Editor
                              $"이전 생성 폴더를 정리했습니다: {string.Join(", ", removed)}");
         }
 
-        public static void ClearCache()
+        internal static void ClearCache()
         {
             _cachedSettings = null;
             _ambiguityHintShown = false;

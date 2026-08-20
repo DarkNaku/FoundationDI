@@ -103,10 +103,7 @@ Package Manager의 **Samples** 탭에서 예제를 import할 수 있습니다.
 | 04 Overlay | Above/Below 오버레이와 HUD 갱신 |
 | 05 Sound | SFX/Music/Playlist/DynamicMusic 재생, 페이드·볼륨 보간, 전체 제어 |
 
-각 샘플은 자체 데이터를 들고 있어 import 후 바로 실행됩니다.
-`05 Sound`의 오디오를 프로젝트 컬렉션에도 넣고 싶다면
-`Tools > FoundationDI > Sound > Sample Data > 05 Sound > Install Into Project`를 쓰고,
-같은 메뉴의 **Remove From Project**로 되돌립니다.
+각 샘플은 자체 데이터를 들고 있어 import 후 별도 준비 없이 바로 실행됩니다.
 
 ## 라이선스
 

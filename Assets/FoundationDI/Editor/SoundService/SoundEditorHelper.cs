@@ -5,18 +5,15 @@ using UnityEngine;
 
 namespace DarkNaku.FoundationDI.Editor
 {
-    /// <summary>
-    /// Audio Creator/Collection/Output Manager가 공유하는 에디터 동작 모음.
-    /// 에디터 스크립트에서 오디오 데이터를 일괄 등록할 때도 그대로 쓸 수 있다.
-    /// </summary>
-    public static class SoundEditorHelper
+    /// <summary>Audio Creator/Collection/Output Manager가 공유하는 에디터 동작 모음.</summary>
+    internal static class SoundEditorHelper
     {
-        public static readonly Color32 OrangeColor = new(255, 192, 88, 255);
-        public static readonly Color32 GreyColor = new(142, 142, 142, 255);
-        public static readonly Color32 RedColor = new(255, 65, 65, 255);
+        internal static readonly Color32 OrangeColor = new(255, 192, 88, 255);
+        internal static readonly Color32 GreyColor = new(142, 142, 142, 255);
+        internal static readonly Color32 RedColor = new(255, 65, 65, 255);
 
         /// <summary>컬렉션 변경을 저장하고 해당 섹션의 유사 enum 코드를 다시 생성한다.</summary>
-        public static void SaveCollectionChanges(Sections section, bool saveAssets = true)
+        internal static void SaveCollectionChanges(Sections section, bool saveAssets = true)
         {
             var settings = SoundServiceAssetLocator.GetOrCreateSettings();
 
@@ -38,7 +35,7 @@ namespace DarkNaku.FoundationDI.Editor
         }
 
         /// <summary>믹서에서 Output 목록을 다시 읽고 Output 유사 enum을 재생성한다.</summary>
-        public static void ReloadOutputsDatabase(bool saveAssets = true)
+        internal static void ReloadOutputsDatabase(bool saveAssets = true)
         {
             var settings = SoundServiceAssetLocator.GetOrCreateSettings();
 
@@ -61,7 +58,7 @@ namespace DarkNaku.FoundationDI.Editor
         }
 
         /// <summary>프리셋에 맞춰 오디오 클립의 임포트 설정을 바꾸고 재임포트한다.</summary>
-        public static void ChangeAudioClipImportSettings(AudioClip[] clips, CompressionPreset preset, bool forceMono)
+        internal static void ChangeAudioClipImportSettings(AudioClip[] clips, CompressionPreset preset, bool forceMono)
         {
             foreach (var clip in clips)
             {
@@ -108,7 +105,7 @@ namespace DarkNaku.FoundationDI.Editor
         }
 
         /// <summary>유사 enum 식별자로 쓸 수 있는 태그인지 검사한다(영숫자, 숫자로 시작 불가).</summary>
-        public static bool IsTagValid(string tag)
+        internal static bool IsTagValid(string tag)
         {
             if (string.IsNullOrEmpty(tag)) return false;
             if (Regex.IsMatch(tag, @"[^a-zA-Z0-9]")) return false;

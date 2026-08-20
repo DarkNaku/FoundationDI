@@ -19,19 +19,11 @@ Package Manager에서 이 샘플만 import한 뒤 `Sound.unity`를 열고 Play�
 
 ## 실행
 
-`Sound.unity`를 열고 Play. 준비 작업은 없다.
+Package Manager의 **Samples** 탭에서 이 샘플을 Import한 뒤,
+`Sound.unity`를 열고 Play. 그 밖의 준비 작업은 없다.
 
-## 내 프로젝트에 샘플 오디오 가져오기 (선택)
-
-샘플 클립을 **내 프로젝트의** 사운드/음악 컬렉션에도 등록하고 싶다면:
-
-`Tools > FoundationDI > Sound > Sample Data > 05 Sound > Install Into Project`
-
-편집 대상 설정 에셋(`Tools > FoundationDI > Sound > Settings`에서 고른 것)의 컬렉션에
-`Smp*` 태그가 추가되고 `SFX`/`Track` 상수가 다시 생성된다. 되돌리려면 같은 메뉴의
-**Remove From Project**. 이미 설치되어 있으면 Install이, 없으면 Remove가 회색으로 비활성화된다.
-
-> 샘플마다 이 메뉴 한 쌍이 따로 생긴다. 샘플을 여러 개 설치해도 서로 간섭하지 않는다.
+> 샘플 오디오를 내 게임에서도 쓰려면 `Audio/`의 클립을
+> `Tools > FoundationDI > Sound > Audio Creator`로 내 컬렉션에 등록하면 된다.
 
 ## 구성
 
@@ -42,11 +34,6 @@ Package Manager에서 이 샘플만 import한 뒤 `Sound.unity`를 열고 Play�
 ├── Data/                             ★ 이 샘플 전용 데이터 (단독 실행의 핵심)
 │   ├── SoundServiceSettings.asset
 │   └── Collections/{Sound,Music,Output}Collection.asset
-├── Editor/
-│   ├── SoundSampleAudioSet.cs        샘플이 들고 오는 오디오 묶음의 형태
-│   ├── SoundSampleData.cs            이 샘플의 오디오 정의(태그 ↔ 클립)
-│   ├── SoundSampleDataInstaller.cs   설치/제거/자체 데이터 채우기
-│   └── SoundSampleMenu.cs            샘플별 메뉴 항목
 └── Scripts/
     ├── SoundSampleScope.cs           컴포지션 루트
     ├── SoundSampleTags.cs            샘플이 쓰는 문자열 태그
