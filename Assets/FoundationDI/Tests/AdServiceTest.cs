@@ -77,6 +77,7 @@ public class AdServiceTest
         await sut.InitializeAsync();
 
         Assert.AreEqual(0, provider.InterstitialAdapter.LoadCount);
+        Assert.AreEqual(0, provider.RewardedAdapter.LoadCount);
     });
 
     [UnityTest]
@@ -106,6 +107,19 @@ public class AdServiceTest
         CollectionAssert.Contains(displayed, AdFormat.Rewarded);
         CollectionAssert.Contains(closed, AdFormat.Rewarded);
         CollectionAssert.DoesNotContain(displayed, AdFormat.Interstitial);
+
+        // 위의 DoesNotContain은 전면 배선이 통째로 빠져도 통과한다. 전면도 실제로
+        // 포맷 태그와 함께 전파되는지 양성 값으로 확인한다.
+        provider.InterstitialAdapter.RaiseLoaded();
+        var interstitialPending = sut.Interstitial.ShowAsync();
+        provider.InterstitialAdapter.RaiseDisplayed();
+        provider.InterstitialAdapter.RaiseClosed();
+        dispatcher.TickFrames(1);
+        await interstitialPending;
+
+        CollectionAssert.Contains(loaded, AdFormat.Interstitial);
+        CollectionAssert.Contains(displayed, AdFormat.Interstitial);
+        CollectionAssert.Contains(closed, AdFormat.Interstitial);
     });
 
     [UnityTest]
@@ -124,7 +138,13 @@ public class AdServiceTest
         provider.InterstitialAdapter.RaisePaid(NewImpression(AdFormat.Interstitial, "FromAdapter"));
         provider.RaiseImpressionPaid(NewImpression(AdFormat.Banner, "FromProvider"));
 
-        CollectionAssert.AreEquivalent(new[] { "FromAdapter", "FromProvider" }, received);
+        // 배너 갱신 수익이 어댑터 경로로 올 때도(AdMob/MAX 스타일) 새지 않아야 한다.
+        // 배너 어댑터는 Show() 전까지 붙지 않으므로 먼저 표시한다.
+        sut.Banner.Show();
+        provider.BannerAdapter.RaisePaid(NewImpression(AdFormat.Banner, "FromBannerAdapter"));
+
+        CollectionAssert.AreEquivalent(
+            new[] { "FromAdapter", "FromProvider", "FromBannerAdapter" }, received);
     });
 
     private static AdImpression NewImpression(AdFormat format, string network)
@@ -160,17 +180,85 @@ public class AdServiceTest
 
     [UnityTest]
     [Timeout(5000)]
+    public IEnumerator 광고제거를_켜면_배너가_사라진다() => UniTask.ToCoroutine(async () =>
+    {
+        var provider = new FakeAdProvider();
+        var sut = new AdService(provider, new FakeAdDispatcher(), NewOptions(), new FakeRemovalStorage());
+        await sut.InitializeAsync();
+
+        sut.Banner.Show();
+        Assert.IsTrue(sut.Banner.IsVisible, "배너를 표시했는데 보이지 않는다");
+
+        sut.AdsRemoved = true;
+
+        Assert.IsFalse(sut.Banner.IsVisible, "광고제거 후에도 배너가 보인다고 한다");
+        Assert.AreEqual(0f, sut.Banner.Height, "광고제거 후에도 높이가 남아있다");
+        Assert.IsTrue(provider.BannerAdapter.IsDisposed, "광고제거가 배너 어댑터까지 전달되지 않았다");
+    });
+
+    [UnityTest]
+    [Timeout(5000)]
     public IEnumerator Dispose는_provider와_모든_광고_유닛을_해제한다() => UniTask.ToCoroutine(async () =>
     {
         var provider = new FakeAdProvider();
         var sut = new AdService(provider, new FakeAdDispatcher(), NewOptions(), new FakeRemovalStorage());
         await sut.InitializeAsync();
+        sut.Banner.Show();
+
+        var received = new List<string>();
+        sut.Paid += imp => received.Add(imp.NetworkName);
 
         sut.Dispose();
 
         Assert.IsTrue(provider.IsDisposed, "provider가 해제되지 않았다");
         Assert.IsTrue(provider.InterstitialAdapter.IsDisposed);
         Assert.IsTrue(provider.RewardedAdapter.IsDisposed);
+        Assert.IsTrue(provider.BannerAdapter.IsDisposed, "배너 어댑터가 해제되지 않았다");
         Assert.IsFalse(sut.IsInitialized);
+
+        // Dispose가 provider.ImpressionPaid 구독을 해제하지 않으면 해제된 서비스가
+        // 계속 수익 이벤트를 공개 Paid로 흘려보낸다.
+        provider.RaiseImpressionPaid(NewImpression(AdFormat.Banner, "AfterDispose"));
+        Assert.IsEmpty(received, "Dispose 후에도 provider 임프레션 구독이 남아있다");
+
+        Assert.DoesNotThrow(() => sut.Dispose(), "Dispose를 두 번 호출하면 예외가 발생한다");
+    });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 초기화_전에_Dispose를_호출해도_안전하다() => UniTask.ToCoroutine(async () =>
+    {
+        var provider = new FakeAdProvider();
+        var sut = new AdService(provider, new FakeAdDispatcher(), NewOptions(), new FakeRemovalStorage());
+
+        Assert.DoesNotThrow(() => sut.Dispose());
+        Assert.IsTrue(provider.IsDisposed);
+        Assert.IsFalse(sut.IsInitialized);
+
+        await UniTask.Yield();
+    });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator Dispose_이후에는_InitializeAsync가_거짓을_반환하고_다시_초기화하지_않는다() =>
+        UniTask.ToCoroutine(async () =>
+    {
+        var provider = new FakeAdProvider();
+        var storage = new FakeRemovalStorage();
+        var sut = new AdService(provider, new FakeAdDispatcher(), NewOptions(), storage);
+        await sut.InitializeAsync();
+        sut.Dispose();
+
+        var ok = await sut.InitializeAsync();
+
+        Assert.IsFalse(ok, "Dispose 후 InitializeAsync가 성공을 반환했다");
+        Assert.IsFalse(sut.IsInitialized);
+        Assert.IsNull(sut.Interstitial, "Dispose 후에도 전면 광고 유닛이 살아있다");
+        Assert.IsNull(sut.Rewarded, "Dispose 후에도 보상 광고 유닛이 살아있다");
+        Assert.IsNull(sut.Banner, "Dispose 후에도 배너 유닛이 살아있다");
+
+        var saveCountBefore = storage.SaveCount;
+        sut.AdsRemoved = true;
+        Assert.AreEqual(saveCountBefore, storage.SaveCount, "Dispose 후에도 AdsRemoved 설정이 저장소에 반영됐다");
     });
 }
