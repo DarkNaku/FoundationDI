@@ -6,7 +6,7 @@ using UnityEngine;
 namespace DarkNaku.FoundationDI
 {
     /// <summary>SFX 태그 → 클립 묶음 데이터베이스. 에디터의 Audio Creator가 편집한다.</summary>
-    [CreateAssetMenu(fileName = "SoundCollection", menuName = "DarkNaku/FoundationDI/Sound Collection")]
+    [CreateAssetMenu(fileName = "SoundCollection", menuName = "FoundationDI/Sound/Sound Collection")]
     public class SoundDataCollection : ScriptableObject
     {
         [SerializeField] private SoundData[] _sounds = Array.Empty<SoundData>();

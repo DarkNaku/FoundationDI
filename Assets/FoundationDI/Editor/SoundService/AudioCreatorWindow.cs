@@ -29,7 +29,7 @@ namespace DarkNaku.FoundationDI.Editor
 
         private Vector2 _scroll;
 
-        [MenuItem("Tools/DarkNaku/FoundationDI/Sound/Audio Creator", false, 50)]
+        [MenuItem("Tools/FoundationDI/Sound/Audio Creator", false, 50)]
         public static void ShowWindow()
         {
             var window = GetWindow<AudioCreatorWindow>();

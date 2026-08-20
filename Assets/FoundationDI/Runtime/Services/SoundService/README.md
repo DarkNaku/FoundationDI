@@ -11,7 +11,7 @@ AudioMixer Output 볼륨과 3D 오클루전까지 한곳에서 다룬다.
 
 ### 1.1 설정 에셋 만들기
 
-`Tools > DarkNaku > FoundationDI > Sound > Settings`를 열고 **Create Settings**를 누른다.
+`Tools > FoundationDI > Sound > Settings`를 열고 **Create Settings**를 누른다.
 `Assets/FoundationDI.Data/SoundService/` 아래에 다음이 생성된다.
 
 ```
@@ -52,7 +52,7 @@ public class RootLifetimeScope : LifetimeScope
 
 ## 2. 오디오 등록
 
-`Tools > DarkNaku > FoundationDI > Sound > Audio Creator`
+`Tools > FoundationDI > Sound > Audio Creator`
 
 1. **Sounds / Music** 탭을 고른다.
 2. 클립을 드래그하거나 드롭 존을 클릭해서 고른다. **여러 개 넣으면 재생 때마다 무작위로 하나가 선택된다.**
@@ -196,7 +196,7 @@ _sound.StopAll();        // 씬 전환
 
 ## 4. Output (AudioMixer)
 
-`Tools > DarkNaku > FoundationDI > Sound > Output Manager`
+`Tools > FoundationDI > Sound > Output Manager`
 
 1. Master AudioMixer를 지정한다.
 2. 믹서에서 그룹을 만들고, 그룹의 **Volume을 우클릭 → Expose to script** 한 뒤
@@ -245,7 +245,7 @@ builder.Register<SoundService>(Lifetime.Singleton).As<ISoundService>();
 
 ## 6. 씬 컴포넌트
 
-`GameObject > DarkNaku > FoundationDI > Sound >` 메뉴로 배치한다.
+`GameObject > FoundationDI > Sound >` 메뉴로 배치한다.
 모두 `InjectableBehaviour`라 `builder.RegisterInjector()`가 필요하다.
 
 | 컴포넌트 | 하는 일 |

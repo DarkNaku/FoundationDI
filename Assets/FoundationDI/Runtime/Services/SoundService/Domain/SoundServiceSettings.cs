@@ -8,7 +8,7 @@ namespace DarkNaku.FoundationDI
     /// 런타임에는 <c>builder.RegisterSoundService(settings)</c>로 DI 주입되며,
     /// 에디터 도구는 <c>AssetDatabase</c>로 이 에셋을 찾아 사용한다(Resources 의존 없음).
     /// </summary>
-    [CreateAssetMenu(fileName = "SoundServiceSettings", menuName = "DarkNaku/FoundationDI/Sound Service Settings")]
+    [CreateAssetMenu(fileName = "SoundServiceSettings", menuName = "FoundationDI/Sound/Sound Service Settings")]
     public class SoundServiceSettings : ScriptableObject
     {
         [field: Header("Data")]

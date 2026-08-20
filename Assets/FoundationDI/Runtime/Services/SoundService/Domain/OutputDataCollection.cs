@@ -6,7 +6,7 @@ using UnityEngine.Audio;
 namespace DarkNaku.FoundationDI
 {
     /// <summary>AudioMixer의 그룹 목록 스냅샷. 에디터의 Output Manager가 믹서에서 다시 읽어 채운다.</summary>
-    [CreateAssetMenu(fileName = "OutputCollection", menuName = "DarkNaku/FoundationDI/Output Collection")]
+    [CreateAssetMenu(fileName = "OutputCollection", menuName = "FoundationDI/Sound/Output Collection")]
     public class OutputDataCollection : ScriptableObject
     {
         [SerializeField] private OutputData[] _outputs = Array.Empty<OutputData>();

@@ -8,7 +8,7 @@ namespace DarkNaku.FoundationDI.Editor
     /// <summary>GameObject 메뉴에서 SoundService 관련 컴포넌트를 빠르게 배치한다.</summary>
     public static class SoundServiceQuickMenu
     {
-        [MenuItem("GameObject/DarkNaku/FoundationDI/Sound/Music Zone", false, 10)]
+        [MenuItem("GameObject/FoundationDI/Sound/Music Zone", false, 10)]
         private static void CreateMusicZone(MenuCommand command)
         {
             var go = new GameObject("Music Zone");
@@ -18,7 +18,7 @@ namespace DarkNaku.FoundationDI.Editor
             Place(go, command.context, "Create Music Zone");
         }
 
-        [MenuItem("GameObject/DarkNaku/FoundationDI/Sound/UI/Output Volume Slider", false, 11)]
+        [MenuItem("GameObject/FoundationDI/Sound/UI/Output Volume Slider", false, 11)]
         private static void CreateOutputVolumeSlider(MenuCommand command)
         {
             var go = CreateSliderObject("Output Volume Slider");
@@ -28,7 +28,7 @@ namespace DarkNaku.FoundationDI.Editor
             Place(go, command.context, "Create Output Volume Slider");
         }
 
-        [MenuItem("GameObject/DarkNaku/FoundationDI/Sound/UI/Volume Slider", false, 12)]
+        [MenuItem("GameObject/FoundationDI/Sound/UI/Volume Slider", false, 12)]
         private static void CreateVolumeSlider(MenuCommand command)
         {
             var go = CreateSliderObject("Volume Slider");

@@ -29,7 +29,7 @@ namespace DarkNaku.FoundationDI.Editor
 
         private SoundService _service;
 
-        [MenuItem("Tools/DarkNaku/FoundationDI/Sound/Output Manager", false, 52)]
+        [MenuItem("Tools/FoundationDI/Sound/Output Manager", false, 52)]
         public static void ShowWindow()
         {
             var window = GetWindow<OutputManagerWindow>();

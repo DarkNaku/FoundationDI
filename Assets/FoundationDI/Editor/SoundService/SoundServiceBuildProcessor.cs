@@ -24,7 +24,7 @@ namespace DarkNaku.FoundationDI.Editor
                 settings.OutputDataCollection == null)
             {
                 Debug.LogError("[SoundService] SoundServiceSettings의 데이터 컬렉션 참조가 비어 있습니다. " +
-                               "Tools > DarkNaku > FoundationDI > Sound > Settings에서 확인하세요.");
+                               "Tools > FoundationDI > Sound > Settings에서 확인하세요.");
             }
         }
     }

@@ -16,7 +16,7 @@ namespace DarkNaku.FoundationDI.Editor
         private string _dataRootPathInput;
         private string _pathError = string.Empty;
 
-        [MenuItem("Tools/DarkNaku/FoundationDI/Sound/Settings", false, 53)]
+        [MenuItem("Tools/FoundationDI/Sound/Settings", false, 53)]
         public static void ShowWindow()
         {
             var window = GetWindow<SoundServiceSettingsWindow>();

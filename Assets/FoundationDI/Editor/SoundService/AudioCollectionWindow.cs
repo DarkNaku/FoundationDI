@@ -27,7 +27,7 @@ namespace DarkNaku.FoundationDI.Editor
 
         private bool IsSoundsSection => _currentSection == Sections.Sounds;
 
-        [MenuItem("Tools/DarkNaku/FoundationDI/Sound/Audio Collection", false, 51)]
+        [MenuItem("Tools/FoundationDI/Sound/Audio Collection", false, 51)]
         public static void ShowWindow()
         {
             var window = GetWindow<AudioCollectionWindow>();
