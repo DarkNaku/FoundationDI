@@ -144,14 +144,46 @@ public class FakeAdProvider : IAdProvider
 
     public IAdConsent Consent { get; } = new NoopAdConsent();
 
+    // 재진입(동시 InitializeAsync) 테스트용. true면 InitializeAsync가 즉시 완료되지 않고
+    // CompleteInitialize 호출을 기다린다. Awaitable은 단일 사용이므로 대기 중인 호출자마다
+    // completion source를 만들어 리스트에 쌓고, CompleteInitialize가 한 번에 전부 깨운다.
+    // ResourceService.LoadAsync의 대기자 리스트 패턴과 동일한 모양이다.
+    public bool DeferInitialize { get; set; }
+    public int InitializeCallCount { get; private set; }
+
+    private readonly List<AwaitableCompletionSource<bool>> _pendingInitializations = new();
+
     public event Action<AdImpression> ImpressionPaid;
 
     public Awaitable<bool> InitializeAsync(AdProviderContext context)
     {
         ReceivedContext = context;
+        InitializeCallCount++;
+
         var source = new AwaitableCompletionSource<bool>();
-        source.SetResult(InitializeResult);
+
+        if (DeferInitialize)
+        {
+            _pendingInitializations.Add(source);
+        }
+        else
+        {
+            source.SetResult(InitializeResult);
+        }
+
         return source.Awaitable;
+    }
+
+    // DeferInitialize로 보류 중인 모든 InitializeAsync 호출을 같은 결과로 완료시킨다.
+    public void CompleteInitialize(bool result)
+    {
+        var waiters = new List<AwaitableCompletionSource<bool>>(_pendingInitializations);
+        _pendingInitializations.Clear();
+
+        foreach (var waiter in waiters)
+        {
+            waiter.TrySetResult(result);
+        }
     }
 
     public IFullScreenAdapter CreateInterstitial(string adUnitId) => InterstitialAdapter;

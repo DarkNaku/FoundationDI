@@ -261,4 +261,67 @@ public class AdServiceTest
         sut.AdsRemoved = true;
         Assert.AreEqual(saveCountBefore, storage.SaveCount, "Dispose 후에도 AdsRemoved 설정이 저장소에 반영됐다");
     });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 초기화_진행중에_다시_호출하면_새로_시작하지_않고_같은_결과에_편승한다() =>
+        UniTask.ToCoroutine(async () =>
+    {
+        // 부트스트랩 시퀀스와 UI 화면이 같은 프레임에 각각 초기화를 기다리는 상황.
+        var provider = new FakeAdProvider { DeferInitialize = true };
+        var sut = new AdService(provider, new FakeAdDispatcher(), NewOptions(), new FakeRemovalStorage());
+
+        var first = sut.InitializeAsync();
+        var second = sut.InitializeAsync();
+
+        Assert.AreEqual(1, provider.InitializeCallCount,
+                        "초기화가 진행 중인데 provider 초기화를 새로 시작했다");
+
+        provider.CompleteInitialize(true);
+
+        Assert.IsTrue(await first);
+        Assert.IsTrue(await second, "편승한 두 번째 호출이 같은 결과를 받지 못했다");
+
+        // 중복 Load는 세 SDK 모두에서 오류다.
+        Assert.AreEqual(1, provider.InterstitialAdapter.LoadCount, "전면을 중복 로드했다");
+        Assert.AreEqual(1, provider.RewardedAdapter.LoadCount, "보상을 중복 로드했다");
+
+        // 이중 구독은 오직 여기서만 드러난다. provider 임프레션 한 번에 Paid가 두 번 발화하면
+        // 분석에 광고 수익이 2배로 기록된다.
+        var received = new List<string>();
+        sut.Paid += imp => received.Add(imp.NetworkName);
+
+        provider.RaiseImpressionPaid(NewImpression(AdFormat.Banner, "Once"));
+
+        CollectionAssert.AreEqual(new[] { "Once" }, received,
+                                  "provider.ImpressionPaid 구독이 중복돼 Paid가 여러 번 발화했다");
+    });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 초기화에_실패한_뒤_다시_호출하면_새로_시도한다() => UniTask.ToCoroutine(async () =>
+    {
+        var provider = new FakeAdProvider { DeferInitialize = true };
+        var sut = new AdService(provider, new FakeAdDispatcher(), NewOptions(), new FakeRemovalStorage());
+
+        LogAssert.Expect(UnityEngine.LogType.Error,
+                         new System.Text.RegularExpressions.Regex("초기화에 실패"));
+
+        var first = sut.InitializeAsync();
+        provider.CompleteInitialize(false);
+
+        Assert.IsFalse(await first);
+        Assert.IsFalse(sut.IsInitialized);
+
+        // 실패 경로에서 진행 플래그를 내리지 않으면 이 두 번째 호출은 영영 완료되지 않는다.
+        provider.DeferInitialize = false;
+        var ok = await sut.InitializeAsync();
+
+        Assert.IsTrue(ok, "초기화 실패 후 재시도가 성공하지 못했다");
+        Assert.IsTrue(sut.IsInitialized);
+        Assert.AreEqual(2, provider.InitializeCallCount, "재시도가 provider 초기화를 다시 부르지 않았다");
+        Assert.IsNotNull(sut.Interstitial, "재시도 후에도 전면 광고 유닛이 만들어지지 않았다");
+        Assert.IsNotNull(sut.Rewarded, "재시도 후에도 보상 광고 유닛이 만들어지지 않았다");
+        Assert.IsNotNull(sut.Banner, "재시도 후에도 배너 유닛이 만들어지지 않았다");
+    });
 }
