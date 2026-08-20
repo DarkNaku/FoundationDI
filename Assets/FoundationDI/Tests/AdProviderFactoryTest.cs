@@ -94,11 +94,34 @@ public class AdProviderFactoryTest
         var options = settings.ToOptions();
 
         Assert.GreaterOrEqual(options.RetryPolicy.MaxAttempts, 0, "음수 시도 횟수가 그대로 새어나왔다");
-        Assert.Greater(options.RetryPolicy.BaseSeconds, 0f, "0인 base가 그대로 새어나와 백오프가 무너진다");
+        // base는 1 이하로 클램프되면 안 된다 — Pow(base, attempt)가 attempt에 따라
+        // 자라려면 base > 1이어야 한다(1이면 항상 1, 1 미만이면 오히려 줄어든다).
+        Assert.Greater(options.RetryPolicy.BaseSeconds, 1f, "0인 base가 1 이하로 클램프돼 백오프가 자라지 않는다");
         Assert.Greater(options.RetryPolicy.MaxDelaySeconds, 0f, "음수 상한이 그대로 새어나왔다");
 
         // 클램프된 값으로 실제 지연을 계산해도 0이나 음수가 나오면 안 된다.
         Assert.Greater(options.RetryPolicy.DelayFor(1), 0f);
+
+        UnityEngine.ScriptableObject.DestroyImmediate(settings);
+    }
+
+    [Test]
+    public void 재시도_밑값이_0이어도_ToOptions는_시도할수록_지연이_실제로_늘어나는_값으로_클램프한다()
+    {
+        // 위 테스트는 "0이나 음수가 새어나오지 않는다"만 본다 — base가 1 이하(예: 옛
+        // 클램프 0.1)로만 눌러도 그 assert는 통과해버린다. 여기서는 그게 진짜 백오프인지,
+        // 즉 시도할수록 지연이 커지는지를 직접 확인한다. maxRetryDelaySeconds는 손대지
+        // 않고 기본값(64초)을 둔다 — 함께 아주 작은 값으로 눌러버리면 Mathf.Min 상한
+        // 자체가 병목이 되어 base가 아무리 커도 지연이 그 상한에서 묶여버려 성장을
+        // 관찰할 수 없다(위 테스트의 -5 조합이 그렇다).
+        var settings = UnityEngine.ScriptableObject.CreateInstance<AdServiceSettings>();
+        UnityEngine.JsonUtility.FromJsonOverwrite("{\"_retryBaseSeconds\":0}", settings);
+
+        var policy = settings.ToOptions().RetryPolicy;
+
+        Assert.Greater(policy.BaseSeconds, 1f, "밑값이 1 이하로 클램프돼 백오프가 자라지 않는다");
+        Assert.Greater(policy.DelayFor(2), policy.DelayFor(1), "시도 2회차 지연이 1회차보다 커야 한다");
+        Assert.Greater(policy.DelayFor(3), policy.DelayFor(2), "시도 3회차 지연이 2회차보다 커야 한다");
 
         UnityEngine.ScriptableObject.DestroyImmediate(settings);
     }
