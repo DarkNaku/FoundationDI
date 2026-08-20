@@ -87,7 +87,7 @@ public class GameOverScreen
 | `Dismissed` | 보상형 광고를 보상 없이 중간에 닫았다 | `FullScreenAdUnit`(보상)이 닫혔지만 Rewarded 콜백이 없었을 때 |
 | `NotReady` | 아직 로드되지 않았다 | `ShowAsync` 호출 시 어댑터가 준비되지 않음(내부적으로 `Load()`를 다시 걸어 다음 기회를 준비) |
 | `Failed` | 표시 중 실패했거나 중복 호출됐다 | SDK의 표시 실패 콜백, 이미 표시 중인 상태에서 재호출, 서비스가 `Dispose`된 뒤 대기 중이던 호출 |
-| `Blocked` | `AdsRemoved` 등 정책에 의해 차단됐다 | 전면 광고에서 `AdsRemoved == true`일 때 — 로드조차 시도하지 않고 즉시 반환 |
+| `Blocked` | `AdsRemoved` 또는 쿨다운 등 정책에 의해 차단됐다 | 전면 광고에서 `AdsRemoved == true`일 때(로드조차 시도하지 않고 즉시 반환), 또는 전면 광고가 쿨다운 중일 때(아래 2.1절) |
 
 - **`IsRewarded`** — `Outcome == Rewarded`. "보상을 줘도 되는가"만 볼 때 씁니다.
 - **`WasShown`** — `Shown` / `Rewarded` / `Dismissed` 셋 다 포함합니다. "실제로 화면에 광고가
@@ -101,6 +101,32 @@ public class GameOverScreen
 보상 콜백을 즉시 완료시키지 않고 보관해 두었다가 닫힘에서 유예 프레임(`Reward Grace Frames`,
 기본 1프레임)만큼 기다린 뒤 최종 `Outcome`을 확정합니다. 닫힘이 보상보다 먼저 와도 유예
 프레임 안에 보상이 도착하면 `Rewarded`로 확정됩니다.
+
+### 2.1 전면 쿨다운 게이트
+
+전면광고가 한 번 표시되면, 설정된 시간(`Interstitial Cooldown Seconds`, 기본 **120초**)이
+지나기 전까지는 다시 `ShowAsync`를 불러도 즉시 `Blocked`를 반환합니다. 로드조차 시도하지
+않습니다(`AdsRemoved` 차단과 같은 순서로, `ShowAsync`의 `NotReady` 분기보다 먼저 걸립니다).
+
+레벨 클리어 같은 트리거로 짧은 세션을 연달아 반복하면, 쿨다운이 없을 때 플레이어가 1분
+안에 전면광고를 세 번씩 보게 될 수 있습니다. 쿨다운은 그런 몰아치기를 막는 정책입니다.
+
+- **쿨다운은 표시 시점(`Displayed`)에 시작됩니다.** 요청 시점도, 닫힘 시점도 아닙니다 —
+  "마지막으로 실제 유저 화면에 뜬 순간" 기준으로 다음 표시까지의 최소 간격을 둔다는
+  의도입니다.
+- **세션 스코프입니다.** 영속화되지 않습니다 — 앱을 재시작하면 쿨다운도 초기화됩니다.
+- **전면광고에만 적용됩니다.** 보상형은 유저가 자발적으로 보는 것이라 쿨다운 대상이
+  아닙니다(3절의 `AdsRemoved` 면제와 같은 이유입니다). `AdService.BuildAdUnits`가 전면
+  유닛에는 설정값을, 보상 유닛에는 항상 `0`(게이트 무력화)을 조립해 넘깁니다.
+- **`0`으로 설정하면 게이트가 완전히 꺼집니다.** 표시 직후에도 바로 재표시할 수 있습니다.
+- `AdServiceSettings`의 `Interstitial Cooldown Seconds` 필드로 편집합니다. `[Min(0)]`은
+  인스펙터 편집만 막으므로, 손으로 고친 `.asset`이나 스크립트로 만든 값이 음수면
+  `ToOptions()`가 `0`으로 클램프합니다.
+
+**`CanShow`** — `ShowAsync`를 지금 부르면 실제로 표시가 시작될지 미리 알려주는 프로퍼티입니다
+(`IsReady`이고, 해제되지 않았고, `AdsRemoved`에 막히지 않았고, 쿨다운 중이 아닐 때 `true`).
+게임 UI가 "지금 광고를 보여줄 수 있는가"로 버튼을 켜고 끄려 할 때, `ShowAsync`를 호출해
+`Blocked`를 사후에 해석하지 않고 미리 판단할 수 있게 해 줍니다.
 
 ---
 
@@ -279,7 +305,6 @@ AdService/
   계획으로 진행합니다.
 - **IAP(인앱 구매)** — `AdsRemoved`는 세터만 제공합니다. 구매 검증·복원·상점 연동은 이 서비스의
   책임이 아닙니다.
-- **전면 쿨다운 게이트**(마지막 노출 후 N초 재표시 금지 같은 정책) — 현재 구현되지 않았습니다.
 - **AppOpen / MREC / Native 광고 포맷** — `AdFormat`은 `Banner`/`Interstitial`/`Rewarded` 셋뿐입니다.
 - **리모트 컨피그 연동**(광고 단위 ID·재시도 정책을 서버에서 갱신) — `AdServiceSettings`는
   에디터에서 편집하는 정적 값입니다.
