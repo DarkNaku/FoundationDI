@@ -7,16 +7,17 @@ namespace DarkNaku.FoundationDI.Editor
     /// <summary>
     /// 에디터 도구가 <see cref="SoundServiceSettings"/>와 데이터 에셋을 찾고, 없으면 만들어 주는 헬퍼.
     /// 런타임은 DI로 설정을 받으므로 Resources에 의존하지 않는다.
+    /// 에디터 스크립트에서 오디오 데이터를 일괄 등록할 때도 이 클래스를 진입점으로 쓴다.
     /// </summary>
-    internal static class SoundServiceAssetLocator
+    public static class SoundServiceAssetLocator
     {
-        internal const string DefaultDataRootPath = "Assets/FoundationDI.Data/SoundService/";
-        internal const string RuntimeAssemblyName = "FoundationDI";
+        public const string DefaultDataRootPath = "Assets/FoundationDI.Data/SoundService/";
+        public const string RuntimeAssemblyName = "FoundationDI";
 
         private static SoundServiceSettings _cachedSettings;
 
         /// <summary>설정 에셋을 찾는다. 없으면 null(생성하지 않음).</summary>
-        internal static SoundServiceSettings FindSettings()
+        public static SoundServiceSettings FindSettings()
         {
             if (_cachedSettings != null) return _cachedSettings;
 
@@ -37,7 +38,7 @@ namespace DarkNaku.FoundationDI.Editor
         }
 
         /// <summary>설정 에셋을 찾고, 없으면 기본 경로에 설정과 데이터 에셋 일체를 생성한다.</summary>
-        internal static SoundServiceSettings GetOrCreateSettings()
+        public static SoundServiceSettings GetOrCreateSettings()
         {
             var settings = FindSettings();
 
@@ -67,7 +68,7 @@ namespace DarkNaku.FoundationDI.Editor
         }
 
         /// <summary>설정이 참조하는 컬렉션 에셋이 없으면 만들어 연결한다.</summary>
-        internal static void EnsureCollections(SoundServiceSettings settings)
+        public static void EnsureCollections(SoundServiceSettings settings)
         {
             string root = settings.GetNormalizedDataRootPath();
             string collectionsPath = root + "Collections/";
@@ -104,7 +105,7 @@ namespace DarkNaku.FoundationDI.Editor
         }
 
         /// <summary>생성된 유사 enum 코드가 놓일 폴더. asmref도 함께 보장한다.</summary>
-        internal static string GetGeneratedFolder(SoundServiceSettings settings)
+        public static string GetGeneratedFolder(SoundServiceSettings settings)
         {
             string generatedPath = settings.GetNormalizedDataRootPath() + "Generated/";
 
@@ -114,7 +115,7 @@ namespace DarkNaku.FoundationDI.Editor
             return generatedPath;
         }
 
-        internal static void ClearCache() => _cachedSettings = null;
+        public static void ClearCache() => _cachedSettings = null;
 
         /// <summary>
         /// 생성된 코드가 런타임 어셈블리(FoundationDI)에 포함되도록 asmref를 놓는다.

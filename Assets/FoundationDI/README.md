@@ -93,7 +93,7 @@ public class TitleFlow
 
 ## 샘플
 
-Package Manager의 **Samples** 탭에서 UIService 예제를 import할 수 있습니다.
+Package Manager의 **Samples** 탭에서 예제를 import할 수 있습니다.
 
 | 샘플 | 내용 |
 | --- | --- |
@@ -101,6 +101,10 @@ Package Manager의 **Samples** 탭에서 UIService 예제를 import할 수 있�
 | 02 Page Navigation | 다단계 Page 전환, 파라미터 전달, 라이프사이클 콜백 |
 | 03 Popup Modal | 모달 입력 차단과 결과 반환 |
 | 04 Overlay | Above/Below 오버레이와 HUD 갱신 |
+| 05 Sound | SFX/Music/Playlist/DynamicMusic 재생, 페이드·볼륨 보간, 전체 제어 |
+
+> `05 Sound`는 import 후 `Tools > FoundationDI > Sound > Samples > Import Sample Audio`로
+> 샘플 오디오를 컬렉션에 등록해야 실행됩니다.
 
 ## 라이선스
 
