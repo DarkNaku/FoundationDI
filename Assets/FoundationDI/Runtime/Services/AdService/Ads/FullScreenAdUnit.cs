@@ -152,6 +152,9 @@ namespace DarkNaku.FoundationDI
         {
             Debug.LogWarning($"[AdService] {_format} 표시 실패: {error}");
             Complete(AdShowResult.Failed(error));
+
+            // 표시 실패는 대개 만료되거나 소진된 광고가 원인이다. 새로 받아온다.
+            Load();
         }
         // 보상은 래치만 한다. 여기서 완료시키면, 보상 후 닫힘 사이에 유저가 앱을 떠나는
         // 경우와 닫힘이 먼저 오는 경우를 구분할 수 없게 된다.
@@ -192,6 +195,12 @@ namespace DarkNaku.FoundationDI
 
             if (!Complete(result)) return;
             Closed?.Invoke();
+
+            // 세 SDK 모두 "닫히면 즉시 다음 광고를 로드하라"고 권고한다.
+            // 로드에 수 초가 걸리므로 여기서 시작하지 않으면 다음 기회를 놓친다.
+            // Complete가 false를 반환하면(중복 Closed) 이 지점에 도달하지 않으므로
+            // 중복 로드가 발생하지 않는다.
+            Load();
         }
 
         // 어댑터는 배치명을 모른다. 표시 중인 광고의 배치명을 여기서 채워 넣는다.

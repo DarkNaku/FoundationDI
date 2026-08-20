@@ -507,4 +507,45 @@ public class FullScreenAdUnitTest
 
         Assert.AreEqual(AdShowOutcome.Failed, result.Outcome);
     });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 광고가_닫히면_다음_광고를_자동으로_로드한다() => UniTask.ToCoroutine(async () =>
+    {
+        var adapter = new FakeFullScreenAdapter();
+        var dispatcher = new FakeAdDispatcher();
+        var sut = NewUnit(adapter, dispatcher, AdFormat.Interstitial);
+
+        adapter.RaiseLoaded();
+        var loadCountBefore = adapter.LoadCount;
+
+        var pending = sut.ShowAsync();
+        adapter.RaiseDisplayed();
+        adapter.RaiseClosed();
+        dispatcher.TickFrames(1);
+        await pending;
+
+        Assert.AreEqual(loadCountBefore + 1, adapter.LoadCount, "닫힘 후 자동 재로드가 없었다");
+    });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 표시에_실패하면_다음_광고를_자동으로_로드한다() => UniTask.ToCoroutine(async () =>
+    {
+        // 표시 실패는 대개 만료·소진된 광고가 원인이라 즉시 새로 받아와야 한다.
+        var adapter = new FakeFullScreenAdapter();
+        var dispatcher = new FakeAdDispatcher();
+        var sut = NewUnit(adapter, dispatcher, AdFormat.Interstitial);
+
+        adapter.RaiseLoaded();
+        var loadCountBefore = adapter.LoadCount;
+
+        var pending = sut.ShowAsync();
+        LogAssert.Expect(UnityEngine.LogType.Warning,
+                         new System.Text.RegularExpressions.Regex("표시 실패"));
+        adapter.RaiseDisplayFailed(new AdError(7, "expired"));
+        await pending;
+
+        Assert.AreEqual(loadCountBefore + 1, adapter.LoadCount, "표시 실패 후 재로드가 없었다");
+    });
 }
