@@ -2,6 +2,10 @@
 
 `SoundService`의 주요 기능을 한 화면에서 눌러 보는 샘플.
 
+**이 샘플은 단독으로 동작한다.** 자체 `SoundServiceSettings`와 컬렉션을 `Data/`에 들고 있어서,
+Package Manager에서 이 샘플만 import한 뒤 `Sound.unity`를 열고 Play하면 바로 소리가 난다.
+프로젝트의 다른 사운드 데이터와 섞이지 않는다.
+
 ## 시연 내용
 
 - **SFX** — 같은 태그(`SmpClick`)에 클립 3개를 묶어 두고 누를 때마다 다른 클립 + 다른 피치로 재생.
@@ -13,31 +17,40 @@
 - **전체 제어** — `PauseAll` / `ResumeAll` / `StopAll`, 그리고 `SetId`로 걸어 둔 id를 이용한
   참조 없는 개별 정지.
 
-## 실행 방법
+## 실행
 
-1. **`Tools > FoundationDI > Sound > Samples > Import Sample Audio`** 실행.
-   `Audio/` 폴더의 클립이 프로젝트의 사운드/음악 컬렉션에 `Smp*` 태그로 등록되고,
-   `SFX`/`Track` 상수가 다시 생성된다.
-2. `Sound.unity`를 열고 Play.
-3. 왼쪽 패널의 버튼과 슬라이더를 눌러 본다.
+`Sound.unity`를 열고 Play. 준비 작업은 없다.
 
-되돌리려면 `Tools > FoundationDI > Sound > Samples > Remove Sample Audio`.
+## 내 프로젝트에 샘플 오디오 가져오기 (선택)
 
-> 1번을 건너뛰면 패널이 안내 문구만 표시한다. 태그 데이터는 씬이 아니라
-> **프로젝트의 컬렉션 에셋**에 들어 있기 때문이다.
+샘플 클립을 **내 프로젝트의** 사운드/음악 컬렉션에도 등록하고 싶다면:
+
+`Tools > FoundationDI > Sound > Sample Data > 05 Sound > Install Into Project`
+
+편집 대상 설정 에셋(`Tools > FoundationDI > Sound > Settings`에서 고른 것)의 컬렉션에
+`Smp*` 태그가 추가되고 `SFX`/`Track` 상수가 다시 생성된다. 되돌리려면 같은 메뉴의
+**Remove From Project**. 이미 설치되어 있으면 Install이, 없으면 Remove가 회색으로 비활성화된다.
+
+> 샘플마다 이 메뉴 한 쌍이 따로 생긴다. 샘플을 여러 개 설치해도 서로 간섭하지 않는다.
 
 ## 구성
 
 ```
 05-Sound/
-├── Sound.unity                     SoundSampleScope + SoundSampleDemo만 있는 씬
-├── Audio/                          절차적으로 만든 무저작권 샘플 클립 9개
+├── Sound.unity                       SoundSampleScope + SoundSampleDemo만 있는 씬
+├── Audio/                            절차적으로 합성한 무저작권 클립 9개
+├── Data/                             ★ 이 샘플 전용 데이터 (단독 실행의 핵심)
+│   ├── SoundServiceSettings.asset
+│   └── Collections/{Sound,Music,Output}Collection.asset
 ├── Editor/
-│   └── SoundSampleDataImporter.cs  샘플 클립을 컬렉션에 일괄 등록/제거
+│   ├── SoundSampleAudioSet.cs        샘플이 들고 오는 오디오 묶음의 형태
+│   ├── SoundSampleData.cs            이 샘플의 오디오 정의(태그 ↔ 클립)
+│   ├── SoundSampleDataInstaller.cs   설치/제거/자체 데이터 채우기
+│   └── SoundSampleMenu.cs            샘플별 메뉴 항목
 └── Scripts/
-    ├── SoundSampleScope.cs         컴포지션 루트
-    ├── SoundSampleTags.cs          샘플이 쓰는 문자열 태그
-    └── SoundSampleDemo.cs          OnGUI 데모 패널
+    ├── SoundSampleScope.cs           컴포지션 루트
+    ├── SoundSampleTags.cs            샘플이 쓰는 문자열 태그
+    └── SoundSampleDemo.cs            OnGUI 데모 패널
 ```
 
 UI 프리팹을 두지 않고 `OnGUI`로 그린 이유는, 샘플의 초점을 UI 배선이 아니라
@@ -46,7 +59,7 @@ UI 프리팹을 두지 않고 `OnGUI`로 그린 이유는, 샘플의 초점을 U
 ## 핵심 코드
 
 ```csharp
-// 컴포지션 루트
+// 컴포지션 루트 — 샘플 전용 설정 에셋을 주입한다.
 public class SoundSampleScope : LifetimeScope
 {
     [SerializeField] private SoundServiceSettings _soundSettings;
@@ -72,11 +85,10 @@ _dynamicMusic.ChangeTrackVolume("SmpLayerLead", 1f, lerpTime: 0.2f);
 ```
 
 > 샘플은 생성된 `SFX.SmpClick` 상수 대신 문자열 오버로드를 쓴다.
-> 유사 enum 상수는 프로젝트 컬렉션 내용에 따라 만들어지므로, 데이터를 아직 등록하지 않은
-> 프로젝트에서도 스크립트가 컴파일되어야 하기 때문이다.
+> 유사 enum 상수는 **프로젝트에 한 벌만** 만들어지는데, 샘플은 자체 데이터로 도는 탓에
+> 그 한 벌에 샘플 태그가 없을 수 있기 때문이다.
 > **실제 게임 코드에서는 오타를 컴파일 타임에 잡아 주는 생성 상수를 쓰는 쪽이 낫다.**
 
 ## 오디오 출처
 
-`Audio/`의 9개 클립은 사인/삼각/사각파와 노이즈로 합성한 것이라 저작권 제약이 없다.
-생성 방식은 커밋 이력을 참고.
+`Audio/`의 9개 클립은 사인·삼각·사각파와 노이즈로 합성한 것이라 저작권 제약이 없다.

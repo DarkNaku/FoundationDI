@@ -257,7 +257,7 @@ MonoBehaviour:
     TypeName: 
   autoRun: 1
   autoInjectGameObjects: []
-  _soundSettings: {fileID: 11400000, guid: 19a128f1c466f4a2cba592295fc29f2c, type: 2}
+  _soundSettings: {fileID: 11400000, guid: 127d8d52ba65647218a96718b736da89, type: 2}
 --- !u!4 &2106324404
 Transform:
   m_ObjectHideFlags: 0

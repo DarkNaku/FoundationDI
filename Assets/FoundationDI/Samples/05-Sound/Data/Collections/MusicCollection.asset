@@ -1,0 +1,40 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 79801749683664e608711d7bf48f1e68, type: 3}
+  m_Name: MusicCollection
+  m_EditorClassIdentifier: FoundationDI::DarkNaku.FoundationDI.MusicDataCollection
+  _musicTracks:
+  - _tag: SmpSong1
+    _clips:
+    - {fileID: 8300000, guid: bea510bf3027f41b3a9288d5db2a36e5, type: 3}
+    _compressionPreset: 0
+    _forceToMono: 0
+  - _tag: SmpSong2
+    _clips:
+    - {fileID: 8300000, guid: e0f0bb9fcef2f41ee84cde8febdc7c6f, type: 3}
+    _compressionPreset: 0
+    _forceToMono: 0
+  - _tag: SmpLayerDrum
+    _clips:
+    - {fileID: 8300000, guid: fe4ba22c6c70e4ebe96d8a3f5a11dacc, type: 3}
+    _compressionPreset: 0
+    _forceToMono: 0
+  - _tag: SmpLayerBass
+    _clips:
+    - {fileID: 8300000, guid: 843697001c3f245b8abc7543bbe830ec, type: 3}
+    _compressionPreset: 0
+    _forceToMono: 0
+  - _tag: SmpLayerLead
+    _clips:
+    - {fileID: 8300000, guid: f6292695e29694a3ab973151d53b09c1, type: 3}
+    _compressionPreset: 0
+    _forceToMono: 0

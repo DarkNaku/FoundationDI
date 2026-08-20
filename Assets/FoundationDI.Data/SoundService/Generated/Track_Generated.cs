@@ -3,10 +3,5 @@ namespace DarkNaku.FoundationDI
 {
     public partial struct Track
     {
-        public static readonly Track SmpSong1 = new Track("SmpSong1");
-        public static readonly Track SmpSong2 = new Track("SmpSong2");
-        public static readonly Track SmpLayerDrum = new Track("SmpLayerDrum");
-        public static readonly Track SmpLayerBass = new Track("SmpLayerBass");
-        public static readonly Track SmpLayerLead = new Track("SmpLayerLead");
     }
 }

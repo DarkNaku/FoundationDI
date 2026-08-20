@@ -3,7 +3,5 @@ namespace DarkNaku.FoundationDI
 {
     public partial struct SFX
     {
-        public static readonly SFX SmpClick = new SFX("SmpClick");
-        public static readonly SFX SmpCoin = new SFX("SmpCoin");
     }
 }

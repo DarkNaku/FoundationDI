@@ -42,7 +42,7 @@ namespace DarkNaku.FoundationDI.Editor
             _scroll = EditorGUILayout.BeginScrollView(_scroll);
 
             EditorGUILayout.LabelField("Settings Asset", EditorStyles.boldLabel);
-            EditorGUILayout.ObjectField("Asset", _settings, typeof(SoundServiceSettings), false);
+            DrawSettingsPicker();
 
             EditorGUILayout.Space(8f);
             DrawDataSection();
@@ -64,6 +64,46 @@ namespace DarkNaku.FoundationDI.Editor
             EditorGUILayout.EndScrollView();
 
             _serializedSettings.ApplyModifiedProperties();
+        }
+
+        /// <summary>
+        /// 프로젝트에 설정 에셋이 여러 개면(예: 샘플이 자체 설정을 들고 온 경우)
+        /// 에디터 도구가 편집할 대상을 여기서 고른다.
+        /// </summary>
+        private void DrawSettingsPicker()
+        {
+            var all = SoundServiceAssetLocator.FindAllSettings();
+
+            if (all.Length <= 1)
+            {
+                EditorGUILayout.ObjectField("Asset", _settings, typeof(SoundServiceSettings), false);
+                return;
+            }
+
+            var labels = new string[all.Length];
+            int current = 0;
+
+            for (int i = 0; i < all.Length; i++)
+            {
+                labels[i] = AssetDatabase.GetAssetPath(all[i]).Replace("/", " \u2215 ");
+
+                if (all[i] == _settings) current = i;
+            }
+
+            EditorGUI.BeginChangeCheck();
+
+            int selected = EditorGUILayout.Popup("Asset", current, labels);
+
+            if (EditorGUI.EndChangeCheck() && selected != current)
+            {
+                SoundServiceAssetLocator.ActiveSettings = all[selected];
+                Reload();
+                GUIUtility.ExitGUI();
+            }
+
+            EditorGUILayout.HelpBox(
+                $"설정 에셋이 {all.Length}개 있습니다. 여기서 고른 에셋을 Audio Creator/Collection/Output Manager가 편집합니다.",
+                MessageType.Info);
         }
 
         private void DrawMissingSettings()

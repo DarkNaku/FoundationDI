@@ -30,6 +30,12 @@ Assets/FoundationDI.Data/SoundService/
 
 `Data Root Path`를 바꾸면 다음 저장부터 그 경로를 쓴다.
 
+설정 에셋은 여러 개 둘 수 있다(예: 샘플이 자체 설정을 들고 오는 경우). 이때 Settings 창 위쪽의
+**Asset** 드롭다운에서 에디터 도구가 편집할 대상을 고른다. 선택은 프로젝트별로 기억된다.
+
+> `SFX`/`Track`/`Output` 상수는 `partial struct`라 **프로젝트 전체에 한 벌만** 존재할 수 있다.
+> 편집 대상을 바꿔 다른 위치에 상수를 생성하면, 도구가 이전 `Generated/` 폴더를 자동으로 정리한다.
+
 ### 1.2 DI 등록
 
 ```csharp
