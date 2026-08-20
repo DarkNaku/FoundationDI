@@ -58,6 +58,11 @@ namespace DarkNaku.FoundationDI
         {
             if (_isDisposed) return;
 
+            // 명시적 Load 호출은 새 시도의 시작이다. 리셋하지 않으면 한 번 예산을
+            // 소진한 뒤로는(예: 초기 자동로드가 네트워크 없이 실패) 닫힘 후 자동
+            // 재로드나 NotReady의 ShowAsync가 트리거하는 Load()가 매번 딱 1회
+            // 시도 후 곧장 에러 로그로 끝나 버린다.
+            _retryAttempt = 0;
             CancelScheduledRetry();
             _adapter.Load();
         }
@@ -168,6 +173,8 @@ namespace DarkNaku.FoundationDI
 
         private void OnClosed()
         {
+            if (_isDisposed) return;
+
             // 닫힘이 보상보다 먼저 오는 SDK/네트워크가 있다. 유예 프레임을 두고 기다린다.
             _scheduledClose?.Dispose();
 
@@ -223,18 +230,26 @@ namespace DarkNaku.FoundationDI
             _scheduledClose?.Dispose();
             _scheduledClose = null;
 
-            // spec: 해제 시 대기 중인 ShowAsync를 Failed로 깨운다. 그러지 않으면 호출자가 영구 정지한다.
-            Complete(AdShowResult.Failed(new AdError(-4, "서비스가 해제됐다")));
+            try
+            {
+                // spec: 해제 시 대기 중인 ShowAsync를 Failed로 깨운다. 그러지 않으면 호출자가 영구 정지한다.
+                // SetResult는 대기 중이던 호출자의 이어달리기를 동기적으로 재개시킬 수 있다 —
+                // 그 이어달리기가 예외를 던지면 finally 없이는 아래 구독 해제와 어댑터 Dispose가
+                // 통째로 건너뛰어져 SDK 광고 객체가 샌다.
+                Complete(AdShowResult.Failed(new AdError(-4, "서비스가 해제됐다")));
+            }
+            finally
+            {
+                _adapter.Loaded -= OnLoaded;
+                _adapter.LoadFailed -= OnLoadFailed;
+                _adapter.Displayed -= OnDisplayed;
+                _adapter.DisplayFailed -= OnDisplayFailed;
+                _adapter.Closed -= OnClosed;
+                _adapter.Rewarded -= OnRewarded;
+                _adapter.Paid -= OnPaid;
 
-            _adapter.Loaded -= OnLoaded;
-            _adapter.LoadFailed -= OnLoadFailed;
-            _adapter.Displayed -= OnDisplayed;
-            _adapter.DisplayFailed -= OnDisplayFailed;
-            _adapter.Closed -= OnClosed;
-            _adapter.Rewarded -= OnRewarded;
-            _adapter.Paid -= OnPaid;
-
-            _adapter.Dispose();
+                _adapter.Dispose();
+            }
         }
     }
 }

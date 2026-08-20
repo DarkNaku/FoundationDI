@@ -74,6 +74,44 @@ public class FullScreenAdUnitTest
     }
 
     [Test]
+    public void 재시도_한도_소진_후_명시적_Load_호출은_재시도_카운터를_초기화한다()
+    {
+        // 초기 자동로드가 네트워크 없이 예산을 전부 소진하면, 리셋 없이는 닫힘 후
+        // 자동 재로드나 NotReady의 ShowAsync가 트리거하는 Load()가 매번 딱 1회
+        // 시도 후 곧장 에러 로그로 끝나 버린다.
+        var adapter = new FakeFullScreenAdapter();
+        var dispatcher = new FakeAdDispatcher();
+        var sut = NewUnit(adapter, dispatcher);   // maxAttempts = 3
+
+        sut.Load();
+        for (var i = 0; i < 3; i++)
+        {
+            adapter.RaiseLoadFailed(new AdError(3, "no fill"));
+            dispatcher.Advance(200f);
+        }
+
+        LogAssert.Expect(UnityEngine.LogType.Error,
+                         new System.Text.RegularExpressions.Regex("재시도 후에도 실패"));
+        adapter.RaiseLoadFailed(new AdError(3, "no fill"));   // 예산 소진 — 더 이상 재시도 예약 안 됨
+
+        var loadCountBeforeExplicitLoad = adapter.LoadCount;
+
+        sut.Load();   // 명시적 재호출 — 카운터가 리셋돼야 한다
+        Assert.AreEqual(loadCountBeforeExplicitLoad + 1, adapter.LoadCount,
+                        "명시적 Load가 어댑터를 다시 호출하지 않았다");
+
+        adapter.RaiseLoadFailed(new AdError(3, "no fill"));
+
+        dispatcher.Advance(1.9f);
+        Assert.AreEqual(loadCountBeforeExplicitLoad + 1, adapter.LoadCount,
+                        "리셋 후 첫 재시도가 2초 전에 발생했다");
+
+        dispatcher.Advance(0.2f);   // 누적 2.1초 — 리셋됐다면 2^1 = 2초 지연이어야 한다
+        Assert.AreEqual(loadCountBeforeExplicitLoad + 2, adapter.LoadCount,
+                        "한도 소진 후 명시적 Load가 재시도 카운터를 초기화하지 않았다");
+    }
+
+    [Test]
     public void 로드에_성공하면_재시도_카운터가_초기화된다()
     {
         var adapter = new FakeFullScreenAdapter();
