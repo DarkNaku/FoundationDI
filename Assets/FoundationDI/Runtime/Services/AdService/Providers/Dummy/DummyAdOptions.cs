@@ -14,7 +14,7 @@ namespace DarkNaku.FoundationDI
         [SerializeField] private float _failureRate;
 
         [Tooltip("가짜 전면/보상 광고가 화면에 떠 있는 시간(초).")]
-        [SerializeField] private float _adDurationSeconds;
+        [SerializeField, Min(0f)] private float _adDurationSeconds;
 
         [Tooltip("가짜 배너의 높이(화면 픽셀).")]
         [SerializeField] private float _bannerHeight;

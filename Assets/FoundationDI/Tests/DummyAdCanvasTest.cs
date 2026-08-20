@@ -135,6 +135,62 @@ public class DummyAdCanvasTest
     }
 
     [Test]
+    public void 리워드는_duration이_0이어도_즉시_onComplete가_호출되고_브릭되지_않는다()
+    {
+        // Tick()의 완료 전환은 카운트다운이 "지금 막" 0을 통과할 때만 발화한다
+        // (이미 0 이하면 early-return). duration<=0으로 시작하면 그 전환을 절대
+        // 못 만나므로, 리셋 없이 즉시 완료시키지 않으면 패널이 안 닫히고 onComplete도
+        // 안 와서 그 유닛의 _showCompletion이 영구히 안 빈다 — 이 웨이브가 잡으려던
+        // 바로 그 부류의 브릭이다.
+        _sut = new DummyAdCanvas();
+
+        var skipped = 0;
+        var completed = 0;
+        _sut.ShowFullScreen(AdFormat.Rewarded, 0f, () => skipped++, () => completed++);
+
+        Assert.AreEqual(0, skipped);
+        Assert.AreEqual(1, completed, "duration 0인데 onComplete가 즉시 호출되지 않았다(브릭)");
+        Assert.IsFalse(_sut.IsFullScreenActive);
+
+        // Tick을 더 돌려도 다시 발화하면 안 된다(이중 완료 방지 확인).
+        _sut.Tick(1f);
+        Assert.AreEqual(1, completed);
+    }
+
+    [Test]
+    public void 리워드는_duration이_음수여도_즉시_onComplete가_호출되고_브릭되지_않는다()
+    {
+        // 손으로 고친 .asset이나 스크립트 생성값은 [Min]을 우회하므로 음수도 들어올 수
+        // 있다 — 0과 같은 취급이어야 한다.
+        _sut = new DummyAdCanvas();
+
+        var completed = 0;
+        _sut.ShowFullScreen(AdFormat.Rewarded, -5f, () => { }, () => completed++);
+
+        Assert.AreEqual(1, completed, "duration이 음수인데 onComplete가 즉시 호출되지 않았다(브릭)");
+        Assert.IsFalse(_sut.IsFullScreenActive);
+    }
+
+    [Test]
+    public void 인터스티셜은_duration이_0이어도_브릭되지_않고_클릭을_기다린다()
+    {
+        // 인터스티셜은 애초에 자동완료가 없다 — duration<=0이면 버튼이 처음부터
+        // 보이고 클릭을 기다릴 뿐, 브릭되지 않는다는 것을 확인한다.
+        _sut = new DummyAdCanvas();
+
+        var completed = 0;
+        _sut.ShowFullScreen(AdFormat.Interstitial, 0f, () => { }, () => completed++);
+
+        Assert.AreEqual(0, completed, "인터스티셜이 클릭 없이 즉시 완료됐다");
+        Assert.IsTrue(_sut.IsFullScreenActive);
+        Assert.IsTrue(_sut.IsActionButtonVisible, "duration 0인데 닫기 버튼이 바로 보이지 않는다");
+
+        _sut.OnActionButtonClicked();
+
+        Assert.AreEqual(1, completed);
+    }
+
+    [Test]
     public void Dispose_이후에는_Tick이_아무_콜백도_발화시키지_않는다()
     {
         _sut = new DummyAdCanvas();

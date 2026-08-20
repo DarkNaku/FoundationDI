@@ -48,11 +48,21 @@ namespace DarkNaku.FoundationDI
             _format = format;
             _onSkip = onSkip;
             _onComplete = onComplete;
-            _remaining = duration;
+            _remaining = Mathf.Max(0f, duration);
 
             _label.text = $"{format}\n(Dummy Ad)";
             _fullScreenPanel.SetActive(true);
             UpdateCountdown();
+
+            // duration<=0인 리워드는 카운트다운이 이미 끝난 채로 시작한다. Tick()의 완료
+            // 전환은 "카운트다운이 지금 막 0을 통과했을 때"만 발화하도록 짜여 있어서
+            // (early-return: 이미 0 이하면 아무것도 안 함), 처음부터 0이면 그 전환을
+            // 영원히 못 만난다 — 패널이 안 닫히고 콜백도 안 오는 채로 그 유닛의
+            // _showCompletion이 영구히 안 비는, 이 웨이브가 잡으려던 바로 그 부류의
+            // 브릭이다. 인터스티셜은 애초에 자동완료가 없고 항상 클릭을 기다리므로
+            // duration<=0이어도 브릭되지 않는다(버튼이 바로 보일 뿐이다) — 그래서
+            // 여기서는 리워드만 즉시 완료시킨다.
+            if (_remaining <= 0f && _format != AdFormat.Interstitial) CompleteFullScreen();
         }
 
         public void ShowBanner(BannerPosition position, float height)
