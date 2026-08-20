@@ -234,4 +234,89 @@ public class FullScreenAdUnitTest
         Assert.AreEqual("coins", result.Reward.Label);
         Assert.AreEqual(50, result.Reward.Amount, 0.001);
     });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 보상없이_닫히면_Dismissed를_반환한다() => UniTask.ToCoroutine(async () =>
+    {
+        var adapter = new FakeFullScreenAdapter();
+        var dispatcher = new FakeAdDispatcher();
+        var sut = NewUnit(adapter, dispatcher, AdFormat.Rewarded);
+
+        adapter.RaiseLoaded();
+        var pending = sut.ShowAsync();
+
+        adapter.RaiseDisplayed();
+        adapter.RaiseClosed();
+        dispatcher.TickFrames(1);
+
+        var result = await pending;
+
+        Assert.AreEqual(AdShowOutcome.Dismissed, result.Outcome);
+        Assert.IsTrue(result.WasShown, "노출은 됐으므로 WasShown이어야 한다");
+    });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 전면광고는_보상없이_닫히면_Shown을_반환한다() => UniTask.ToCoroutine(async () =>
+    {
+        var adapter = new FakeFullScreenAdapter();
+        var dispatcher = new FakeAdDispatcher();
+        var sut = NewUnit(adapter, dispatcher, AdFormat.Interstitial);
+
+        adapter.RaiseLoaded();
+        var pending = sut.ShowAsync();
+
+        adapter.RaiseDisplayed();
+        adapter.RaiseClosed();
+        dispatcher.TickFrames(1);
+
+        var result = await pending;
+
+        Assert.AreEqual(AdShowOutcome.Shown, result.Outcome);
+    });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 닫힘이_보상보다_먼저_와도_유예_프레임_안에서_Rewarded로_확정된다() =>
+        UniTask.ToCoroutine(async () =>
+    {
+        // 일부 미디에이션 네트워크가 실제로 이 순서로 이벤트를 보낸다.
+        // 유예 프레임이 없으면 유저가 광고를 다 봤는데도 보상을 잃는다.
+        var adapter = new FakeFullScreenAdapter();
+        var dispatcher = new FakeAdDispatcher();
+        var sut = NewUnit(adapter, dispatcher, AdFormat.Rewarded, rewardGraceFrames: 1);
+
+        adapter.RaiseLoaded();
+        var pending = sut.ShowAsync();
+
+        adapter.RaiseDisplayed();
+        adapter.RaiseClosed();                              // 닫힘이 먼저
+        adapter.RaiseRewarded(new AdReward("coins", 10));   // 보상이 나중
+        dispatcher.TickFrames(1);
+
+        var result = await pending;
+
+        Assert.AreEqual(AdShowOutcome.Rewarded, result.Outcome);
+        Assert.AreEqual(10, result.Reward.Amount, 0.001);
+    });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 유예_프레임이_0이면_닫힘_즉시_확정한다() => UniTask.ToCoroutine(async () =>
+    {
+        var adapter = new FakeFullScreenAdapter();
+        var dispatcher = new FakeAdDispatcher();
+        var sut = NewUnit(adapter, dispatcher, AdFormat.Rewarded, rewardGraceFrames: 0);
+
+        adapter.RaiseLoaded();
+        var pending = sut.ShowAsync();
+
+        adapter.RaiseRewarded(new AdReward("coins", 10));
+        adapter.RaiseClosed();   // TickFrames 없이 바로 확정돼야 한다
+
+        var result = await pending;
+
+        Assert.AreEqual(AdShowOutcome.Rewarded, result.Outcome);
+    });
 }
