@@ -24,6 +24,8 @@ namespace DarkNaku.FoundationDI
 
         private AwaitableCompletionSource<AdShowResult> _showCompletion;
         private string _activePlacement;
+        private AdReward? _pendingReward;
+        private IDisposable _scheduledClose;
 
         public event Action Loaded;
         public event Action Displayed;
@@ -144,8 +146,38 @@ namespace DarkNaku.FoundationDI
             Debug.LogWarning($"[AdService] {_format} 표시 실패: {error}");
             Complete(AdShowResult.Failed(error));
         }
-        private void OnClosed() { }                        // Task 5
-        private void OnRewarded(AdReward reward) { }       // Task 5
+        // 보상은 래치만 한다. 여기서 완료시키면, 보상 후 닫힘 사이에 유저가 앱을 떠나는
+        // 경우와 닫힘이 먼저 오는 경우를 구분할 수 없게 된다.
+        private void OnRewarded(AdReward reward)
+        {
+            _pendingReward = reward;
+        }
+
+        private void OnClosed()
+        {
+            // 닫힘이 보상보다 먼저 오는 SDK/네트워크가 있다. 유예 프레임을 두고 기다린다.
+            _scheduledClose?.Dispose();
+            _scheduledClose = _dispatcher.NextFrames(_rewardGraceFrames, () =>
+            {
+                _scheduledClose = null;
+                FinalizeClose();
+            });
+        }
+
+        private void FinalizeClose()
+        {
+            var reward = _pendingReward;
+            _pendingReward = null;
+
+            AdShowResult result;
+            if (reward.HasValue) result = AdShowResult.Rewarded(reward.Value);
+            else if (_format == AdFormat.Rewarded) result = AdShowResult.Dismissed();
+            else result = AdShowResult.Shown();
+
+            Complete(result);
+            Closed?.Invoke();
+        }
+
         // 어댑터는 배치명을 모른다. 표시 중인 광고의 배치명을 여기서 채워 넣는다.
         private void OnPaid(AdImpression impression)
         {
@@ -160,6 +192,8 @@ namespace DarkNaku.FoundationDI
             _isDisposed = true;
 
             CancelScheduledRetry();
+            _scheduledClose?.Dispose();
+            _scheduledClose = null;
 
             _adapter.Loaded -= OnLoaded;
             _adapter.LoadFailed -= OnLoadFailed;

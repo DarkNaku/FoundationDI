@@ -211,4 +211,27 @@ public class FullScreenAdUnitTest
         Assert.IsTrue(received.HasValue, "Paid 이벤트가 발화되지 않았다");
         Assert.AreEqual("adapter-own-placement", received.Value.Placement);
     }
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 보상_이벤트_후_닫히면_Rewarded와_보상정보를_반환한다() => UniTask.ToCoroutine(async () =>
+    {
+        var adapter = new FakeFullScreenAdapter();
+        var dispatcher = new FakeAdDispatcher();
+        var sut = NewUnit(adapter, dispatcher, AdFormat.Rewarded);
+
+        adapter.RaiseLoaded();
+        var pending = sut.ShowAsync("double_coins");
+
+        adapter.RaiseDisplayed();
+        adapter.RaiseRewarded(new AdReward("coins", 50));
+        adapter.RaiseClosed();
+        dispatcher.TickFrames(1);           // 유예 프레임 소진
+
+        var result = await pending;
+
+        Assert.AreEqual(AdShowOutcome.Rewarded, result.Outcome);
+        Assert.AreEqual("coins", result.Reward.Label);
+        Assert.AreEqual(50, result.Reward.Amount, 0.001);
+    });
 }
