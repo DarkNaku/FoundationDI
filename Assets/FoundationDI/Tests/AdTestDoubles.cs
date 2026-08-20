@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using DarkNaku.FoundationDI;
+using UnityEngine;
 
 // 정책 계층 테스트용 시계. 실제 시간을 쓰지 않고 Advance/TickFrames로 손으로 돌린다.
 public class FakeAdDispatcher : IAdDispatcher
@@ -128,4 +129,36 @@ public class FakeBannerAdapter : IBannerAdapter
 
     public void SetHeight(float height) { Height = height; HeightChanged?.Invoke(height); }
     public void RaisePaid(AdImpression impression) => Paid?.Invoke(impression);
+}
+
+public class FakeAdProvider : IAdProvider
+{
+    public string Name => "Fake";
+    public bool InitializeResult { get; set; } = true;
+    public bool IsDisposed { get; private set; }
+    public AdProviderContext ReceivedContext { get; private set; }
+
+    public readonly FakeFullScreenAdapter InterstitialAdapter = new();
+    public readonly FakeFullScreenAdapter RewardedAdapter = new();
+    public readonly FakeBannerAdapter BannerAdapter = new();
+
+    public IAdConsent Consent { get; } = new NoopAdConsent();
+
+    public event Action<AdImpression> ImpressionPaid;
+
+    public Awaitable<bool> InitializeAsync(AdProviderContext context)
+    {
+        ReceivedContext = context;
+        var source = new AwaitableCompletionSource<bool>();
+        source.SetResult(InitializeResult);
+        return source.Awaitable;
+    }
+
+    public IFullScreenAdapter CreateInterstitial(string adUnitId) => InterstitialAdapter;
+    public IFullScreenAdapter CreateRewarded(string adUnitId) => RewardedAdapter;
+    public IBannerAdapter CreateBanner(string adUnitId, BannerOptions options) => BannerAdapter;
+
+    public void RaiseImpressionPaid(AdImpression impression) => ImpressionPaid?.Invoke(impression);
+
+    public void Dispose() => IsDisposed = true;
 }
