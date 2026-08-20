@@ -443,4 +443,68 @@ public class FullScreenAdUnitTest
         Assert.IsFalse(closedFired, "Dispose 후에도 예약된 확정이 발화했다");
         Assert.AreEqual(0, dispatcher.PendingCount, "Dispose가 예약된 확정을 취소하지 않았다");
     }
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 늦은_Closed는_다음_쇼를_확정시키지_않는다() => UniTask.ToCoroutine(async () =>
+    {
+        var adapter = new FakeFullScreenAdapter();
+        var dispatcher = new FakeAdDispatcher();
+        var sut = NewUnit(adapter, dispatcher, AdFormat.Interstitial, rewardGraceFrames: 1);
+
+        var closedCount = 0;
+        sut.Closed += () => closedCount++;
+
+        // 쇼 1: 표시 실패로 끝난다.
+        adapter.RaiseLoaded();
+        var firstPending = sut.ShowAsync();
+
+        LogAssert.Expect(UnityEngine.LogType.Warning,
+                         new System.Text.RegularExpressions.Regex("표시 실패"));
+        adapter.RaiseDisplayFailed(new AdError(7, "no ad to show"));
+
+        var firstResult = await firstPending;
+        Assert.AreEqual(AdShowOutcome.Failed, firstResult.Outcome);
+
+        // AdMob은 DisplayFailed 이후에도 Closed를 보낼 수 있다. 틱하지 않은 채로 남겨둔다.
+        adapter.RaiseClosed();
+
+        // 쇼 2 시작 — ShowAsync가 쇼 1의 늦은 Closed 예약을 버려야 한다.
+        adapter.RaiseLoaded();
+        var secondPending = sut.ShowAsync();
+
+        adapter.RaiseDisplayed();
+
+        // 버려지지 않았다면 이 틱에서 쇼 1의 늦은 Closed가 쇼 2를 새치기해 확정시켜 버린다.
+        dispatcher.TickFrames(1);
+
+        Assert.AreEqual(0, closedCount, "쇼 1의 늦은 Closed가 확정을 일으켰다(쇼 2가 새치기당했다)");
+
+        // 쇼 2를 정상적으로 마무리한다.
+        adapter.RaiseClosed();
+        dispatcher.TickFrames(1);
+
+        var secondResult = await secondPending;
+
+        Assert.AreEqual(AdShowOutcome.Shown, secondResult.Outcome);
+        Assert.AreEqual(1, closedCount, "쇼 2 확정에서 Closed 이벤트가 정확히 한 번 발화하지 않았다");
+    });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator Dispose는_대기_중인_ShowAsync를_Failed로_완료시킨다() => UniTask.ToCoroutine(async () =>
+    {
+        var adapter = new FakeFullScreenAdapter();
+        var dispatcher = new FakeAdDispatcher();
+        var sut = NewUnit(adapter, dispatcher);
+
+        adapter.RaiseLoaded();
+        var pending = sut.ShowAsync();
+
+        sut.Dispose();
+
+        var result = await pending;
+
+        Assert.AreEqual(AdShowOutcome.Failed, result.Outcome);
+    });
 }

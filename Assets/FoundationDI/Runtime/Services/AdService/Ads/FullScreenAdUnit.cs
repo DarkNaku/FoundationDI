@@ -81,6 +81,10 @@ namespace DarkNaku.FoundationDI
             _showCompletion = new AwaitableCompletionSource<AdShowResult>();
             _pendingReward = null;
 
+            // 이전 쇼의 늦은 Closed가 예약돼 있으면 새 쇼를 확정시켜 버린다. 함께 버린다.
+            _scheduledClose?.Dispose();
+            _scheduledClose = null;
+
             var awaitable = _showCompletion.Awaitable;
             _adapter.Show();
             return awaitable;
@@ -206,6 +210,9 @@ namespace DarkNaku.FoundationDI
             CancelScheduledRetry();
             _scheduledClose?.Dispose();
             _scheduledClose = null;
+
+            // spec: 해제 시 대기 중인 ShowAsync를 Failed로 깨운다. 그러지 않으면 호출자가 영구 정지한다.
+            Complete(AdShowResult.Failed(new AdError(-4, "서비스가 해제됐다")));
 
             _adapter.Loaded -= OnLoaded;
             _adapter.LoadFailed -= OnLoadFailed;
