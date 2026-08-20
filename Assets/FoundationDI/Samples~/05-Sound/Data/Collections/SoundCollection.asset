@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 215a69c97b80d430ab93b10d3e2e1e90, type: 3}
+  m_Name: SoundCollection
+  m_EditorClassIdentifier: FoundationDI::DarkNaku.FoundationDI.SoundDataCollection
+  _sounds:
+  - _tag: SmpClick
+    _clips:
+    - {fileID: 8300000, guid: 4c356a310cb4d4fe6bf8882abd497900, type: 3}
+    - {fileID: 8300000, guid: d5b054c80d8c84709b77dafa4a0daeee, type: 3}
+    - {fileID: 8300000, guid: 6e4c940359b174815aa643575b73283c, type: 3}
+    _compressionPreset: 1
+    _forceToMono: 0
+  - _tag: SmpCoin
+    _clips:
+    - {fileID: 8300000, guid: 3df13391293ad495d99fc4956228d608, type: 3}
+    _compressionPreset: 1
+    _forceToMono: 0
