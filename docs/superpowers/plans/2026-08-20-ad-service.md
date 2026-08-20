@@ -2353,6 +2353,7 @@ public class AdServiceTest
     }
 
     [UnityTest]
+    [Timeout(5000)]
     public IEnumerator 초기화에_성공하면_IsInitialized가_참이_되고_전면과_보상을_로드한다() =>
         UniTask.ToCoroutine(async () =>
     {
@@ -2706,6 +2707,7 @@ git commit -m "[BEHAVIORAL] AdService 조립과 초기화 추가"
 
 ```csharp
     [UnityTest]
+    [Timeout(5000)]
     public IEnumerator 초기화에_실패하면_false를_반환하고_광고를_요청하지_않는다() =>
         UniTask.ToCoroutine(async () =>
     {
@@ -2723,6 +2725,7 @@ git commit -m "[BEHAVIORAL] AdService 조립과 초기화 추가"
     });
 
     [UnityTest]
+    [Timeout(5000)]
     public IEnumerator 자동로드가_꺼져있으면_초기화해도_광고를_로드하지_않는다() =>
         UniTask.ToCoroutine(async () =>
     {
@@ -2736,6 +2739,7 @@ git commit -m "[BEHAVIORAL] AdService 조립과 초기화 추가"
     });
 
     [UnityTest]
+    [Timeout(5000)]
     public IEnumerator 어댑터_이벤트가_포맷과_함께_서비스_이벤트로_전파된다() => UniTask.ToCoroutine(async () =>
     {
         var provider = new FakeAdProvider();
@@ -2764,6 +2768,7 @@ git commit -m "[BEHAVIORAL] AdService 조립과 초기화 추가"
     });
 
     [UnityTest]
+    [Timeout(5000)]
     public IEnumerator 어댑터_임프레션과_provider_전역_임프레션이_모두_Paid로_합류한다() =>
         UniTask.ToCoroutine(async () =>
     {
@@ -2788,6 +2793,7 @@ git commit -m "[BEHAVIORAL] AdService 조립과 초기화 추가"
     }
 
     [UnityTest]
+    [Timeout(5000)]
     public IEnumerator 광고제거_상태는_저장소에_영속화되고_생성시_복원된다() => UniTask.ToCoroutine(async () =>
     {
         var storage = new FakeRemovalStorage { Value = true };
@@ -2812,6 +2818,7 @@ git commit -m "[BEHAVIORAL] AdService 조립과 초기화 추가"
     });
 
     [UnityTest]
+    [Timeout(5000)]
     public IEnumerator Dispose는_provider와_모든_광고_유닛을_해제한다() => UniTask.ToCoroutine(async () =>
     {
         var provider = new FakeAdProvider();
