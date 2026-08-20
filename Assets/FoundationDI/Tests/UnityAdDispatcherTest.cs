@@ -81,6 +81,25 @@ public class UnityAdDispatcherTest
         Assert.AreEqual(1, inner);
     }
 
+    // Post 드레인 도중(네이티브 스레드 콜백 마샬링 경로) 예약된 프레임 작업이
+    // 같은 펌프에서 곧바로 틱되면 안 된다 — NextFrames(1)이 0프레임으로 축소되는
+    // 회귀를 잡는다. FakeAdDispatcher.Post는 동기 실행이라 이 경로를 재현하지
+    // 못하므로 정책 계층 테스트로는 커버되지 않는다.
+    [Test]
+    public void Post_콜백에서_예약된_프레임작업은_같은_펌프에서_실행되지_않는다()
+    {
+        var sut = NewDispatcher();
+        var inner = 0;
+
+        sut.Post(() => sut.NextFrames(1, () => inner++));
+
+        sut.Pump(0.016f);
+        Assert.AreEqual(0, inner, "Post로 예약한 NextFrames(1)이 같은 펌프에서 실행됐다");
+
+        sut.Pump(0.016f);
+        Assert.AreEqual(1, inner);
+    }
+
     [Test]
     public void 한_작업이_예외를_던져도_나머지_작업은_실행된다()
     {
@@ -110,5 +129,40 @@ public class UnityAdDispatcherTest
         sut.Pump(1f);
 
         Assert.AreEqual(0, ran);
+    }
+
+    [Test]
+    public void 프레임0으로_예약한_작업은_펌프_없이_즉시_실행된다()
+    {
+        var sut = NewDispatcher();
+        var ran = 0;
+
+        sut.NextFrames(0, () => ran++);
+
+        Assert.AreEqual(1, ran, "count<=0인데 즉시 실행되지 않았다");
+    }
+
+    [Test]
+    public void Dispose_이후_프레임0_예약은_실행되지_않는다()
+    {
+        var sut = NewDispatcher();
+        var ran = 0;
+
+        sut.Dispose();
+        sut.NextFrames(0, () => ran++);
+
+        Assert.AreEqual(0, ran, "Dispose 이후에도 즉시 실행 경로가 살아있다");
+    }
+
+    [Test]
+    public void 프레임0_콜백이_예외를_던지면_전파되지_않고_로그된다()
+    {
+        var sut = NewDispatcher();
+
+        UnityEngine.TestTools.LogAssert.Expect(UnityEngine.LogType.Exception,
+            new System.Text.RegularExpressions.Regex("InvalidOperationException"));
+
+        Assert.DoesNotThrow(() =>
+            sut.NextFrames(0, () => throw new System.InvalidOperationException("boom")));
     }
 }

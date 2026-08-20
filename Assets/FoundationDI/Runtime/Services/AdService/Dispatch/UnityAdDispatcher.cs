@@ -16,6 +16,11 @@ namespace DarkNaku.FoundationDI
             public bool IsFrameBased;
             public Action Action;
             public bool Cancelled;
+
+            // 이 항목이 생성된 펌프의 인덱스. Post 콜백(DrainPosted)에서 예약된 항목이
+            // 같은 Pump 호출의 AdvanceEntries에서 곧바로 틱되는 것을 막는 데 쓴다 —
+            // 그렇지 않으면 NextFrames(1)이 0프레임으로 축소된다.
+            public int CreatedAtPump;
         }
 
         private class Handle : IDisposable
@@ -36,6 +41,7 @@ namespace DarkNaku.FoundationDI
 
         private AdServiceRunner _runner;
         private bool _isDisposed;
+        private int _pumpIndex;
 
         // [Inject]가 없으면 VContainer가 파라미터가 더 많은 (bool) 생성자를 고르고
         // bool을 해석하지 못해 등록이 실패한다. 반드시 붙인다.
@@ -55,20 +61,28 @@ namespace DarkNaku.FoundationDI
 
         public IDisposable Delay(float seconds, Action action)
         {
-            var entry = new Entry { SecondsLeft = seconds, IsFrameBased = false, Action = action };
+            // Dispose 이후에는 예약하지 않는다 — Pump가 더 이상 돌지 않으므로 여기서
+            // 막지 않으면 아무도 드레인하지 않는 항목이 _entries에 계속 쌓인다.
+            if (_isDisposed) return new Handle(new Entry { Cancelled = true });
+
+            var entry = new Entry { SecondsLeft = seconds, IsFrameBased = false, Action = action, CreatedAtPump = _pumpIndex };
             _entries.Add(entry);
             return new Handle(entry);
         }
 
         public IDisposable NextFrames(int count, Action action)
         {
+            if (_isDisposed) return new Handle(new Entry { Cancelled = true });
+
             if (count <= 0)
             {
-                action?.Invoke();
+                // 즉시 실행 경로도 SafeInvoke를 거친다 — 여기서 던진 예외가
+                // 호출자(광고 SDK 콜백 스택 포함)로 그대로 전파되면 안 된다.
+                SafeInvoke(action);
                 return new Handle(new Entry { Cancelled = true });
             }
 
-            var entry = new Entry { FramesLeft = count, IsFrameBased = true, Action = action };
+            var entry = new Entry { FramesLeft = count, IsFrameBased = true, Action = action, CreatedAtPump = _pumpIndex };
             _entries.Add(entry);
             return new Handle(entry);
         }
@@ -77,6 +91,7 @@ namespace DarkNaku.FoundationDI
         {
             if (_isDisposed) return;
 
+            _pumpIndex++;
             DrainPosted();
             AdvanceEntries(deltaTime);
         }
@@ -101,6 +116,10 @@ namespace DarkNaku.FoundationDI
             foreach (var entry in _entries)
             {
                 if (entry.Cancelled) continue;
+
+                // 이번 펌프 중(Post 드레인)에 막 예약된 항목은 이번 펌프에서 틱하지 않는다.
+                // 다음 Pump 호출부터 원래 count/seconds 그대로 카운트다운을 시작한다.
+                if (entry.CreatedAtPump == _pumpIndex) continue;
 
                 if (entry.IsFrameBased) entry.FramesLeft--;
                 else entry.SecondsLeft -= deltaTime;
