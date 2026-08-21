@@ -18,6 +18,7 @@ public class RootLifetimeScope : LifetimeScope
         // 백엔드 교체는 이 provider 등록 한 줄만 바꾼다 (예: AddressablesProvider).
         builder.Register<IResourceProvider, ResourcesProvider>(Lifetime.Singleton);
         builder.Register<IResourceService, ResourceService>(Lifetime.Singleton);
+        builder.RegisterMessageService();
         builder.RegisterUIService(settings);
         builder.RegisterHapticService();
         builder.RegisterInitializeService();
