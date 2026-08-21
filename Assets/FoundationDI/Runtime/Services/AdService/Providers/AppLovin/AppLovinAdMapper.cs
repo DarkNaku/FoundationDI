@@ -34,7 +34,11 @@ namespace DarkNaku.FoundationDI
                 info.Revenue,
                 Currency,
                 MapRevenuePrecision(info.RevenuePrecision),
-                info.CreativeIdentifier);
+                // MaxSdkUtils.GetStringFromDictionary는 값이 없으면 ""(빈 문자열) 기본값을
+                // 채운다. AdImpression.CreativeId의 문서화된 계약은 "없으면 null"이므로 여기서
+                // 정규화한다 — 그대로 넘기면 "크리에이티브 ID가 빈 문자열"과 "필드 자체가
+                // 없음"을 소비자가 구분할 수 없다.
+                string.IsNullOrEmpty(info.CreativeIdentifier) ? null : info.CreativeIdentifier);
         }
 
         public static AdError ToAdError(this MaxSdkBase.ErrorInfo error)

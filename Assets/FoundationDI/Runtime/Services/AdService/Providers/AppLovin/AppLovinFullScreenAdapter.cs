@@ -120,6 +120,16 @@ namespace DarkNaku.FoundationDI
         private void OnAdRevenuePaid(string adUnitId, MaxSdkBase.AdInfo info)
         {
             if (_isDisposed || adUnitId != _adUnitId) return;
+
+            // MaxSdkBase.AdInfo(adInfoDictionary)는 revenue가 없으면 -1을 기본값으로 채운다
+            // (MaxSdkBase.cs:446) — "수익 없음"의 센티널이지 진짜 0 미만 수익이 아니다. 그대로
+            // 흘려보내면 임프레션을 합산하는 소비자가 음수 매출을 계상한다. 레퍼런스 통합도
+            // 같은 이유로 걸러낸다(MahjongTripleJam ADService.HandleAdRevenuePaid:
+            // `if (info == null || info.Revenue <= 0d) return;`) — 억제가 이 seam의 더
+            // 안전한 기본값이다: 어댑터는 전달만 하고 필터링은 하지 않는다는 원칙보다
+            // "있지도 않은 수익을 보고하지 않는다"가 우선한다.
+            if (info == null || info.Revenue <= 0d) return;
+
             Paid?.Invoke(info.ToAdImpression(_format));
         }
 
