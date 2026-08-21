@@ -36,10 +36,20 @@ namespace DarkNaku.FoundationDI
             get
             {
                 // 캔버스는 DontDestroyOnLoad라 정상적으로는 파괴되지 않는다.
-                // 예외적으로 GO가 파괴되면(fake-null) 참조를 버리고 재구성한다.
-                if (_root != null && _root.GO == null) DiscardRoot();
-                return _root ??= new UIRoot(_settings != null ? _settings.ReferenceResolution : default);
+                // 예외적으로 파괴되면(fake-null) 참조를 버리고 재구성한다.
+                // UIRoot는 이제 MonoBehaviour다 → ??= 는 fake-null을 못 걸러내므로 쓰지 않는다.
+                if (_root == null) DiscardRoot();
+                if (_root == null) _root = CreateRoot();
+                return _root;
             }
+        }
+
+        // 상주화 책임은 서비스가 진다. 루트를 어디서 얻었든(폴백/프리팹) 동일하게 적용한다.
+        private UIRoot CreateRoot()
+        {
+            var root = UIRoot.CreateDefault();
+            UnityEngine.Object.DontDestroyOnLoad(root.GO);
+            return root;
         }
 
         // 전용 풀: 상주 Canvas 아래에 위치한다. 씬 전환 시 dispose되고 다음 표시에서 재구성된다.
