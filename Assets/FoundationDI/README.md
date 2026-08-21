@@ -5,6 +5,8 @@
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Author](https://img.shields.io/badge/author-DarkNaku-orange)
 
+> **0.4.0 BREAKING** — `UIServiceSettings.ReferenceResolution`이 제거되고 루트 캔버스 프리팹 참조(`RootPrefab`)로 대체되었습니다. 업그레이드 절차는 [UIService 마이그레이션](Runtime/Services/UIService/README.md#마이그레이션-030--040)을 참고하세요. 조치하지 않으면 기준 해상도가 코드 기본값(1920x1080)으로 폴백합니다.
+
 DI(의존성 주입) 기반 Unity 게임 개발 파운데이션 패키지입니다. [VContainer](https://github.com/hadashiA/VContainer)를 코어로 MessagePipe·R3·UniTask·Addressables를 조합한 공통 서비스 계층(메시징·리소스·UI·풀·사운드·햅틱)을 제공합니다. 각 서비스는 인터페이스(`IXxxService`)로 등록되어 생성자 주입으로 소비되며, 외부 의존(Addressables 등)은 seam으로 분리되어 EditMode 단위 테스트가 가능합니다.
 
 ## 주요 기능
