@@ -291,19 +291,44 @@ public string Placement { get; }  // 게임이 ShowAsync에 넘긴 배치명
    `MaxSdkCallbacks`의 `InvokeEvent` 헬퍼들은 네이티브가 실어 보낸 `keepInBackground` 플래그가
    참이면 `MaxEventExecutor`를 건너뛰고 콜백 스레드에서 그 자리에 곧바로 이벤트를 발화시킵니다
    (`MaxSdkCallbacks.cs:965~1053`). iOS 플러그인은 **전면/보상의 수익 콜백**
-   (`OnAdRevenuePaidEvent`)에서 정확히 이 플래그를 참으로 채웁니다
+   (`OnAdRevenuePaidEvent`)에서 이 플래그를 참으로 채웁니다
    (`Assets/MaxSdk/AppLovin/Plugins/iOS/MAUnityAdManager.m:1005`,
    `args[@"keepInBackground"] = @([adFormat isFullscreenAd]);`) — 배너 수익은 영향받지
-   않습니다. 즉 **같은 SDK, 같은 이벤트 이름(`OnAdRevenuePaidEvent`)인데도 포맷에 따라
-   스레드가 다릅니다.** `MaxSdkBase.InvokeEventsOnUnityMainThread`(공개 `bool?` 세터)를
-   `true`로 설정하면 이 우회를 막고 모든 콜백이 `MaxEventExecutor`를 거치게 강제할 수
-   있습니다 — AppLovin 어댑터는 `InitializeAsync`의 모든 진입 경로(이미 초기화된 경우 포함)
-   맨 앞에서 이걸 세팅해, `_dispatcher.Post` 없이도 안전하게 감쌉니다. **이 문제는 Unity
-   에디터에서 재현되지 않습니다** — `MaxSdkUnityEditor`는 메인 스레드 코루틴으로만 콜백을
-   만들어내므로, 에디터에서 통과하는 코드가 디바이스에서 백그라운드 스레드 예외로 죽을 수
-   있습니다. Android는 이 리포지토리에 JVM 툴체인이 없어 `.aar` 역디컴파일로만 확인했지만
-   `keepInBackground`/`isMainThread` 리터럴과 `BackgroundCallbackProxy` 전달 경로가 나와
-   iOS와 동일한 것으로 간주했습니다.
+   않습니다. (같은 패턴이 크리에이티브 ID 생성 이벤트(:1077)와 CMP 에러 경로(:2022, 항상 참)에도
+   쓰입니다 — 이 어댑터가 실제로 구독해서 영향받는 건 수익 콜백뿐이라는 뜻이지, 벡터가
+   수익 콜백 하나뿐이라는 뜻은 아닙니다.) 즉 **같은 SDK, 같은 이벤트 이름
+   (`OnAdRevenuePaidEvent`)인데도 포맷에 따라 스레드가 다릅니다.**
+   `MaxSdkBase.InvokeEventsOnUnityMainThread`(공개 `bool?` 세터)를 `true`로 설정하면 이
+   우회를 막고 모든 콜백이 `MaxEventExecutor`를 거치게 강제할 수 있습니다 — AppLovin
+   어댑터는 `InitializeAsync`의 모든 진입 경로(이미 초기화된 경우 포함) 맨 앞에서 이걸
+   세팅해, `_dispatcher.Post` 없이도 안전하게 감쌉니다.
+
+   **이 세팅은 공짜가 아닙니다.** `MAUnityAdManager.m`은 전면 광고가 뜰 때(`didDisplayAd`,
+   `isFullscreenAd` 가드) `UnityPause(YES)`를 부르고(:780) 닫힐 때(`didHideAd`)
+   `UnityPause(NO)`로 되돌립니다(:853). Unity가 멈춰 있는 동안 `MaxEventExecutor.Update()`도
+   돌지 않으므로, `InvokeEventsOnUnityMainThread = true`로 큐에 강제로 밀어 넣은 전면/보상
+   수익 이벤트는 **광고가 떠 있는 동안엔 도착하지 않고 광고가 닫혀 Unity가 재개된 뒤에야**
+   드레인됩니다 — 그 사이 프로세스가 죽으면 그 임프레션은 재전송 없이 사라집니다. 벤더가
+   애초에 `keepInBackground`를 켠 이유가 정확히 이걸 막기 위해서였습니다: "Forward the event
+   in background for fullscreen ads so that the user gets the callback even while the ad is
+   playing."(`MAUnityAdManager.m:1079`). AppLovin 어댑터는 그래도 이 트레이드를 택했습니다 —
+   백그라운드 스레드로 오는 콜백은 이 seam의 계약(메인 스레드 발화)과 그 위 정책
+   계층·분석 구독자의 메인 스레드 전제를 둘 다 어기고, 그 실패 모드(경합, 크래시, 조용히
+   삼켜지는 예외)가 매 임프레션마다 발생합니다. 광고 표시 도중 프로세스가 죽는 드문
+   경우에 임프레션 하나를 잃는 편이 낫다고 판단한 것입니다 — 하지만 이건 무조건 맞는
+   답이 아니라 **이 서비스의 우선순위(정확성·안전성 > 임프레션 손실 최소화)에서 나온
+   선택**이니, 다른 SDK/다른 우선순위의 어댑터를 붙일 때는 다시 판단하세요.
+
+   **`InvokeEventsOnUnityMainThread`는 프로세스 전역 정적 상태입니다.** 같은 프로세스 안에서
+   MAX를 직접(이 어댑터를 거치지 않고) 쓰는 다른 코드가 있다면 그 코드의 콜백 스레드
+   동작도 조용히 이 설정을 물려받습니다 — provider 하나만을 위한 설정이라고 생각해도
+   실제로는 앱 전체에 적용됩니다.
+
+   **이 문제는 Unity 에디터에서 재현되지 않습니다** — `MaxSdkUnityEditor`는 메인 스레드
+   코루틴으로만 콜백을 만들어내므로, 에디터에서 통과하는 코드가 디바이스에서 백그라운드
+   스레드 예외로 죽을 수 있습니다. Android는 이 리포지토리에 JVM 툴체인이 없어 `.aar`
+   역디컴파일로만 확인했지만 `keepInBackground`/`isMainThread` 리터럴과
+   `BackgroundCallbackProxy` 전달 경로가 나와 iOS와 동일한 것으로 간주했습니다.
 6. `AdProviderFactory.Build`는 옵셔널 어셈블리를 직접 `new`할 수 없다(참조 방향이 반대라
    순환 참조가 된다). 대신 `Providers/AdProviderRegistry.cs`(`FoundationDI` 어셈블리 소속)에
    creator를 등록한다. 옵셔널 어셈블리 안에 `[RuntimeInitializeOnLoadMethod]` 정적 메서드를
