@@ -56,4 +56,28 @@ public class UIRootTests
 
         Object.DestroyImmediate(root.GO);
     }
+
+    [Test]
+    public void GetMissingLayerNames는_레이어가_모두_연결되어_있으면_null을_반환한다()
+    {
+        var root = UIRoot.CreateDefault();
+
+        Assert.IsNull(root.GetMissingLayerNames());
+
+        Object.DestroyImmediate(root.GO);
+    }
+
+    [Test]
+    public void GetMissingLayerNames는_파괴된_레이어의_필드_이름을_보고한다()
+    {
+        var root = UIRoot.CreateDefault();
+        Object.DestroyImmediate(root.PageLayer.gameObject);
+
+        var missing = root.GetMissingLayerNames();
+
+        Assert.IsNotNull(missing);
+        CollectionAssert.AreEquivalent(new[] { nameof(UIRoot.PageLayer) }, missing);
+
+        Object.DestroyImmediate(root.GO);
+    }
 }

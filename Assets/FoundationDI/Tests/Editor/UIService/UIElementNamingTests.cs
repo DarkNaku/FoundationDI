@@ -1,8 +1,13 @@
 using NUnit.Framework;
+using DarkNaku.FoundationDI;
 using DarkNaku.FoundationDI.Editor;
 
 public class UIElementNamingTests
 {
+    // TypeCache 충돌 검사(Finding 3)를 위한 픽스처. 이름은 다른 테스트/런타임 타입과 겹치지 않게 고른다.
+    private class NamingCollisionProbeView : UIView { }
+    private class NamingCollisionProbePresenter : UIPagePresenter<NamingCollisionProbeView> { }
+
     [TestCase("Shop")]
     [TestCase("ShopPopup")]
     [TestCase("_Shop")]
@@ -44,5 +49,31 @@ public class UIElementNamingTests
     {
         Assert.AreEqual("Assets/UI/Shop.prefab",
             UIElementNaming.ResolveResourceKey("Assets/UI/Shop.prefab"));
+    }
+
+    [Test]
+    public void FindExistingViewType은_같은_이름의_View_타입이_다른_곳에_있어도_찾는다()
+    {
+        Assert.AreEqual(typeof(NamingCollisionProbeView),
+            UIElementNaming.FindExistingViewType("NamingCollisionProbe"));
+    }
+
+    [Test]
+    public void FindExistingViewType은_존재하지_않는_이름이면_null을_반환한다()
+    {
+        Assert.IsNull(UIElementNaming.FindExistingViewType("이런이름의View는존재하지않는다XyzZzz"));
+    }
+
+    [Test]
+    public void FindExistingPresenterType은_같은_이름의_Presenter_타입이_다른_곳에_있어도_찾는다()
+    {
+        Assert.AreEqual(typeof(NamingCollisionProbePresenter),
+            UIElementNaming.FindExistingPresenterType("NamingCollisionProbe"));
+    }
+
+    [Test]
+    public void FindExistingPresenterType은_존재하지_않는_이름이면_null을_반환한다()
+    {
+        Assert.IsNull(UIElementNaming.FindExistingPresenterType("이런이름의Presenter는존재하지않는다XyzZzz"));
     }
 }

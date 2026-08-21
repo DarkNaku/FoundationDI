@@ -51,7 +51,9 @@ namespace DarkNaku.FoundationDI.Editor
 
                     EditorGUILayout.HelpBox(
                         "Prefab Root가 Resources 폴더 아래면 로드 키는 Resources 기준 상대 경로가 되고, " +
-                        "그렇지 않으면 경로 전체가 Addressables 주소로 쓰입니다.",
+                        "그렇지 않으면 경로 전체가 Addressables 주소로 쓰입니다. " +
+                        "후자의 경우 생성된 프리팹을 Addressables 그룹에 직접 추가해야 로드됩니다 " +
+                        "(마법사는 주소만 계산하고 등록은 하지 않습니다).",
                         MessageType.Info);
 
                     if (EditorGUI.EndChangeCheck()) settings.Save();

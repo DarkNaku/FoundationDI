@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Text.RegularExpressions;
 using Cysharp.Threading.Tasks;
 using NSubstitute;
 using NUnit.Framework;
@@ -79,6 +80,10 @@ public class UIServiceRootPrefabTests
     {
         var settings = ScriptableObject.CreateInstance<UIServiceSettings>();
 
+        // RootPrefab 미지정은 0.3.0→0.4.0 마이그레이션의 사각지대라 컴파일 에러 없이 조용히
+        // 폴백한다 — 그래서 반드시 경고를 남겨야 한다(Finding 2).
+        LogAssert.Expect(LogType.Warning, new Regex(@"\[UIService\].*RootPrefab"));
+
         var service = CreateService(settings);
         var p = service.Page<P>();
         await UniTask.WaitUntil(() => p.Shown);
@@ -89,6 +94,27 @@ public class UIServiceRootPrefabTests
         Assert.AreEqual(UIRoot.DefaultReferenceResolution,
             root.GO.GetComponent<CanvasScaler>().referenceResolution);
         Assert.AreEqual("DontDestroyOnLoad", root.GO.scene.name);
+
+        service.Dispose();
+    });
+
+    [UnityTest]
+    public IEnumerator 루트프리팹의_레이어가_비어있으면_에러를_로그하고_UI는_계속_표시된다() => UniTask.ToCoroutine(async () =>
+    {
+        // PageLayer를 파괴해 fake-null로 만든다 — SetParent(null, false)는 예외를 던지지 않으므로
+        // 검증이 없으면 UI가 조용히 씬 루트로 떨어져 화면에서 사라진다(Finding 1).
+        Object.DestroyImmediate(_rootTemplate.PageLayer.gameObject);
+
+        var settings = ScriptableObject.CreateInstance<UIServiceSettings>();
+        settings.RootPrefab = _rootTemplate;
+
+        LogAssert.Expect(LogType.Error, new Regex(@"\[UIService\].*PageLayer"));
+
+        var service = CreateService(settings);
+        var p = service.Page<P>();
+        await UniTask.WaitUntil(() => p.Shown);
+
+        Assert.IsTrue(p.Shown, "레이어가 비어 있어도 크래시 없이 표시(비록 화면 밖이라도)는 계속되어야 한다");
 
         service.Dispose();
     });

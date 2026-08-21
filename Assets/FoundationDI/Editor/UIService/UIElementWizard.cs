@@ -58,7 +58,16 @@ namespace DarkNaku.FoundationDI.Editor
             var viewExists = !string.IsNullOrEmpty(_name) && File.Exists(viewPath);
             var presenterExists = !string.IsNullOrEmpty(_name) && File.Exists(presenterPath);
             var prefabExists = !string.IsNullOrEmpty(_name) && AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath) != null;
-            var exists = viewExists || presenterExists || prefabExists;
+
+            // 파일 존재 검사만으로는 놓친다: ShopView가 다른 폴더/어셈블리에 이미 있으면 세 검사 모두
+            // 통과해 파일이 새로 쓰이고, 컴파일이 CS0101로 실패한다. 실패해도 SessionState는
+            // 이미 남아 있어 나중에 잘못된(기존) 타입으로 프리팹이 조립될 수 있다 — 타입도 따로 검사한다.
+            var existingViewType = !string.IsNullOrEmpty(_name) ? UIElementNaming.FindExistingViewType(_name) : null;
+            var existingPresenterType = !string.IsNullOrEmpty(_name) ? UIElementNaming.FindExistingPresenterType(_name) : null;
+            var viewTypeExists = existingViewType != null;
+            var presenterTypeExists = existingPresenterType != null;
+
+            var exists = viewExists || presenterExists || prefabExists || viewTypeExists || presenterTypeExists;
 
             if (exists)
             {
@@ -67,6 +76,8 @@ namespace DarkNaku.FoundationDI.Editor
                 if (viewExists) collisions.Add($"View 스크립트: {viewPath}");
                 if (presenterExists) collisions.Add($"Presenter 스크립트: {presenterPath}");
                 if (prefabExists) collisions.Add($"프리팹: {prefabPath}");
+                if (viewTypeExists) collisions.Add($"View 타입이 이미 존재: {existingViewType.FullName}");
+                if (presenterTypeExists) collisions.Add($"Presenter 타입이 이미 존재: {existingPresenterType.FullName}");
 
                 EditorGUILayout.HelpBox($"이미 존재합니다 — {string.Join(", ", collisions)}", MessageType.Error);
             }

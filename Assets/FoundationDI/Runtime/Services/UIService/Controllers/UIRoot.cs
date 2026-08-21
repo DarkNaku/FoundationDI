@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -23,6 +24,46 @@ namespace DarkNaku.FoundationDI
         public Transform BelowOverlayLayer => _belowOverlayLayer;
         public Transform PopupLayer => _popupLayer;
         public Transform AboveOverlayLayer => _aboveOverlayLayer;
+
+        /// <summary>
+        /// 비어 있는 레이어 필드 이름 목록을 반환한다(없으면 null).
+        /// UIService.CreateRoot()의 런타임 검증과 아래 OnValidate의 저작 시점 검증이 이 로직을 공유한다.
+        /// </summary>
+        internal List<string> GetMissingLayerNames()
+        {
+            List<string> missing = null;
+
+            if (_pageLayer == null) (missing ??= new()).Add(nameof(PageLayer));
+            if (_belowOverlayLayer == null) (missing ??= new()).Add(nameof(BelowOverlayLayer));
+            if (_popupLayer == null) (missing ??= new()).Add(nameof(PopupLayer));
+            if (_aboveOverlayLayer == null) (missing ??= new()).Add(nameof(AboveOverlayLayer));
+
+            return missing;
+        }
+
+#if UNITY_EDITOR
+        // 인스펙터 편집·프리팹 로드 시 레이어 미연결을 저작 시점에 잡는다.
+        // CreateDefault()/프리팹 조립 도중에는 필드가 아직 다 채워지지 않은 채로 호출될 수 있어
+        // delayCall로 한 프레임 미룬 뒤 최종 상태를 검사한다(CameraFitter.OnValidate와 동일 패턴).
+        private void OnValidate()
+        {
+            UnityEditor.EditorApplication.delayCall += ValidateLayersFromEditor;
+        }
+
+        private void ValidateLayersFromEditor()
+        {
+            if (this == null) return; // delayCall 사이에 파괴되었을 수 있음
+
+            var missing = GetMissingLayerNames();
+
+            if (missing != null)
+            {
+                Debug.LogError(
+                    $"[UIRoot] '{name}' 레이어가 비어 있습니다: {string.Join(", ", missing)}. " +
+                    "인스펙터에서 해당 필드를 이 프리팹 하위의 RectTransform에 연결하세요.");
+            }
+        }
+#endif
 
         /// <summary>
         /// 루트 프리팹이 지정되지 않았을 때 쓰는 기본 계층을 조립한다.

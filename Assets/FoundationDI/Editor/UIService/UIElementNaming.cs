@@ -1,5 +1,6 @@
 using System;
 using System.Text.RegularExpressions;
+using UnityEditor;
 
 namespace DarkNaku.FoundationDI.Editor
 {
@@ -70,6 +71,40 @@ namespace DarkNaku.FoundationDI.Editor
             var dot = relative.LastIndexOf('.');
 
             return dot >= 0 ? relative[..dot] : relative;
+        }
+
+        /// <summary>
+        /// '{name}View' 타입이 이미 로드된 어셈블리(다른 폴더/네임스페이스 포함)에 존재하면 그 타입을 반환한다.
+        /// 마법사는 File.Exists만으로는 파일 위치만 다른 기존 타입과의 충돌(CS0101)을 잡지 못하므로
+        /// 파일 존재 검사와 별개로 타입 존재 여부를 확인해야 한다.
+        /// </summary>
+        public static Type FindExistingViewType(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return null;
+
+            var typeName = $"{name}View";
+
+            foreach (var type in TypeCache.GetTypesDerivedFrom<UIView>())
+            {
+                if (type.Name == typeName) return type;
+            }
+
+            return null;
+        }
+
+        /// <summary>'{name}Presenter' 타입이 이미 로드된 어셈블리에 존재하면 그 타입을 반환한다.</summary>
+        public static Type FindExistingPresenterType(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return null;
+
+            var typeName = $"{name}Presenter";
+
+            foreach (var type in TypeCache.GetTypesDerivedFrom<UIPresenter>())
+            {
+                if (type.Name == typeName) return type;
+            }
+
+            return null;
         }
     }
 }
