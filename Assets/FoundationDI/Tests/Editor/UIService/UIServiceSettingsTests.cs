@@ -6,15 +6,18 @@ using DarkNaku.FoundationDI;
 public class UIServiceSettingsTests
 {
     [Test]
-    public void UIServiceSettings는_기준해상도를_설정값으로_반환한다()
+    public void UIServiceSettings는_루트프리팹을_설정값으로_반환한다()
     {
         var settings = ScriptableObject.CreateInstance<UIServiceSettings>();
+        var root = UIRoot.CreateDefault();
+
         var so = new SerializedObject(settings);
-        so.FindProperty("_referenceResolution").vector2Value = new Vector2(1080f, 1920f);
+        so.FindProperty("_rootPrefab").objectReferenceValue = root;
         so.ApplyModifiedPropertiesWithoutUndo();
 
-        Assert.AreEqual(new Vector2(1080f, 1920f), settings.ReferenceResolution);
+        Assert.AreEqual(root, settings.RootPrefab);
 
         Object.DestroyImmediate(settings);
+        Object.DestroyImmediate(root.GO);
     }
 }

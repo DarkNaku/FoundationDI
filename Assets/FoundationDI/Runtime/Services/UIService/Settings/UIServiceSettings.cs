@@ -5,9 +5,16 @@ namespace DarkNaku.FoundationDI
     [CreateAssetMenu(fileName = "UIServiceSettings", menuName = "DarkNaku/UIServiceSettings")]
     public sealed class UIServiceSettings : ScriptableObject
     {
-        // CanvasScaler(Scale With Screen Size, Expand)의 기준 해상도
-        [SerializeField] private Vector2 _referenceResolution = new Vector2(1920f, 1080f);
+        // UIService가 런타임에 인스턴스화할 캔버스 루트 프리팹.
+        // 캔버스 렌더 모드/CanvasScaler/레이어 구성은 전부 이 프리팹이 결정한다.
+        // 비워두면 UIRoot.CreateDefault()로 폴백한다.
+        [SerializeField] private UIRoot _rootPrefab;
 
-        public Vector2 ReferenceResolution => _referenceResolution;
+        // setter는 테스트 전용이다(InternalsVisibleTo). 런타임에는 인스펙터가 유일한 설정 경로다.
+        public UIRoot RootPrefab
+        {
+            get => _rootPrefab;
+            internal set => _rootPrefab = value;
+        }
     }
 }

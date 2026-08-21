@@ -36,10 +36,52 @@ namespace DarkNaku.FoundationDI
             get
             {
                 // 캔버스는 DontDestroyOnLoad라 정상적으로는 파괴되지 않는다.
-                // 예외적으로 GO가 파괴되면(fake-null) 참조를 버리고 재구성한다.
-                if (_root != null && _root.GO == null) DiscardRoot();
-                return _root ??= new UIRoot(_settings != null ? _settings.ReferenceResolution : default);
+                // 예외적으로 파괴되면(fake-null) 참조를 버리고 재구성한다.
+                // UIRoot는 이제 MonoBehaviour다 → ??= 는 fake-null을 못 걸러내므로 쓰지 않는다.
+                if (_root == null) DiscardRoot();
+                if (_root == null) _root = CreateRoot();
+                return _root;
             }
+        }
+
+        // 상주화 책임은 서비스가 진다. 루트를 어디서 얻었든(프리팹/폴백) 동일하게 적용한다.
+        private UIRoot CreateRoot()
+        {
+            var prefab = _settings != null ? _settings.RootPrefab : null;
+            UIRoot root;
+
+            if (prefab != null)
+            {
+                root = UnityEngine.Object.Instantiate(prefab);
+            }
+            else
+            {
+                // RootPrefab 미지정은 0.3.0→0.4.0 마이그레이션에서 놓치기 쉬운 지점이다:
+                // 제거된 ReferenceResolution이 조용히 사라져도 컴파일 에러가 나지 않고,
+                // 첫 신호가 화면 배율이 뒤바뀌는 시각적 회귀로만 나타난다.
+                Debug.LogWarning(
+                    "[UIService] UIServiceSettings.RootPrefab이 지정되지 않아 코드 기본값" +
+                    "(ScreenSpaceOverlay / 1920x1080)으로 폴백합니다. 세로 화면 등 다른 기준 해상도가 필요하면 " +
+                    "Tools/FoundationDI/UI/Create UI Root Prefab으로 루트 프리팹을 만들고 " +
+                    "UIServiceSettings.RootPrefab에 연결하세요.");
+                root = UIRoot.CreateDefault();
+            }
+
+            UnityEngine.Object.DontDestroyOnLoad(root.GO);
+
+            // 레이어 미연결은 예외 없이 조용히 UI가 사라지는 원인이 된다(SetParent(null,false)는 합법).
+            // 던지지 않고 로그만 남긴다 — 게임 런타임을 크래시시키는 것보다 저하된 채로라도 동작하는 편이 낫다.
+            var missingLayers = root.GetMissingLayerNames();
+
+            if (missingLayers != null)
+            {
+                Debug.LogError(
+                    $"[UIService] 루트 '{root.GO.name}'의 레이어가 비어 있습니다: {string.Join(", ", missingLayers)}. " +
+                    "해당 레이어로 향하는 UI는 부모 없이 씬 루트에 붙어 화면에 보이지 않습니다. " +
+                    "UIRoot 컴포넌트 인스펙터에서 해당 필드를 프리팹 하위 RectTransform에 연결하세요.");
+            }
+
+            return root;
         }
 
         // 전용 풀: 상주 Canvas 아래에 위치한다. 씬 전환 시 dispose되고 다음 표시에서 재구성된다.

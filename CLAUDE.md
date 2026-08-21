@@ -45,14 +45,17 @@ NuGet 의존성은 **NuGetForUnity**(`Assets/NuGet/`)가 `Assets/packages.config
 모든 런타임 코드는 단일 asmdef `FoundationDI`(`Runtime/FoundationDI.asmdef`)에 들어간다.
 
 - **MessageService** (`Services/MessageService.cs`): MessagePipe 래퍼. `IObjectResolver`로 `IPublisher<T>`/`ISubscriber<T>`를 지연 해석해 `ConcurrentDictionary`에 캐싱. 동기/비동기(UniTask) pub-sub 제공.
-- **UIManager** (`Managers/UIManager/`): uGUI 기반 UI 시스템. 네임스페이스 `DarkNaku.FoundationDI`.
-  - **빌더 API**: `uiManager.Page<TPresenter>()` / `Popup<TPresenter>()` / `Overlay<TPresenter>()` → 인스턴스 즉시 반환 + Show 자동 enqueue (`.Show()` 별도 호출 불필요) → 같은 프레임 내 `.WithParams(params)` / `.OnShown(...)` / `.WithTransition(...)` 동기 체인.
+- **UIService** (`Services/UIService/`): uGUI 기반 UI 시스템. 네임스페이스 `DarkNaku.FoundationDI`.
+  - **빌더 API**: `_ui.Page<TPresenter>()` / `Popup<TPresenter>()` / `Overlay<TPresenter>()` → 인스턴스 즉시 반환 + Show 자동 enqueue (`.Show()` 별도 호출 불필요) → 같은 프레임 내 `.WithParams(params)` / `.OnAfterShow(...)` / `.WithTransition(...)` / `.WithOverlay(...)` 동기 체인.
   - **표시 모드**: Presenter 타입으로 컴파일 타임 고정 — `UIPagePresenter<TView>`(단일 교체) / `UIPopupPresenter<TView>`(LIFO 스택) / `UIOverlayPresenter<TView>`(Popup 기준 Above/Below 상주). View 공통 기반 `UIView : MonoBehaviour`.
-  - **`ShowQueue`**: 모든 Show/Hide 전환을 단일 큐로 순차 직렬화 → race 조건 제거.
-  - **prefab 매핑**: `[UIPrefab("키")]` 속성을 Presenter 타입에 부착. `IUIAssetLoader`(기본 `ResourcesUILoader`, 옵션 `AddressablesUILoader`)로 로드.
-  - **`InstanceCache`**: Hide 후 인스턴스를 타입 키로 보관·재사용. 다음 Show 시 `OnInitialize` 생략.
-  - **트랜지션**: `IUITransition` 추상화 + 기본 3종(`FadeTransitionAsset`/`ScaleTransitionAsset`/`SlideTransitionAsset`) ScriptableObject. 트윈 라이브러리 비의존 — UniTask 자체 보간(`AnimationCurve` 인스펙터 커스터마이즈). 폴백 `NoopTransition`(즉시). 해석 우선순위: 빌더 오버라이드 > `UIView` 인스펙터 > Noop.
-  - **DI 등록**: `builder.RegisterUIManager(settings)` 확장 메서드(루트 `LifetimeScope` 에서 호출). Presenter/View는 `_container.Inject()`로 의존성 주입.
+  - **`OperationQueue`**: 모든 Show/Hide 전환을 단일 큐로 순차 직렬화 → race 조건 제거.
+  - **prefab 매핑**: `[UIPrefab("키")]` 속성을 Presenter 타입에 부착. 로딩은 `IResourceService`에 위임(Resources/Addressables 중 어느 쪽이든 등록된 `IResourceProvider`가 결정).
+  - **Presenter는 매 표시마다 새로 생성**(인스턴스 캐시 없음, `OnInitialize` 재실행) — **View는 프리팹 키로 풀링**되어 재사용됨.
+  - **상주 캔버스**: 루트는 `UIServiceSettings.RootPrefab`으로 지정한 프리팹을 인스턴스화하며(렌더 모드/`CanvasScaler`/레이어 구성은 프리팹이 결정), 미지정 시 `UIRoot.CreateDefault()`(ScreenSpaceOverlay/1920x1080)로 폴백한다. `DontDestroyOnLoad`로 앱 전체에 1개만 상주하며 씬 전환 시 자식 UI만 clear.
+  - **트랜지션**: `IUITransition` 추상화 + 기본 3종 MonoBehaviour 컴포넌트(`FadeTransition`/`ScaleTransition`/`SlideTransition`, 공통 기반 `UITransitionBehaviour`). 트윈 라이브러리 비의존 — `Awaitable` 자체 보간(`AnimationCurve` 인스펙터 커스터마이즈). 폴백 `NoopTransition`(즉시). 해석 우선순위: 빌더 오버라이드 > View의 트랜지션 컴포넌트 > Noop.
+  - **DI 등록**: `builder.RegisterUIService(settings)` 확장 메서드(루트 `LifetimeScope`에서, `IResourceService` 등록 이후에 호출). Presenter/View는 VContainer가 주입.
+  - **에디터 도구**(`Assets/FoundationDI/Editor/UIService/`): `Tools/FoundationDI/UI/Create UI Root Prefab`(루트 프리팹 생성) · `Setup/Clear Prefab Editing Environment`(프리팹을 실제 캔버스 안에서 편집) · `Create UI Element...`(View/Presenter 스크립트 + 프리팹 생성 마법사).
+  - 상세: `Assets/FoundationDI/Runtime/Services/UIService/README.md`.
 - **PoolService** (`Services/PoolService/`): 키 기반 GameObject 오브젝트 풀. `Resources.Load` 우선, 실패 시 Addressables fallback으로 프리팹을 로드(`Load()`). `ObjectPool<IPoolItem>` 기반이며 `PoolData`가 풀+Addressables 핸들을, `PoolItem`(MonoBehaviour)이 풀 항목 생명주기 콜백(`OnGetItem`/`OnReleaseItem` 등)과 지연 반환(`Release(delay)`)을 담당. **현재 `plan.md`의 활성 개선 대상**(crash/thread-safety/null-safety).
 - **SoundService** (`Services/SoundService/`): 태그 기반 오디오 시스템.
   - 공개 API는 `ISoundService` 하나. `CreateSound/CreateMusic/CreatePlaylist/CreateDynamicMusic` 팩토리로 빌더를 만들고 체이닝 후 `Play()`. 빌더가 쓰는 내부 seam은 `ISoundEngine`(internal).
