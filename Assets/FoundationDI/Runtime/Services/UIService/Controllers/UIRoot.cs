@@ -54,6 +54,11 @@ namespace DarkNaku.FoundationDI
         {
             if (this == null) return; // delayCall 사이에 파괴되었을 수 있음
 
+            // 저작 시점 검증이므로 플레이 중에는 돌지 않는다. 런타임 경로는 UIService.CreateRoot()가
+            // 이미 결정적으로 검증한다. 플레이 중에도 돌면 delayCall이 비동기라 이 에러가 임의의
+            // 후속 프레임(=다른 테스트의 로그 스트림)에 떨어져 PlayMode 테스트를 간헐적으로 깨뜨린다.
+            if (Application.isPlaying) return;
+
             var missing = GetMissingLayerNames();
 
             if (missing != null)
