@@ -17,20 +17,6 @@
       },
       "hash": "4ce7dd3cc54e37e2ed6dc59cb5a047f3dccb3f50"
     },
-    "com.cysharp.messagepipe": {
-      "version": "https://github.com/Cysharp/MessagePipe.git?path=src/MessagePipe.Unity/Assets/Plugins/MessagePipe",
-      "depth": 0,
-      "source": "git",
-      "dependencies": {},
-      "hash": "33a618d2b2914b37e0d27b21c4ed89500381e965"
-    },
-    "com.cysharp.messagepipe.vcontainer": {
-      "version": "https://github.com/Cysharp/MessagePipe.git?path=src/MessagePipe.Unity/Assets/Plugins/MessagePipe.VContainer",
-      "depth": 0,
-      "source": "git",
-      "dependencies": {},
-      "hash": "33a618d2b2914b37e0d27b21c4ed89500381e965"
-    },
     "com.cysharp.r3": {
       "version": "https://github.com/Cysharp/R3.git?path=src/R3.Unity/Assets/R3.Unity",
       "depth": 0,
