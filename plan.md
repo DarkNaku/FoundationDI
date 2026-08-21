@@ -1,6 +1,12 @@
 # plan.md
 
-## 활성 계획: MessageService — MessagePipe 의존성 제거
+## 활성 계획: 없음
+
+다음 작업이 정해지면 여기에 테스트 목록을 채운다.
+
+---
+
+## 완료: MessageService — MessagePipe 의존성 제거
 
 MessagePipe 래퍼를 폐기하고 `Dictionary<Type, Delegate>` 기반 자체 구현으로 교체한다.
 `IMessageService : IDisposable` (동기 `Publish` / `IDisposable` 반환 `Subscribe`)만 남기고,
