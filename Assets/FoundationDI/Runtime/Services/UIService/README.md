@@ -6,7 +6,7 @@ uGUI 기반 UI 표시/전환 시스템입니다. Presenter 타입으로 표시 �
 - **빌더 체인** — `Page<T>()` 즉시 인스턴스 반환 + Show 자동 enqueue → 같은 프레임 `.WithParams()/.OnAfterShow()/.WithTransition()/.WithOverlay()` 동기 체인
 - **전환 직렬화** — `OperationQueue`로 모든 전환을 순차 처리(race 제거)
 - **Presenter는 매 표시마다 새로 생성, View는 풀 재사용** — Presenter 인스턴스 캐시는 없음. `Page/Popup/Overlay<T>()`마다 새 Presenter 생성 + `OnInitialize` 재실행. View만 프리팹 키로 풀링되어 재사용됨.
-- **상주 캔버스** — 단일 `[UIService]` Canvas(ScreenSpaceOverlay)는 `DontDestroyOnLoad`로 앱 전체에 1개만 상주. 씬 전환 시 자식 UI만 clear하고 캔버스는 유지.
+- **상주 캔버스** — 단일 루트 Canvas는 `DontDestroyOnLoad`로 앱 전체에 1개만 상주. `UIServiceSettings.RootPrefab`을 인스턴스화하며(렌더 모드/CanvasScaler/레이어는 프리팹이 결정), 미지정 시 코드 기본값(ScreenSpaceOverlay/1920x1080)으로 폴백. 씬 전환 시 자식 UI만 clear하고 캔버스는 유지.
 - **WithOverlay** — Page/Popup과 오버레이를 동시에 노출(동시 애니메이션). `persistent` 옵션으로 페이지 전환 간 깜빡임 없이 유지.
 - **트랜지션 추상화** — `IUITransition` + 기본 3종(Fade/Slide/Scale) MonoBehaviour 컴포넌트(공통 기반 `UITransitionBehaviour`), 폴백 Noop. Slide/Scale은 배경(Image)·컨텐츠 분리 연출 지원.
 
@@ -39,6 +39,8 @@ public class RootLifetimeScope : LifetimeScope
 ```
 
 > 백엔드는 `IResourceProvider` 구현체 선택으로 결정됩니다. 호스트 샘플은 `ResourcesProvider`(Resources)를 쓰며, Addressables는 선택입니다.
+
+> 캔버스 렌더 모드/기준 해상도를 커스터마이즈하려면 `settings.RootPrefab`에 루트 프리팹을 연결하세요(만드는 법은 아래 [에디터 워크플로](#에디터-워크플로-디자이너용) 1번 참고). 비워두면 코드 기본값으로 동작합니다.
 
 ### 2) View와 Presenter 정의
 
@@ -108,9 +110,64 @@ public class ConfirmPresenter : UIPopupPresenter<ConfirmView>, IConfigurable<Con
 
 ---
 
+## 에디터 워크플로 (디자이너용)
+
+### 1) 루트 프리팹 만들기 (프로젝트당 1회)
+
+`Tools/FoundationDI/UI/Create UI Root Prefab` → 저장 위치 선택 → 생성된 프리팹을
+`UIServiceSettings`의 **Root Prefab**에 연결합니다. 캔버스 렌더 모드, `CanvasScaler`,
+기준 해상도, 레이어 구성은 전부 이 프리팹이 결정합니다. 비워두면 코드 기본값
+(ScreenSpaceOverlay / ScaleWithScreenSize / Expand / 1920x1080)으로 폴백합니다.
+
+### 2) 프리팹 편집 환경 지정하기 (프로젝트당 1회)
+
+`Tools/FoundationDI/UI/Setup Prefab Editing Environment` → 씬 저장 위치 선택.
+이후 **UI 프리팹을 프로젝트 창에서 더블클릭**하면 런타임과 동일한 캔버스 안에서
+올바른 크기/스케일로 열립니다. 씬에 임시 캔버스를 만들 필요도, 작업 후 지울 필요도 없습니다.
+
+> 이 설정(`EditorSettings.prefabUIEnvironment`)은 프리팹을 **격리 모드**로 열 때만
+> 적용됩니다. 씬의 프리팹 인스턴스에서 "Open"으로 들어가는 "in context" 모드에는
+> 적용되지 않습니다.
+
+해제는 `Tools/FoundationDI/UI/Clear Prefab Editing Environment`.
+
+### 3) 새 UI 요소 만들기
+
+`Tools/FoundationDI/UI/Create UI Element...` → 이름과 모드(Page/Popup/Overlay) 입력 → Create.
+
+생성되는 것:
+
+| 산출물 | 예시(이름 `Shop`, Popup) |
+|---|---|
+| View 스크립트 | `<Script Root>/ShopView.cs` — `public class ShopView : UIView` |
+| Presenter 스크립트 | `<Script Root>/ShopPresenter.cs` — `[UIPrefab("UI/Shop")] public class ShopPresenter : UIPopupPresenter<ShopView>`(`protected override void OnInitialize()` 스텁 포함) |
+| 프리팹 | `<Prefab Root>/Shop.prefab` — 루트(stretch + CanvasGroup + ShopView) + `Background` + `Content` |
+
+컴파일이 끝나면(`[DidReloadScripts]`) 프리팹이 자동으로 조립되고 프리팹 편집 모드로 열립니다.
+이 자동 열기는 **best-effort**입니다 — 포커스가 없거나 headless인 에디터에서는 지연 콜백이
+실행되지 않을 수 있습니다(스크립트와 프리팹 자체는 항상 정상적으로 만들어지며, 콘솔 로그로
+성공 여부를 확인할 수 있습니다). 이 경우 프리팹을 직접 더블클릭하면 됩니다.
+
+경로/네임스페이스 기본값은 `Project Settings > FoundationDI > UI`에서 바꿉니다.
+`Prefab Root`가 `Resources` 폴더 아래면 로드 키는 Resources 기준 상대 경로가 되고,
+아니면 경로 전체가 Addressables 주소로 쓰입니다.
+
+모드별 프리팹 템플릿:
+
+| 모드 | 루트 | 자식 |
+|---|---|---|
+| Page | RectTransform(stretch) + CanvasGroup + View | 없음 |
+| Popup | 위와 동일 | `Background`(Image, 검정 α=0.5, 모달 입력 차단), `Content`(중앙 정렬) |
+| Overlay | 위와 동일 | 없음 |
+
+Page와 Overlay는 전면 배경이 없으므로 빈 영역의 입력이 자연히 아래로 통과합니다.
+`CanvasGroup.blocksRaycasts`는 끄지 않습니다 — 끄면 오버레이 안의 버튼까지 죽습니다.
+
+---
+
 ## Canvas 수명(지속)
 
-- `[UIService]` 루트 Canvas는 **최초 표시 시 지연 생성**되고, `renderMode = ScreenSpaceOverlay` + `DontDestroyOnLoad`로 **씬을 넘어 앱 전체에 1개만 상주**합니다(카메라 비의존). 레이어 렌더 순서(아래→위)는 `Page → BelowOverlay → Popup → AboveOverlay`.
+- 루트 Canvas는 **최초 표시 시 지연 생성**됩니다. `UIServiceSettings`의 **Root Prefab**을 인스턴스화하며(렌더 모드·`CanvasScaler`·레이어 구성은 그 프리팹이 결정), 미지정 시 코드 기본값(`UIRoot.CreateDefault()` — ScreenSpaceOverlay / ScaleWithScreenSize / Expand / 1920x1080)으로 폴백합니다. 어느 경로든 `DontDestroyOnLoad`는 서비스가 인스턴스화 직후 적용하므로 **씬을 넘어 앱 전체에 1개만 상주**합니다. 레이어 렌더 순서(아래→위)는 `Page → BelowOverlay → Popup → AboveOverlay`.
 - **씬 전환(activeSceneChanged) 시** UIService는 자식 UI 컨텐츠를 전부 clear합니다 — 활성 Presenter를 teardown(`OnBeforeHide`/`OnAfterHide` 발화)하고 진행 중인 큐를 취소하며 **View 풀을 dispose**합니다. **캔버스 자체는 유지**되며, 풀은 다음 표시 때 캔버스 아래에 재구성됩니다.
 - 캔버스는 오직 `UIService.Dispose()`(= 소유 루트 스코프 dispose) 시에만 파괴됩니다. 그래서 앱 전체 단일 인스턴스가 되려면 지속되는 **프로젝트 루트 LifetimeScope**에 등록해야 합니다.
 - 예외적으로 캔버스 GameObject가 외부에서 파괴되면(fake-null) 참조를 버리고 다음 표시에서 재구성합니다.
@@ -244,7 +301,7 @@ _ui.Page<StagePage>()
 - **주입 대상**: Presenter는 생성 시(`UIInstanceFactory`), View는 프리팹 인스턴스 생성 시 계층 전체의 MonoBehaviour가 주입됩니다(`InjectGameObject`). 둘 다 `[Inject]` 필드를 쓸 수 있습니다.
   - View 주입은 **풀 인스턴스당 1회**입니다. 풀에서 재사용될 때는 다시 주입되지 않습니다(씬 전환 시 풀이 dispose되므로 다음 표시에서 새로 생성·주입됩니다).
   - UIService는 루트 스코프에 등록되므로 Presenter/View 모두 **루트 스코프 의존만** 해석됩니다.
-- `UIServiceSettings`(ScriptableObject) — `ReferenceResolution`(기본 1920×1080) **하나만** 제공합니다. CanvasScaler를 **Scale With Screen Size + Screen Match Mode = Expand**로 구성하고 기준 해상도로 사용합니다(설정이 없거나 0 이하면 1920×1080 폴백). sorting-layer/카메라/plane 필드는 ScreenSpaceOverlay 전환과 함께 제거되었습니다.
+- `UIServiceSettings`(ScriptableObject) — `RootPrefab`(`UIRoot`) **하나만** 제공합니다. 캔버스 렌더 모드, `CanvasScaler`(스케일 모드/기준 해상도), 레이어 구성은 전부 이 프리팹이 결정합니다. `Tools/FoundationDI/UI/Create UI Root Prefab`으로 만듭니다(자세한 절차는 위 [에디터 워크플로](#에디터-워크플로-디자이너용) 참고). 비워두면 `UIRoot.CreateDefault()`가 조립한 코드 기본값(ScreenSpaceOverlay / Scale With Screen Size + Expand / 1920×1080)으로 폴백합니다.
 
 ---
 
@@ -282,3 +339,15 @@ _ui.Page<StagePage>()
 - 상주 캔버스 단일 인스턴스는 UIService를 지속 루트 스코프에 등록했을 때만 보장됩니다(자식 스코프에 등록하면 스코프 dispose 시 캔버스가 파괴됨).
 - 큐 작업 중 발생한 예외는 로그로 남지만 대기 중인 호출자에게 전파되지는 않습니다.
 - 메인 스레드 전제(스레드 안전성 없음).
+
+---
+
+## 마이그레이션 (0.3.0 → 0.4.0)
+
+**BREAKING:** `UIServiceSettings.ReferenceResolution`이 제거되고 `RootPrefab`으로 대체되었습니다.
+
+1. `Tools/FoundationDI/UI/Create UI Root Prefab`으로 루트 프리팹을 만듭니다.
+2. 그 프리팹의 `CanvasScaler`에 기존에 쓰던 기준 해상도를 설정합니다.
+3. `UIServiceSettings`의 **Root Prefab**에 연결합니다.
+
+연결하지 않아도 동작은 하지만, 기준 해상도가 코드 기본값(1920x1080)으로 폴백합니다.
