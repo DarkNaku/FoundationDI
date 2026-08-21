@@ -242,16 +242,26 @@ public string Placement { get; }  // 게임이 ShowAsync에 넘긴 배치명
 ## 5. 3사 어댑터를 추가하는 방법
 
 정책 계층(`FullScreenAdUnit`/`BannerAdUnit`/`AdService`)은 건드리지 않습니다. 새 SDK는
-`Providers/<SDK>/` 아래에 seam 구현만 추가합니다.
+`FoundationDI` 어셈블리 **바깥**에, `FoundationDI`와 SDK 어셈블리를 함께 참조하는
+별도의 옵셔널 asmdef로 추가합니다. `FoundationDI`는 SDK가 없는 프로젝트에서도 컴파일돼야
+하는데, 만약 `Providers/<SDK>/`를 `FoundationDI` 어셈블리 안에 두면 그 asmdef가 없는
+SDK 어셈블리를 참조하게 되어 SDK 미설치 프로젝트에서 컴파일 에러가 됩니다.
 
 1. SDK를 `Packages/manifest.json` 또는 `.unitypackage`로 설치한다.
 2. `Player Settings > Scripting Define Symbols`에 `FOUNDATIONDI_ADMOB` 같은 심볼을 정의한다
    (`AdProviderFactory.IsAvailable`이 이 심볼로 SDK 존재 여부를 판단합니다).
-3. `Providers/AdMob/`(예시) 아래에 `IAdProvider`/`IFullScreenAdapter`/`IBannerAdapter`를
-   구현하는 `AdMobProvider`/`AdMobFullScreenAdapter`/`AdMobBannerAdapter`를 작성한다.
+3. `FoundationDI.<SDK>`(예: `FoundationDI.AppLovin`)라는 새 asmdef를 만든다. `references`에
+   `FoundationDI`와 SDK 어셈블리를 넣고, `defineConstraints`에 1번에서 정의한 심볼(예:
+   `FOUNDATIONDI_ADMOB`)을 넣는다. **`defineConstraints`가 충족되지 않으면 Unity는 이
+   asmdef를 통째로 건너뛴다** — SDK 어셈블리가 프로젝트에 없어도 참조 자체가 에러가 되지
+   않는다(이 동작은 실제로 확인됨). 이 asmdef는 `Assets/FoundationDI/Runtime/` 바깥, SDK
+   설치 위치에 가까운 곳에 둔다 — `FoundationDI` 패키지 폴더 안에 넣으면 배포 시 SDK
+   유무와 무관하게 항상 딸려나간다.
+4. 그 안에 `IAdProvider`/`IFullScreenAdapter`/`IBannerAdapter`를 구현하는
+   `AdMobProvider`/`AdMobFullScreenAdapter`/`AdMobBannerAdapter`(예시)를 작성한다.
    구현 시 `docs/superpowers/specs/2026-08-20-adservice-design.md`의 **"3사 매핑표"**(6절)를
    대조하며 작성하고, 실제 SDK의 필드명이 표와 어긋나면 표를 갱신한다.
-4. **SDK 콜백을 메인 스레드로 마샬링한다.** `IFullScreenAdapter`/`IBannerAdapter`는 이벤트가
+5. **SDK 콜백을 메인 스레드로 마샬링한다.** `IFullScreenAdapter`/`IBannerAdapter`는 이벤트가
    메인 스레드에서 발화된다고 전제하는 계약입니다(`IFullScreenAdapter.cs`/`IBannerAdapter.cs`
    인터페이스 주석 참고) — `AdService`도 `Ads/` 정책 계층도 이걸 대신 해주지 않습니다.
    AdMob/LevelPlay/AppLovin 모두 네이티브 스레드에서 콜백을 올릴 수 있으므로, SDK 콜백
@@ -260,9 +270,26 @@ public string Placement { get; }  // 게임이 ShowAsync에 넘긴 배치명
    단계를 생략하는 이유는 `DummyAdCanvas`/`DummyAdTicker`가 처음부터 Unity 메인 스레드
    (`MonoBehaviour.Update`)에서만 콜백을 만들어내기 때문입니다 — 실제 SDK 어댑터는 이
    전제가 없습니다.
-5. `AdProviderFactory.Create`(내부적으로 `Build`)의 `switch`에 새 `case`를 추가한다.
-6. 필요하면 `Consent/`에 provider별 동의 구현(`UmpAdConsent` 등)을 추가해 `IAdProvider.Consent`로 노출한다.
-7. **`IFullScreenAdapter.Load()`는 SDK 호출로 바로 이어져도 된다.** `FullScreenAdUnit`이
+6. `AdProviderFactory.Build`는 옵셔널 어셈블리를 직접 `new`할 수 없다(참조 방향이 반대라
+   순환 참조가 된다). 대신 `Providers/AdProviderRegistry.cs`(`FoundationDI` 어셈블리 소속)에
+   creator를 등록한다. 옵셔널 어셈블리 안에 `[RuntimeInitializeOnLoadMethod]` 정적 메서드를
+   하나 두고 거기서 호출한다:
+   ```csharp
+   [RuntimeInitializeOnLoadMethod]
+   private static void Register()
+   {
+       AdProviderRegistry.Register(AdProviderType.AdMob,
+           context => new AdMobProvider(context.Dispatcher));
+   }
+   ```
+   `AdProviderCreationContext`는 provider 생성에 필요한 것(현재는 `Dispatcher`뿐)을 담는
+   readonly struct다 — 나중에 의존성이 늘어나도 이 델리게이트 시그니처는 그대로다.
+   `Register`는 같은 타입으로 다시 호출하면 이전 creator를 예외 없이 교체한다(도메인
+   리로드·에디터 재실행이 이 경로를 여러 번 태운다). `AdProviderRegistry`는 심볼 유무와
+   무관하게 항상 `FoundationDI`에 존재한다 — "심볼이 정의됐는데 아무도 등록하지 않은" 상태는
+   `AdProviderFactory.Build`가 에러 로그와 함께 Dummy로 대체해 조용히 새지 않게 한다.
+7. 필요하면 `Consent/`에 provider별 동의 구현(`UmpAdConsent` 등)을 추가해 `IAdProvider.Consent`로 노출한다.
+8. **`IFullScreenAdapter.Load()`는 SDK 호출로 바로 이어져도 된다.** `FullScreenAdUnit`이
    이미 로드 진행 중 상태를 추적해 중복 호출을 걸러내므로, 어댑터 스스로 진행 중 로드를
    기억해 뒀다가 걸러내는 자체 로직을 둘 필요가 없다(예: `if (_isLoading) return;` 같은
    가드는 정책 계층의 일이지 어댑터의 일이 아니다).
@@ -290,6 +317,7 @@ AdService/
 │   ├── IAdProvider.cs            SDK seam. BannerOptions/AdProviderContext도 여기 있다
 │   ├── IFullScreenAdapter.cs / IBannerAdapter.cs   광고 단위 하나를 나타내는 어댑터 seam
 │   ├── IAdProviderFactory.cs / AdProviderFactory.cs  심볼 기반 provider 선택 + Dummy 폴백
+│   ├── AdProviderRegistry.cs     3사 어댑터(옵셔널 어셈블리)가 자신을 등록하는 진입점
 │   └── Dummy/                    SDK 없이 흐름을 검증하는 provider 구현
 ├── Dispatch/
 │   ├── IAdDispatcher.cs          메인스레드 마샬링 + 지연 + 프레임 대기 seam
