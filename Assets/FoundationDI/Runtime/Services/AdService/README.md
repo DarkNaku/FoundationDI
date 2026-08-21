@@ -262,6 +262,10 @@ public string Placement { get; }  // 게임이 ShowAsync에 넘긴 배치명
    전제가 없습니다.
 5. `AdProviderFactory.Create`(내부적으로 `Build`)의 `switch`에 새 `case`를 추가한다.
 6. 필요하면 `Consent/`에 provider별 동의 구현(`UmpAdConsent` 등)을 추가해 `IAdProvider.Consent`로 노출한다.
+7. **`IFullScreenAdapter.Load()`는 SDK 호출로 바로 이어져도 된다.** `FullScreenAdUnit`이
+   이미 로드 진행 중 상태를 추적해 중복 호출을 걸러내므로, 어댑터 스스로 진행 중 로드를
+   기억해 뒀다가 걸러내는 자체 로직을 둘 필요가 없다(예: `if (_isLoading) return;` 같은
+   가드는 정책 계층의 일이지 어댑터의 일이 아니다).
 
 `FullScreenAdUnit`을 수정해야만 어댑터가 붙는다면 seam 설계가 잘못됐다는 신호입니다 — 멈추고
 재검토합니다.
