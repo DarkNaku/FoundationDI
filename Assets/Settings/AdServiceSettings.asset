@@ -1,0 +1,44 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 58087e5553fe34295971cef5bf8e7718, type: 3}
+  m_Name: AdServiceSettings
+  m_EditorClassIdentifier: FoundationDI::DarkNaku.FoundationDI.AdServiceSettings
+  _provider: 0
+  _forceDummyInEditor: 1
+  _appKey:
+    _android: 
+    _ios: 
+  _bannerUnitId:
+    _android: 
+    _ios: 
+  _interstitialUnitId:
+    _android: 
+    _ios: 
+  _rewardedUnitId:
+    _android: 
+    _ios: 
+  _bannerPosition: 0
+  _bannerSize: 4
+  _useAdaptiveBanner: 1
+  _autoLoadOnInitialize: 1
+  _maxRetryAttempts: 5
+  _retryBaseSeconds: 2
+  _maxRetryDelaySeconds: 64
+  _rewardGraceFrames: 1
+  _verboseLogging: 0
+  _testMode: 0
+  _testDeviceIds: []
+  _dummyOptions:
+    _loadDelaySeconds: 1
+    _failureRate: 0.5
+    _adDurationSeconds: 3
+    _bannerHeight: 100

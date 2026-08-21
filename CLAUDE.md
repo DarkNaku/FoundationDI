@@ -32,7 +32,7 @@ Unity 프로젝트이므로 CLI 빌드 명령은 없다. **모든 컴파일·테
 - 스크립트 생성/수정 후에는 `read_console`로 **컴파일 에러를 먼저 확인**한다. 컴파일이 끝나야(`editor_state.isCompiling == false`) 새 타입을 쓸 수 있다.
 - 테스트는 Unity Test Framework로 실행한다: UnityMCP의 `run_tests` 사용 (EditMode/PlayMode).
 - 모킹은 **NSubstitute 5.3.0** (`Assets/Packages/`, NuGetForUnity로 관리)을 사용한다.
-- 테스트 코드는 아직 없다. 추가 시 Tests용 asmdef를 만들고 `FoundationDI` 런타임 asmdef와 NSubstitute/NUnit을 참조해야 한다.
+- 테스트는 `Assets/FoundationDI/Tests/`의 `FoundationDI.Tests`(EditMode) asmdef에 있다. `FoundationDI` 런타임 asmdef와 NSubstitute/NUnit을 참조한다.
 
 NuGet 의존성은 **NuGetForUnity**(`Assets/NuGet/`)가 `Assets/packages.config`로 관리하며, `Assets/Packages/`에 풀린다. UPM 의존성은 `Packages/manifest.json`에 있다 (VContainer, MessagePipe, R3, UniTask, Director 등은 git URL로 참조).
 
@@ -62,6 +62,12 @@ NuGet 의존성은 **NuGetForUnity**(`Assets/NuGet/`)가 `Assets/packages.config
   - Output 볼륨 영속화는 `ISoundVolumeStorage` seam(기본 `PlayerPrefsVolumeStorage`).
   - 에디터 도구는 `Assets/FoundationDI/Editor/SoundService/`(IMGUI): Audio Creator / Audio Collection / Output Manager / Settings 창 + 유사 enum PropertyDrawer + MusicZone 인스펙터.
   - 상세: `Assets/FoundationDI/Runtime/Services/SoundService/README.md`.
+- **AdService** (`Services/AdService/`): 광고 네트워크 중립 서비스. AdMob/LevelPlay/AppLovin 중 무엇을 붙이더라도 게임 코드는 `IAdService` 하나로 전면·보상·배너를 다룬다.
+  - **3계층**: `Providers/`(SDK seam, `IAdProvider`/`IFullScreenAdapter`/`IBannerAdapter`) → `Ads/`(정책 계층, `FullScreenAdUnit`/`BannerAdUnit` — 재시도 백오프·보상 래치·자동 재로드·광고제거 게이트) → `AdService`(조립 + 이벤트 합류). 어댑터를 추가해도 정책 계층은 건드리지 않는 것이 설계 원칙.
+  - **`ShowAsync`는 `Awaitable<AdShowResult>`**. `UnityAdDispatcher`가 `[AdService] Runner`(`HideAndDontSave`)를 통해 지연·프레임 대기를 펌프한다. `IAdDispatcher.Post`(메인스레드 마샬링)는 서비스 어디서도 쓰지 않는다 — **SDK 콜백을 메인 스레드로 마샬링하는 책임은 3사 어댑터 구현체에 있다.**
+  - **`AdsRemoved`는 포맷별로 다르게 게이트한다**: 전면·배너는 차단, 보상형은 계속 동작. `IAdRemovalStorage`(기본 `PlayerPrefsAdRemovalStorage`)로 영속화된다.
+  - **현재 Dummy provider만 구현됨** — 3사 실제 어댑터는 각각 별도 계획.
+  - 상세: `Assets/FoundationDI/Runtime/Services/AdService/README.md`.
 
 공통 패턴: 런타임에 리소스를 로드하는 서비스(PoolService, ResourceService 등)는 `Resources.Load<T>()`를 먼저 시도하고 실패 시 `Addressables.LoadAssetAsync<T>().WaitForCompletion()`으로 폴백한 뒤 핸들을 보관해 두었다가 dispose 시 해제한다. SoundService는 `SoundData`가 `AudioClip`을 컴파일 타임 직접 참조로 보유하므로 이 패턴에 해당하지 않는다.
 

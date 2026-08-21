@@ -1,5 +1,6 @@
 using DarkNaku.FoundationDI;
 using FoundationDI.Host;
+using UnityEngine;
 using VContainer;
 using VContainer.Unity;
 
@@ -7,6 +8,9 @@ public class RootLifetimeScope : LifetimeScope
 {
     // 인스펙터에서 Assets/Settings/UIServiceSettings.asset 을 연결한다.
     public UIServiceSettings settings;
+
+    // 인스펙터에서 Assets/Settings/AdServiceSettings.asset 을 연결한다.
+    [SerializeField] private AdServiceSettings _adServiceSettings;
 
     protected override void Configure(IContainerBuilder builder)
     {
@@ -17,6 +21,7 @@ public class RootLifetimeScope : LifetimeScope
         builder.RegisterUIService(settings);
         builder.RegisterHapticService();
         builder.RegisterInitializeService();
+        builder.RegisterAdService(_adServiceSettings);
         builder.RegisterEntryPoint<TestHubBootstrap>();
     }
 }

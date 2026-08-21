@@ -1,0 +1,19 @@
+{
+    "name": "FoundationDI.AppLovin",
+    "rootNamespace": "",
+    "references": [
+        "FoundationDI",
+        "MaxSdk.Scripts"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "FOUNDATIONDI_APPLOVIN"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
