@@ -44,11 +44,16 @@ namespace DarkNaku.FoundationDI
             }
         }
 
-        // 상주화 책임은 서비스가 진다. 루트를 어디서 얻었든(폴백/프리팹) 동일하게 적용한다.
+        // 상주화 책임은 서비스가 진다. 루트를 어디서 얻었든(프리팹/폴백) 동일하게 적용한다.
         private UIRoot CreateRoot()
         {
-            var root = UIRoot.CreateDefault();
+            var prefab = _settings != null ? _settings.RootPrefab : null;
+            var root = prefab != null
+                ? UnityEngine.Object.Instantiate(prefab)
+                : UIRoot.CreateDefault();
+
             UnityEngine.Object.DontDestroyOnLoad(root.GO);
+
             return root;
         }
 
