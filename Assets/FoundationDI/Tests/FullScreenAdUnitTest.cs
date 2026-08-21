@@ -937,4 +937,67 @@ public class FullScreenAdUnitTest
 
         Assert.IsFalse(sut.CanShow, "표시 요청 중(아직 Displayed 전)인데 CanShow가 참이다");
     }
+
+    // ---- 로드 진행 중 가드 ----
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 로드가_진행_중이면_ShowAsync는_NotReady를_반환하되_어댑터에_중복_로드를_요청하지_않는다() =>
+        UniTask.ToCoroutine(async () =>
+    {
+        // AppLovin MAX는 같은 광고 단위에 로드가 진행 중일 때 다시 Load하면 경고를 찍고
+        // 무시한다. 폴링(show → NotReady → 대기 → show)이 매 시도마다 어댑터를 다시
+        // 호출하면 안 된다 — 정책 계층이 진행 중 로드를 스스로 추적해 걸러야 한다.
+        var adapter = new FakeFullScreenAdapter { IsReady = false };
+        var dispatcher = new FakeAdDispatcher();
+        var sut = NewUnit(adapter, dispatcher);
+
+        sut.Load();   // 최초 로드 — 진행 중 상태가 된다
+        var loadCountAfterFirstLoad = adapter.LoadCount;
+
+        var result = await sut.ShowAsync();   // 아직 로드 중인데 폴링
+
+        Assert.AreEqual(AdShowOutcome.NotReady, result.Outcome);
+        Assert.AreEqual(loadCountAfterFirstLoad, adapter.LoadCount,
+                        "로드가 진행 중인데 어댑터에 중복 로드를 요청했다");
+    });
+
+    [Test]
+    public void 로드_성공_후_명시적_Load는_어댑터에_다시_도달한다()
+    {
+        // 진행 중 플래그가 Loaded에서 풀리지 않으면, 성공한 이후의 모든 Load가
+        // 영원히 어댑터를 부르지 못하고 조용히 무시된다.
+        var adapter = new FakeFullScreenAdapter();
+        var dispatcher = new FakeAdDispatcher();
+        var sut = NewUnit(adapter, dispatcher);
+
+        sut.Load();
+        adapter.RaiseLoaded();   // 성공 — 진행 중 플래그가 풀려야 한다
+
+        var loadCountBefore = adapter.LoadCount;
+        sut.Load();
+
+        Assert.AreEqual(loadCountBefore + 1, adapter.LoadCount,
+                        "로드 성공 후 플래그가 풀리지 않아 다음 Load가 어댑터에 도달하지 못했다");
+    }
+
+    [Test]
+    public void 진행_중_플래그가_남아도_어댑터가_준비완료면_다음_Load는_어댑터에_도달한다()
+    {
+        // Loaded 이벤트 없이 어댑터만 준비완료가 되는(플래그를 풀 기회를 놓치는) 방어적
+        // 시나리오. 플래그 하나만으로 가드하면 이 경우 영원히 걸어잠긴다 — RequestLoad가
+        // IsReady도 함께 보는 이유가 이 보험이다.
+        var adapter = new FakeFullScreenAdapter();
+        var dispatcher = new FakeAdDispatcher();
+        var sut = NewUnit(adapter, dispatcher);
+
+        sut.Load();                // 진행 중 플래그 세팅. Loaded는 발화하지 않는다.
+        adapter.IsReady = true;    // Loaded 없이 어댑터만 준비완료가 된 상황을 흉내낸다
+
+        var loadCountBefore = adapter.LoadCount;
+        sut.Load();
+
+        Assert.AreEqual(loadCountBefore + 1, adapter.LoadCount,
+                        "IsReady가 참인데도 진행 중 플래그에 막혀 Load가 어댑터에 도달하지 못했다");
+    }
 }

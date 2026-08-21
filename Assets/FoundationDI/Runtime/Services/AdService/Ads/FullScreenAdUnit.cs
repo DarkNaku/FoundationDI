@@ -22,6 +22,7 @@ namespace DarkNaku.FoundationDI
         private int _retryAttempt;
         private IDisposable _scheduledRetry;
         private bool _isDisposed;
+        private bool _isLoadInFlight;
 
         private bool _isCoolingDown;
         private IDisposable _scheduledCooldown;
@@ -81,6 +82,20 @@ namespace DarkNaku.FoundationDI
             // 시도 후 곧장 에러 로그로 끝나 버린다.
             _retryAttempt = 0;
             CancelScheduledRetry();
+            RequestLoad();
+        }
+
+        // 어댑터 로드 호출은 반드시 이 한 곳을 거친다. 로드가 이미 진행 중이면 건너뛴다 —
+        // AppLovin MAX 등은 같은 광고 단위에 중복 Load를 걸면 경고를 찍고 무시하는데,
+        // show → NotReady → 대기 → show로 폴링하는 호출 패턴에서 매 시도마다 어댑터를
+        // 다시 부르면 그 경고가 반복된다. IsReady를 함께 보는 이유: 어댑터가 Loaded를
+        // 발화시키지 않고도 준비 상태가 될 가능성에 대비한 보험이다 — 플래그 하나만 보면
+        // Loaded가 안 오는 순간 영원히 걸어잠긴다.
+        private void RequestLoad()
+        {
+            if (_isLoadInFlight && !_adapter.IsReady) return;
+
+            _isLoadInFlight = true;
             _adapter.Load();
         }
 
@@ -139,12 +154,14 @@ namespace DarkNaku.FoundationDI
 
         private void OnLoaded()
         {
+            _isLoadInFlight = false;
             _retryAttempt = 0;
             Loaded?.Invoke();
         }
 
         private void OnLoadFailed(AdError error)
         {
+            _isLoadInFlight = false;
             ScheduleRetry(error);
         }
 
@@ -163,7 +180,9 @@ namespace DarkNaku.FoundationDI
             _scheduledRetry = _dispatcher.Delay(delay, () =>
             {
                 _scheduledRetry = null;
-                if (!_isDisposed) _adapter.Load();
+                // Load()가 아니라 RequestLoad()를 직접 부른다 — 재시도는 _retryAttempt를
+                // 리셋하면 안 되므로 Load()를 거치지 않는다(그 이유는 위 Load() 주석 참고).
+                if (!_isDisposed) RequestLoad();
             });
         }
 
