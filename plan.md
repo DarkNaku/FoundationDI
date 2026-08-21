@@ -6,6 +6,23 @@
 
 ---
 
+## 완료: MessageService — MessagePipe 의존성 제거
+
+MessagePipe 래퍼를 폐기하고 `Dictionary<Type, Delegate>` 기반 자체 구현으로 교체한다.
+`IMessageService : IDisposable` (동기 `Publish` / `IDisposable` 반환 `Subscribe`)만 남기고,
+비동기 API와 `where T : struct` 제약은 제거한다. 메인 스레드 전제.
+
+- [x] 구독한 핸들러가 발행된 메시지를 받고 다른 타입은 받지 않는다
+- [x] 같은 타입에 여러 핸들러를 구독하면 모두 호출된다
+- [x] 구독을 Dispose하면 더 이상 수신하지 않고 중복 Dispose도 안전하다
+- [x] 발행 중 구독/해제가 일어나도 현재 발행은 스냅샷으로 완주한다
+- [x] 핸들러가 예외를 던져도 나머지 핸들러가 호출된다
+- [x] 서비스를 Dispose하면 모든 구독이 해제되고 이후 사용은 거부된다
+- [x] null 핸들러 구독은 거부된다
+- [x] RegisterMessageService로 IMessageService가 싱글턴 등록된다
+
+---
+
 ## 완료: ADService — 광고 네트워크 중립 서비스
 
 세부: `docs/superpowers/specs/2026-08-20-adservice-design.md`

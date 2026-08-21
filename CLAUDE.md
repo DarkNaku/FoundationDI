@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 프로젝트 개요
 
-FoundationDI는 DarkNaku의 DI(의존성 주입) 기반 Unity 게임 개발 파운데이션 패키지입니다. VContainer를 코어로 MessagePipe, R3, UniTask, Addressables를 조합한 공통 서비스 계층을 제공합니다.
+FoundationDI는 DarkNaku의 DI(의존성 주입) 기반 Unity 게임 개발 파운데이션 패키지입니다. VContainer를 코어로 R3, UniTask, Addressables를 조합한 공통 서비스 계층을 제공합니다.
 
 - **Unity 버전**: 6000.3.17f1 (`ProjectSettings/ProjectVersion.txt`)
 - **배포 형태**: UPM 패키지 (`Assets/FoundationDI/` = `com.darknaku.foundationdi`). 즉 이 리포지토리는 패키지 개발용 호스트 프로젝트이며, 재사용 코드는 모두 `Assets/FoundationDI/` 안에 있어야 한다. `Assets/Scripts/`는 패키지를 시험하는 호스트 프로젝트 전용 코드다.
@@ -34,7 +34,7 @@ Unity 프로젝트이므로 CLI 빌드 명령은 없다. **모든 컴파일·테
 - 모킹은 **NSubstitute 5.3.0** (`Assets/Packages/`, NuGetForUnity로 관리)을 사용한다.
 - 테스트는 `Assets/FoundationDI/Tests/`의 `FoundationDI.Tests`(EditMode) asmdef에 있다. `FoundationDI` 런타임 asmdef와 NSubstitute/NUnit을 참조한다.
 
-NuGet 의존성은 **NuGetForUnity**(`Assets/NuGet/`)가 `Assets/packages.config`로 관리하며, `Assets/Packages/`에 풀린다. UPM 의존성은 `Packages/manifest.json`에 있다 (VContainer, MessagePipe, R3, UniTask, Director 등은 git URL로 참조).
+NuGet 의존성은 **NuGetForUnity**(`Assets/NuGet/`)가 `Assets/packages.config`로 관리하며, `Assets/Packages/`에 풀린다. UPM 의존성은 `Packages/manifest.json`에 있다 (VContainer, R3, UniTask, Director 등은 git URL로 참조).
 
 ## 아키텍처
 
@@ -44,7 +44,11 @@ NuGet 의존성은 **NuGetForUnity**(`Assets/NuGet/`)가 `Assets/packages.config
 ### 핵심 서비스 (`Assets/FoundationDI/Runtime/`)
 모든 런타임 코드는 단일 asmdef `FoundationDI`(`Runtime/FoundationDI.asmdef`)에 들어간다.
 
-- **MessageService** (`Services/MessageService.cs`): MessagePipe 래퍼. `IObjectResolver`로 `IPublisher<T>`/`ISubscriber<T>`를 지연 해석해 `ConcurrentDictionary`에 캐싱. 동기/비동기(UniTask) pub-sub 제공.
+- **MessageService** (`Services/MessageService/`): 외부 라이브러리 없는 인-메모리 pub-sub. 타입을 채널로 삼는 `Dictionary<Type, Delegate>` 하나가 전부다. 공개 API는 `Publish<T>`/`Subscribe<T>`/`Dispose` 셋뿐이며 메시지 타입에 제약이 없다.
+  - `Subscribe`는 `IDisposable`을 반환한다. R3의 `AddTo(this)`로 MonoBehaviour 수명에 묶을 수 있다.
+  - 발행은 `GetInvocationList()` 스냅샷으로 진행하므로 핸들러 안에서 구독/해제해도 안전하고, 핸들러별 try/catch로 예외를 격리한다.
+  - 메인 스레드 전제(잠금 없음). DI 등록은 `builder.RegisterMessageService()`.
+  - 상세: `Assets/FoundationDI/Runtime/Services/MessageService/README.md`.
 - **UIService** (`Services/UIService/`): uGUI 기반 UI 시스템. 네임스페이스 `DarkNaku.FoundationDI`.
   - **빌더 API**: `_ui.Page<TPresenter>()` / `Popup<TPresenter>()` / `Overlay<TPresenter>()` → 인스턴스 즉시 반환 + Show 자동 enqueue (`.Show()` 별도 호출 불필요) → 같은 프레임 내 `.WithParams(params)` / `.OnAfterShow(...)` / `.WithTransition(...)` / `.WithOverlay(...)` 동기 체인.
   - **표시 모드**: Presenter 타입으로 컴파일 타임 고정 — `UIPagePresenter<TView>`(단일 교체) / `UIPopupPresenter<TView>`(LIFO 스택) / `UIOverlayPresenter<TView>`(Popup 기준 Above/Below 상주). View 공통 기반 `UIView : MonoBehaviour`.
