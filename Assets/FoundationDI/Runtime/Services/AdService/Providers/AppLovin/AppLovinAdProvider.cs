@@ -65,9 +65,11 @@ namespace DarkNaku.FoundationDI
             // 준다 — `args[@"keepInBackground"] = @([adFormat isFullscreenAd]);`
             // (Assets/MaxSdk/AppLovin/Plugins/iOS/MAUnityAdManager.m:1005, didPayRevenueForAd).
             // 즉 **전면/보상의 OnAdRevenuePaidEvent는 기본값 그대로 두면 백그라운드(네이티브)
-            // 스레드에서 발화된다.** 배너 수익은 영향받지 않는다(배너는 keepInBackground를
-            // 안 준다). Android는 이 리포지토리에서 JVM 툴체인 없이 .aar 역디컴파일로만
-            // 확인했지만 같은 리터럴(`keepInBackground`, `isMainThread`)과
+            // 스레드에서 발화된다.** (같은 패턴이 크리에이티브 ID 생성 이벤트(:1077)와 CMP 에러
+            // 경로(:2022, 항상 참)에도 쓰인다 — "전면/보상 수익에서만"이 아니라 그게 우리가 실제로
+            // 구독하는 유일한 영향받는 이벤트라는 뜻이다.) 배너 수익은 영향받지 않는다(배너는
+            // keepInBackground를 안 준다). Android는 이 리포지토리에서 JVM 툴체인 없이 .aar
+            // 역디컴파일로만 확인했지만 같은 리터럴(`keepInBackground`, `isMainThread`)과
             // `BackgroundCallbackProxy` 전달 경로가 나와 iOS와 동일하다고 간주한다.
             //
             // `ShouldInvokeInBackground`는 `MaxSdkBase.InvokeEventsOnUnityMainThread`
@@ -80,6 +82,34 @@ namespace DarkNaku.FoundationDI
             // 돌린다). 이 세팅 덕분에 IAdDispatcher.Post로 다시 감싸지 않아도 되는 원래
             // 주장은 유효하다 — 다만 "MAX가 알아서 마샬링한다"가 아니라 "이 provider가
             // MAX에게 마샬링하라고 명시적으로 지시했기 때문에" 유효한 것이다.
+            //
+            // **이 세팅은 공짜가 아니다.** MAUnityAdManager.m은 전면 광고(interstitial/
+            // appOpen/rewarded, isFullscreenAd 가드)가 뜰 때 didDisplayAd에서
+            // UnityPause(YES)를 부르고(:780) 닫힐 때 didHideAd에서 UnityPause(NO)로 되돌린다
+            // (:853). (AdView인 배너/MREC도 확장/축소 시 같은 패턴을 쓴다 —
+            // didExpandAd:889/didCollapseAd:928 — 이건 우리 배너 어댑터와 무관하다. 배너는
+            // keepInBackground를 안 받으므로 이 문단의 위험 자체가 없다.) Unity가 멈춰 있는
+            // 동안 MaxEventExecutor.Update()도 돌지 않는다 — 즉 여기서 큐로 강제로 밀어 넣은
+            // 전면/보상 수익 이벤트는 **광고가 떠 있는 동안엔 절대 도착하지 않고, 광고가 닫혀
+            // Unity가 재개된 뒤에야** 드레인된다. 그 사이
+            // 프로세스가 죽으면(디바이스 전환, OS가 백그라운드에서 강제 종료 등) 그 임프레션은
+            // 영영 사라진다 — 재전송되지 않는다. 벤더가 애초에 keepInBackground를 켠 이유가
+            // 정확히 이걸 막기 위해서였다: "Forward the event in background for fullscreen ads
+            // so that the user gets the callback even while the ad is playing."
+            // (MAUnityAdManager.m:1079, didGenerateCreativeIdentifier 바로 위 — 수익 콜백에도
+            // 같은 근거가 적용된다). 그래도 이 트레이드를 택한 이유: 백그라운드 스레드로 오는
+            // 콜백은 이 seam의 계약(메인 스레드 발화)을 어기고, 그 위의 정책 계층
+            // (FullScreenAdUnit._activePlacement 등 non-volatile 상태)과 게임 쪽 분석
+            // 구독자(PlayerPrefs/Time.*/UI 접근이 흔함) 둘 다 메인 스레드를 전제한다 — 잘못
+            // 쓰면 스레드마다 다른 실패 모드(경합, 크래시, MaxSdkLogger로 조용히 삼켜지는
+            // UnityException)가 매 임프레션마다 발생한다. 프로세스가 광고 표시 도중 죽는
+            // 드문 경우에 임프레션 하나를 잃는 편이, 매 수익 콜백마다 스레드 문제를 감수하는
+            // 것보다 낫다고 판단했다.
+            //
+            // **이 필드는 프로세스 전역 정적 상태다.** 같은 프로세스 안에서 MAX를 직접(우리
+            // 어댑터를 거치지 않고) 쓰는 다른 코드가 있다면, 그 코드의 콜백 스레드 동작도
+            // 조용히 이 설정을 물려받는다 — 우리가 이 provider 하나만을 위해 세팅한다고
+            // 생각해도 실제로는 앱 전체에 적용된다.
             MaxSdkBase.InvokeEventsOnUnityMainThread = true;
 
             // 테스트 기기 ID/verbose 로깅은 InitializeSdk() 호출 전에 세팅해야 반영된다.
@@ -179,13 +209,28 @@ namespace DarkNaku.FoundationDI
             // 초기화 도중 Dispose되는 것은 흔한 일이다(예: 부트스트랩 취소). 여기서 완료시켜
             // 주지 않으면 AdService.InitializeAsync가 영원히 돌아오지 않고, _initWaiters에
             // 편승한 모든 대기자가 함께 멈춘다(FullScreenAdUnit.Dispose가 대기 중인
-            // ShowAsync를 Failed로 깨우는 것과 같은 이유).
-            foreach (var pending in _pendingInitializations)
-            {
-                MaxSdkCallbacks.OnSdkInitializedEvent -= pending.Handler;
-                pending.Source.TrySetResult(false);
-            }
+            // ShowAsync를 Failed로 깨우는 것과 같은 이유 — 그쪽은 Complete()를 try, 구독
+            // 해제를 finally에 두어 이어달리기가 던진 예외가 정리를 건너뛰지 못하게 한다).
+            //
+            // 구독 해제 + 리스트 비우기를 완료 통지(TrySetResult)보다 먼저 끝낸다.
+            // TrySetResult는 대기 중이던 이어달리기를 동기적으로 재개시킬 수 있는데, 그
+            // 이어달리기가 예외를 던지면 — 만약 구독 해제와 통지를 한 루프에 같이 뒀다면 —
+            // 아직 통지하지 못한 나머지 항목의 구독 해제까지 통째로 건너뛰어져, 이미 Dispose된
+            // provider를 정적 이벤트가 계속 참조하는 채로 남는다. 그래서 먼저 스냅샷을 뜬 뒤
+            // 전부 구독 해제 + Clear()로 정리를 확정 짓고, 그 다음에야 통지를 시작한다. 통지
+            // 자체도 항목별로 try/catch해 한 이어달리기의 예외가 나머지 대기자의 통지를 막지
+            // 않게 한다(UnityAdDispatcher.SafeInvoke와 같은 이유).
+            var pending = new List<(Action<MaxSdkBase.SdkConfiguration> Handler, AwaitableCompletionSource<bool> Source)>(
+                _pendingInitializations);
+
+            foreach (var p in pending) MaxSdkCallbacks.OnSdkInitializedEvent -= p.Handler;
             _pendingInitializations.Clear();
+
+            foreach (var p in pending)
+            {
+                try { p.Source.TrySetResult(false); }
+                catch (Exception e) { Debug.LogException(e); }
+            }
         }
     }
 }

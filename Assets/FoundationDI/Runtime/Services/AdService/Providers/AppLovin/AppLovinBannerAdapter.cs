@@ -3,9 +3,12 @@ using UnityEngine;
 
 namespace DarkNaku.FoundationDI
 {
-    // 배너 광고 단위 하나를 나타내는 얇은 MAX 래퍼. BannerAdUnit(정책 계층)이 Show()를 부를
-    // 때마다 이 어댑터를 새로 만들므로(팩토리 패턴, Ads/BannerAdUnit.cs 참고), 생성자에서
-    // 곧바로 CreateBanner를 건다.
+    // 배너 광고 단위 하나를 나타내는 얇은 MAX 래퍼. BannerAdUnit(정책 계층)의
+    // EnsureAdapter()는 어댑터가 없을 때만(최초 Show(), 또는 Destroy() 이후 다시 Show()할
+    // 때) 새로 만들고, 그 사이의 Hide()/Show() 반복에서는 기존 인스턴스를 그대로 재사용한다
+    // (Ads/BannerAdUnit.cs 참고) — "Show()를 부를 때마다 새로 만든다"가 아니다. 그래서
+    // 생성자에서 CreateBanner를 한 번만 걸면 되고, 아래 Show()는 이미 만들어진 배너를
+    // 다시 보이기만 한다.
     public class AppLovinBannerAdapter : IBannerAdapter
     {
         private readonly string _adUnitId;
@@ -48,6 +51,16 @@ namespace DarkNaku.FoundationDI
                 Debug.LogWarning($"[AdService] AppLovin 배너 어댑터는 BannerOptions.Size={options.Size}를 " +
                                  "구현하지 않았다 — 표준/적응형 배너로만 표시된다. 이 크기가 필요하면 " +
                                  "MaxSdk.CreateMRec(전용 MREC ad unit)을 쓰는 별도 어댑터/경로가 필요하다.");
+            }
+            else if (options.Size == BannerSize.Adaptive && !options.UseAdaptive)
+            {
+                // BannerOptions는 같은 개념(적응형 여부)을 Size(Adaptive 값 하나)와
+                // UseAdaptive(별도 bool) 두 필드로 표현할 수 있는데, MAX 어댑터는 실제로
+                // AdViewConfiguration.IsAdaptive에 매핑되는 UseAdaptive만 읽는다. Size를
+                // Adaptive로 두고 UseAdaptive를 꺼두면 인스펙터 상으로는 "적응형"인데
+                // 실제로는 고정 크기 배너가 뜬다 — 조용히 무시하지 않고 알린다.
+                Debug.LogWarning("[AdService] BannerOptions.Size=Adaptive인데 UseAdaptive=false다. " +
+                                 "AppLovin 어댑터는 UseAdaptive만 읽으므로 실제로는 고정 크기 배너가 표시된다.");
             }
 
             MaxSdk.CreateBanner(_adUnitId, configuration);
