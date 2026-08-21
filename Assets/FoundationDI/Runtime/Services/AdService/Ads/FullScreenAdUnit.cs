@@ -61,11 +61,14 @@ namespace DarkNaku.FoundationDI
         public bool IsReady => !_isDisposed && _adapter.IsReady;
 
         // 지금 ShowAsync를 부르면 실제로 표시될지: 해제 안 됐고, AdsRemoved에 막히지 않았고,
-        // 쿨다운 중이 아니고, 준비됐다. "이미 표시 중이다"는 여기 포함하지 않는다 —
-        // ShowAsync 재진입 가드가 별도로 다루는 다른 종류의 상태이기 때문이다.
+        // 쿨다운 중이 아니고, 이미 표시 요청이 진행 중이지 않고(요청~표시 사이 포함), 준비됐다.
+        // _showCompletion을 넣는 이유: "지금 부르면 실제로 표시가 시작될지"라는 계약을 어기면
+        // 안 되기 때문이다 — 재진입 자체는 ShowAsync가 Failed(-2)로 별도 진단하지만, 그건
+        // "왜 안 됐는지"의 문제고 CanShow는 "될지 안 될지"의 문제라 여기선 진행 중도 거짓이어야 한다.
         public bool CanShow => !_isDisposed
                                && !(_blockWhenAdsRemoved && _adsRemoved())
                                && !_isCoolingDown
+                               && _showCompletion == null
                                && _adapter.IsReady;
 
         public void Load()

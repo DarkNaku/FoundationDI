@@ -840,4 +840,101 @@ public class FullScreenAdUnitTest
         Assert.DoesNotThrow(() => dispatcher.Advance(200f),
                             "취소되지 않은 쿨다운 콜백이 해제된 유닛을 건드려 예외를 던졌다");
     }
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 쿨다운은_표시_요청이_아니라_실제_표시_시점에_시작된다() => UniTask.ToCoroutine(async () =>
+    {
+        // StartCooldown이 ShowAsync(요청 시점)가 아니라 OnDisplayed(표시 시점)에서 불려야 한다.
+        // 표시에 실패한(유저가 광고를 보지 못한) 쇼는 쿨다운을 걸면 안 된다 — 요청 시점에
+        // 걸었다면 이 테스트가 실패한다.
+        var adapter = new FakeFullScreenAdapter();
+        var dispatcher = new FakeAdDispatcher();
+        var sut = NewUnit(adapter, dispatcher, AdFormat.Interstitial, cooldownSeconds: 120f);
+
+        adapter.RaiseLoaded();
+        var pending = sut.ShowAsync();
+
+        LogAssert.Expect(UnityEngine.LogType.Warning,
+                         new System.Text.RegularExpressions.Regex("표시 실패"));
+        adapter.RaiseDisplayFailed(new AdError(7, "no ad to show"));
+        await pending;
+
+        adapter.RaiseLoaded();   // 표시 실패 후 자동 재로드가 끝났다고 가정한다
+
+        Assert.IsTrue(sut.CanShow, "표시되지 않은(Displayed 없이 실패한) 광고인데 쿨다운이 걸렸다");
+    });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 쿨다운_중에는_준비_여부보다_먼저_Blocked를_반환하고_로드를_트리거하지_않는다() =>
+        UniTask.ToCoroutine(async () =>
+    {
+        // ShowAsync 가드 순서: 쿨다운 검사가 !IsReady 검사보다 먼저다. 순서가 뒤바뀌면
+        // 쿨다운 중에도 NotReady로 오판해 불필요한 Load()가 트리거된다 — 낭비되는 SDK 요청이다.
+        var adapter = new FakeFullScreenAdapter();
+        var dispatcher = new FakeAdDispatcher();
+        var sut = NewUnit(adapter, dispatcher, AdFormat.Interstitial, rewardGraceFrames: 0, cooldownSeconds: 120f);
+
+        adapter.RaiseLoaded();
+        var pending = sut.ShowAsync();
+        adapter.RaiseDisplayed();     // 쿨다운 타이머 예약
+        adapter.RaiseClosed();        // 유예 0 — 즉시 확정 + 자동 재로드. IsReady는 다시 거짓이 된다.
+        await pending;
+
+        var loadCountBeforeReShow = adapter.LoadCount;
+
+        var result = await sut.ShowAsync();   // 아직 준비 안 됐지만(IsReady == false) 쿨다운이 우선이어야 한다
+
+        Assert.AreEqual(AdShowOutcome.Blocked, result.Outcome,
+                        "쿨다운 중인데 NotReady로 새어나갔다(가드 순서가 뒤집혔다)");
+        Assert.AreEqual(loadCountBeforeReShow, adapter.LoadCount,
+                        "쿨다운 중인데도 NotReady 분기의 Load()가 트리거돼 SDK 요청이 낭비됐다");
+    });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 표시_중_재진입은_쿨다운보다_먼저_Failed로_진단된다() => UniTask.ToCoroutine(async () =>
+    {
+        // ShowAsync 가드 순서: _showCompletion(이미 표시 중) 검사가 쿨다운 검사보다 먼저다.
+        // 재진입은 "이미 표시 중"이라는 더 정확한 진단(Failed(-2))을 받아야 하고, 쿨다운으로
+        // 오진단(Blocked)되면 안 된다. 기존 재진입 테스트는 cooldownSeconds: 0을 쓰므로
+        // 이 순서를 검증하지 못한다.
+        var adapter = new FakeFullScreenAdapter();
+        var dispatcher = new FakeAdDispatcher();
+        var sut = NewUnit(adapter, dispatcher, AdFormat.Interstitial, cooldownSeconds: 120f);
+
+        adapter.RaiseLoaded();
+        var first = sut.ShowAsync();
+        adapter.RaiseDisplayed();   // 쿨다운 타이머가 예약된다 — 아직 닫히지 않아 표시 중이기도 하다
+
+        var second = await sut.ShowAsync();
+
+        Assert.AreEqual(AdShowOutcome.Failed, second.Outcome,
+                        "표시 중 재진입이 쿨다운 탓에 Blocked로 오진단됐다(가드 순서가 뒤집혔다)");
+        Assert.AreEqual(-2, second.Error.Code);
+
+        // 정리
+        LogAssert.Expect(UnityEngine.LogType.Warning,
+                         new System.Text.RegularExpressions.Regex("표시 실패"));
+        adapter.RaiseDisplayFailed(new AdError(0, "cleanup"));
+        await first;
+    });
+
+    [Test]
+    public void CanShow은_표시_요청부터_표시_사이에도_거짓이다()
+    {
+        // CanShow는 "지금 부르면 실제로 표시가 시작될지"를 답해야 한다. 이미 표시 요청이
+        // 진행 중(아직 Displayed 전)인데 CanShow가 참이면, 그 계약을 어기는 것이다.
+        var adapter = new FakeFullScreenAdapter();
+        var dispatcher = new FakeAdDispatcher();
+        var sut = NewUnit(adapter, dispatcher, AdFormat.Interstitial);
+
+        adapter.RaiseLoaded();
+        Assert.IsTrue(sut.CanShow, "로드 직후에는 표시 가능해야 한다");
+
+        _ = sut.ShowAsync();   // 아직 Displayed 전 — 이미 쇼가 시작된 상태다
+
+        Assert.IsFalse(sut.CanShow, "표시 요청 중(아직 Displayed 전)인데 CanShow가 참이다");
+    }
 }

@@ -388,25 +388,40 @@ public class AdServiceTest
                                 NewOptions(interstitialCooldownSeconds: 120f), new FakeRemovalStorage());
         await sut.InitializeAsync();
 
+        // 전면: 표시하고 닫는다 — 쿨다운이 걸려야 한다.
         provider.InterstitialAdapter.RaiseLoaded();
         var interstitialPending = sut.Interstitial.ShowAsync();
         provider.InterstitialAdapter.RaiseDisplayed();
-
-        Assert.IsFalse(sut.Interstitial.CanShow, "설정된 쿨다운이 전면광고에 적용되지 않았다");
-
-        provider.RewardedAdapter.RaiseLoaded();
-        var rewardedPending = sut.Rewarded.ShowAsync();
-        provider.RewardedAdapter.RaiseDisplayed();
-
-        Assert.IsTrue(sut.Rewarded.CanShow, "전면 쿨다운이 보상형에도 적용됐다");
-
-        // 정리
         provider.InterstitialAdapter.RaiseClosed();
         dispatcher.TickFrames(1);
         await interstitialPending;
 
+        provider.InterstitialAdapter.RaiseLoaded();   // 닫힘 후 자동 재로드가 끝났다고 가정한다
+        Assert.IsFalse(sut.Interstitial.CanShow, "설정된 쿨다운이 전면광고에 적용되지 않았다");
+
+        // 보상: 표시하고 닫는다 — 전면과 같은 쿨다운 설정값을 받았다면 여기도 막혀야 한다.
+        provider.RewardedAdapter.RaiseLoaded();
+        var rewardedPending = sut.Rewarded.ShowAsync();
+        provider.RewardedAdapter.RaiseDisplayed();
         provider.RewardedAdapter.RaiseClosed();
         dispatcher.TickFrames(1);
         await rewardedPending;
+
+        provider.RewardedAdapter.RaiseLoaded();
+        Assert.IsTrue(sut.Rewarded.CanShow, "전면 쿨다운이 보상형에도 적용됐다");
+
+        // 매출 보호: bool 하나가 아니라 실제로 두 번째 보상형 표시가 진행되는지 본다.
+        // 쿨다운이 새어들어왔다면 여기서 Show가 호출되지 않고 즉시 Blocked로 완료된다.
+        var showCountBefore = provider.RewardedAdapter.ShowCount;
+        var secondRewardedPending = sut.Rewarded.ShowAsync();
+
+        Assert.AreEqual(showCountBefore + 1, provider.RewardedAdapter.ShowCount,
+                        "전면 쿨다운이 보상형의 두 번째 표시를 막았다 — 매출 손실");
+
+        // 정리
+        LogAssert.Expect(UnityEngine.LogType.Warning,
+                         new System.Text.RegularExpressions.Regex("표시 실패"));
+        provider.RewardedAdapter.RaiseDisplayFailed(new AdError(0, "cleanup"));
+        await secondRewardedPending;
     });
 }
