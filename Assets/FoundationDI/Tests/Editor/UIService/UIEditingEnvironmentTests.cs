@@ -100,4 +100,28 @@ public class UIEditingEnvironmentTests
 
         Assert.IsNull(UIEditingEnvironment.ResolveSelectedRootPrefabAsset());
     }
+
+    // Unity는 저장된 적 없는(path가 빈) 씬이 열려 있으면 씬을 추가로 만들지 못한다.
+    // 이 조건을 경로 선택 전에 감지하지 못하면, 사용자가 저장 위치를 고른 뒤에야
+    // InvalidOperationException으로 터진다.
+
+    [Test]
+    public void 저장된_씬만_열려있으면_차단하지_않는다()
+    {
+        Assert.IsFalse(UIEditingEnvironment.IsBlockedByUnsavedScene(
+            new[] { "Assets/Scenes/Main.unity", "Assets/Scenes/Sub.unity" }));
+    }
+
+    [Test]
+    public void 저장된_적_없는_씬이_하나라도_열려있으면_차단한다()
+    {
+        Assert.IsTrue(UIEditingEnvironment.IsBlockedByUnsavedScene(
+            new[] { "Assets/Scenes/Main.unity", "" }));
+    }
+
+    [Test]
+    public void 열린_씬이_하나도_없으면_차단하지_않는다()
+    {
+        Assert.IsFalse(UIEditingEnvironment.IsBlockedByUnsavedScene(new string[0]));
+    }
 }
