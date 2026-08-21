@@ -4,6 +4,15 @@ using UnityEngine.TestTools;
 
 public class AdProviderFactoryTest
 {
+    // AdProviderRegistry는 프로세스 전역 정적 상태다. 어떤 테스트가 등록해 두고 정리하지
+    // 않으면 다른 테스트(특히 실행 순서가 다른 CI)가 그 잔재를 물려받는다. 매 테스트
+    // 앞뒤로 리셋해 이 클래스의 테스트가 순서와 무관하게 통과하도록 한다.
+    [SetUp]
+    public void SetUp() => AdProviderRegistry.Reset();
+
+    [TearDown]
+    public void TearDown() => AdProviderRegistry.Reset();
+
     [Test]
     public void SDK_심볼이_없는_provider를_요청하면_경고와_함께_Dummy로_폴백한다()
     {
@@ -175,11 +184,78 @@ public class AdProviderFactoryTest
         // 없다 — Resolve가 심볼 없이는 Dummy 외의 값을 절대 돌려주지 않기 때문이다. Build를
         // internal로 분리해 "이미 사용 가능하다고 판단된" 상태를 직접 주입해 default 분기
         // (에러 로그 + Dummy 대체)를 검증한다.
+        //
+        // 이 테스트는 레지스트리에 아무 것도 등록돼 있지 않은 상태를 전제로 한다 — SetUp이
+        // 매 테스트 전에 AdProviderRegistry.Reset()을 호출해 이 전제를 보장한다.
         var factory = new AdProviderFactory(new FakeAdDispatcher());
 
         LogAssert.Expect(UnityEngine.LogType.Error, new System.Text.RegularExpressions.Regex("AdMob"));
         var provider = factory.Build(AdProviderType.AdMob, DummyAdOptions.Default);
 
         Assert.IsInstanceOf<DummyAdProvider>(provider);
+    }
+
+    [Test]
+    public void 레지스트리에_등록된_생성자가_있으면_Build는_그_생성자가_만든_provider를_반환한다()
+    {
+        var factory = new AdProviderFactory(new FakeAdDispatcher());
+        var stub = new FakeAdProvider();
+        AdProviderRegistry.Register(AdProviderType.AdMob, context => stub);
+
+        var provider = factory.Build(AdProviderType.AdMob, DummyAdOptions.Default);
+
+        Assert.AreSame(stub, provider);
+    }
+
+    [Test]
+    public void 같은_타입을_다시_등록하면_이전_생성자_대신_새_생성자를_사용한다()
+    {
+        // 도메인 리로드나 에디터의 반복적인 [RuntimeInitializeOnLoadMethod] 실행으로
+        // 같은 타입이 두 번 등록되는 상황이 실제로 재현 가능하다. 예외를 던지거나
+        // 중복 등록되면 둘 다 문제다 — 조용히 교체돼야 한다.
+        var factory = new AdProviderFactory(new FakeAdDispatcher());
+        var first = new FakeAdProvider { Name = "First" };
+        var second = new FakeAdProvider { Name = "Second" };
+        AdProviderRegistry.Register(AdProviderType.AdMob, context => first);
+        AdProviderRegistry.Register(AdProviderType.AdMob, context => second);
+
+        var provider = factory.Build(AdProviderType.AdMob, DummyAdOptions.Default);
+
+        Assert.AreSame(second, provider);
+    }
+
+    [Test]
+    public void 레지스트리_생성자는_팩토리가_주입받은_dispatcher를_그대로_전달받는다()
+    {
+        // 생성자가 엉뚱한 dispatcher를 받으면 결과 provider의 타이머(재시도 백오프,
+        // 쿨다운)가 절대 발화하지 않는다 — 런타임까지는 드러나지 않는 결함이라 여기서
+        // 반드시 확인해야 한다.
+        var dispatcher = new FakeAdDispatcher();
+        var factory = new AdProviderFactory(dispatcher);
+        IAdDispatcher received = null;
+        AdProviderRegistry.Register(AdProviderType.AdMob, context =>
+        {
+            received = context.Dispatcher;
+            return new FakeAdProvider();
+        });
+
+        factory.Build(AdProviderType.AdMob, DummyAdOptions.Default);
+
+        Assert.AreSame(dispatcher, received);
+    }
+
+    [Test]
+    public void Build에_Dummy를_넘기면_레지스트리에_Dummy_생성자가_등록되어_있어도_무시하고_내장_Dummy를_쓴다()
+    {
+        // Dummy 분기는 레지스트리를 아예 보지 않는다 — 내장 경로가 실수로 오버라이드
+        // 가능해지면 안 된다.
+        var factory = new AdProviderFactory(new FakeAdDispatcher());
+        var registered = new FakeAdProvider();
+        AdProviderRegistry.Register(AdProviderType.Dummy, context => registered);
+
+        var provider = factory.Build(AdProviderType.Dummy, DummyAdOptions.Default);
+
+        Assert.IsInstanceOf<DummyAdProvider>(provider);
+        Assert.AreNotSame(registered, provider);
     }
 }

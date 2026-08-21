@@ -11,8 +11,9 @@ namespace DarkNaku.FoundationDI
             _dispatcher = dispatcher;
         }
 
-        // SDK가 설치되고 스크립팅 심볼이 정의됐는지. 3사 어댑터를 추가할 때
-        // 여기와 Create만 손대면 된다.
+        // SDK가 설치되고 스크립팅 심볼이 정의됐는지. 3사 어댑터를 추가할 때 여기에 심볼
+        // 분기를 추가한다. Build 쪽은 손댈 필요 없다 — 옵셔널 어셈블리가
+        // AdProviderRegistry.Register로 자신을 등록하면 Build가 그걸 조회한다.
         public static bool IsAvailable(AdProviderType type)
         {
             switch (type)
@@ -74,19 +75,29 @@ namespace DarkNaku.FoundationDI
         // 직접 넣어 default 분기를 검증할 수 있게 한다.
         internal IAdProvider Build(AdProviderType effective, DummyAdOptions dummyOptions)
         {
-            // 3사 어댑터가 추가되면 여기에 case가 늘어난다.
-            switch (effective)
+            // Dummy는 항상 내장 구현이다 — 레지스트리를 보지 않는다. 그래야 누가 실수로(또는
+            // 악의적으로) Dummy에 creator를 등록해도 이 경로가 오버라이드되지 않는다.
+            if (effective == AdProviderType.Dummy)
             {
-                case AdProviderType.Dummy:
-                    return new DummyAdProvider(_dispatcher, dummyOptions);
-                default:
-                    // IsAvailable이 참(SDK 심볼 있음)이라 Resolve가 요청 그대로를 돌려줬는데
-                    // 여기에 아직 분기가 없는 경우. 조용히 Dummy로 대체하면 이 상태를 아무도
-                    // 알아채지 못한다 — 반드시 에러로 남긴다.
-                    Debug.LogError($"[AdService] {effective} provider는 사용 가능하다고 판단됐지만 " +
-                                  "AdProviderFactory.Build에 아직 구현되지 않았다. Dummy provider로 대체한다.");
-                    return new DummyAdProvider(_dispatcher, dummyOptions);
+                return new DummyAdProvider(_dispatcher, dummyOptions);
             }
+
+            // 3사 어댑터(FoundationDI.AppLovin 등)는 FoundationDI를 참조하는 별도
+            // 옵셔널 어셈블리라 여기서 직접 new할 수 없다(참조 방향이 반대라 순환 참조가
+            // 된다). 대신 그 어셈블리가 AdProviderRegistry.Register로 스스로를 등록해
+            // 두었기를 기대하고 여기서 조회만 한다.
+            if (AdProviderRegistry.TryResolve(effective, out var creator))
+            {
+                return creator(new AdProviderCreationContext(_dispatcher));
+            }
+
+            // IsAvailable이 참(SDK 심볼 있음)이라 Resolve가 요청 그대로를 돌려줬는데
+            // 레지스트리에 creator가 없는 경우. "심볼은 정의됐지만 아무도 등록하지 않았다"는
+            // 옵셔널 어셈블리가 아예 없거나 등록을 빠뜨렸다는 뜻이다. 조용히 Dummy로
+            // 대체하면 이 상태를 아무도 알아채지 못한다 — 반드시 에러로 남긴다.
+            Debug.LogError($"[AdService] {effective} provider는 사용 가능하다고 판단됐지만 " +
+                          "AdProviderFactory.Build에 아직 구현되지 않았다. Dummy provider로 대체한다.");
+            return new DummyAdProvider(_dispatcher, dummyOptions);
         }
     }
 }
