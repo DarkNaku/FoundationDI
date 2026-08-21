@@ -45,6 +45,6 @@ public class UIElementTemplatesTests
     {
         var code = UIElementTemplates.Presenter("MyGame.UI", "Shop", UIElementMode.Page, "UI/Shop");
 
-        StringAssert.Contains("protected internal override void OnInitialize()", code);
+        StringAssert.Contains("protected override void OnInitialize()", code);
     }
 }
