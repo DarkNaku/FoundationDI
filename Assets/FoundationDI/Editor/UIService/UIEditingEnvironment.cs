@@ -1,6 +1,8 @@
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace DarkNaku.FoundationDI.Editor
 {
@@ -18,6 +20,21 @@ namespace DarkNaku.FoundationDI.Editor
         [MenuItem("Tools/FoundationDI/UI/Setup Prefab Editing Environment", false, 61)]
         private static void SetupFromMenu()
         {
+            // 경로를 고르게 하기 전에 먼저 막는다 — 그러지 않으면 사용자가 저장 위치를 정한 뒤에야
+            // Build()에서 InvalidOperationException으로 터진다.
+            if (IsBlockedByUnsavedScene())
+            {
+                EditorUtility.DisplayDialog("UI Editing Environment",
+                    "저장된 적 없는 씬이 열려 있어 편집 환경 씬을 만들 수 없습니다.\n\n" +
+                    "Unity는 이 상태에서 씬을 추가로 만들지 못합니다(\"Cannot create a new scene " +
+                    "additively with an untitled scene unsaved\").\n\n" +
+                    "열려 있는 씬을 저장하거나(File > Save As...) 이미 저장된 씬을 연 뒤 다시 실행하세요.\n" +
+                    "PlayMode 테스트를 돌린 직후에도 이 상태가 됩니다.",
+                    "확인");
+
+                return;
+            }
+
             var rootPrefab = PromptForRootPrefab();
 
             if (rootPrefab == null) return;
@@ -43,6 +60,31 @@ namespace DarkNaku.FoundationDI.Editor
         {
             Clear();
             Debug.Log("[FoundationDI] UI 프리팹 편집 환경 지정을 해제했습니다.");
+        }
+
+        /// <summary>
+        /// 열린 씬 중 하나라도 저장된 적이 없으면(경로가 비면) true.
+        /// Unity는 그 상태에서 <see cref="EditorSceneManager.NewScene"/>의 Additive 생성을 거부한다.
+        /// 사용자의 미저장 씬을 대신 저장하거나 버릴 수는 없으므로 감지해서 안내만 한다.
+        /// 판정 조건은 "수정됨"이 아니라 "한 번도 저장된 적 없음"이다 — 깨끗한 untitled 씬도 막힌다.
+        /// </summary>
+        internal static bool IsBlockedByUnsavedScene(IReadOnlyList<string> loadedScenePaths)
+        {
+            for (int i = 0; i < loadedScenePaths.Count; i++)
+            {
+                if (string.IsNullOrEmpty(loadedScenePaths[i])) return true;
+            }
+
+            return false;
+        }
+
+        private static bool IsBlockedByUnsavedScene()
+        {
+            var paths = new string[SceneManager.sceneCount];
+
+            for (int i = 0; i < paths.Length; i++) paths[i] = SceneManager.GetSceneAt(i).path;
+
+            return IsBlockedByUnsavedScene(paths);
         }
 
         public static void Assign(SceneAsset scene) => EditorSettings.prefabUIEnvironment = scene;
