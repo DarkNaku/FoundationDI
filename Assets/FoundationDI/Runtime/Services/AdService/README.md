@@ -242,10 +242,16 @@ public string Placement { get; }  // 게임이 ShowAsync에 넘긴 배치명
 ## 5. 3사 어댑터를 추가하는 방법
 
 정책 계층(`FullScreenAdUnit`/`BannerAdUnit`/`AdService`)은 건드리지 않습니다. 새 SDK는
-`FoundationDI` 어셈블리 **바깥**에, `FoundationDI`와 SDK 어셈블리를 함께 참조하는
-별도의 옵셔널 asmdef로 추가합니다. `FoundationDI`는 SDK가 없는 프로젝트에서도 컴파일돼야
-하는데, 만약 `Providers/<SDK>/`를 `FoundationDI` 어셈블리 안에 두면 그 asmdef가 없는
-SDK 어셈블리를 참조하게 되어 SDK 미설치 프로젝트에서 컴파일 에러가 됩니다.
+`FoundationDI`와 SDK 어셈블리를 함께 참조하는 별도의 옵셔널 asmdef로 추가합니다.
+`FoundationDI`는 SDK가 없는 프로젝트에서도 컴파일돼야 하는데, 만약 `Providers/<SDK>/`를
+`FoundationDI` 어셈블리 **자체**(즉 `FoundationDI.asmdef`가 이 폴더까지 포함) 안에 두면 그
+어셈블리가 없는 SDK 어셈블리를 참조하게 되어 SDK 미설치 프로젝트에서 컴파일 에러가 됩니다 —
+그래서 옵셔널 asmdef가 자기 폴더를 `FoundationDI` 어셈블리에서 도려내야 합니다. 그 폴더 자체는
+`Assets/FoundationDI/Runtime/Services/AdService/Providers/<SDK>/`처럼 패키지 안에 둬도
+됩니다(AppLovin 어댑터가 그렇습니다) — 패키지가 SDK와 함께 배포되는 걸 의도했다면 그게
+맞는 위치입니다. 패키지와 별도로 관리하고 싶은 SDK라면 asmdef를 패키지 폴더 바깥, SDK 설치
+위치에 가깝게 둘 수도 있습니다. 어느 쪽이든 핵심은 "옵셔널 asmdef가 자기 폴더를 도려낸다"는
+것이지 물리적 위치 자체가 아닙니다.
 
 1. SDK를 `Packages/manifest.json` 또는 `.unitypackage`로 설치한다.
 2. `Player Settings > Scripting Define Symbols`에 `FOUNDATIONDI_ADMOB` 같은 심볼을 정의한다
@@ -254,22 +260,50 @@ SDK 어셈블리를 참조하게 되어 SDK 미설치 프로젝트에서 컴파�
    `FoundationDI`와 SDK 어셈블리를 넣고, `defineConstraints`에 1번에서 정의한 심볼(예:
    `FOUNDATIONDI_ADMOB`)을 넣는다. **`defineConstraints`가 충족되지 않으면 Unity는 이
    asmdef를 통째로 건너뛴다** — SDK 어셈블리가 프로젝트에 없어도 참조 자체가 에러가 되지
-   않는다(이 동작은 실제로 확인됨). 이 asmdef는 `Assets/FoundationDI/Runtime/` 바깥, SDK
-   설치 위치에 가까운 곳에 둔다 — `FoundationDI` 패키지 폴더 안에 넣으면 배포 시 SDK
-   유무와 무관하게 항상 딸려나간다.
+   않는다(이 동작은 실제로 확인됨). 위치는 패키지 안(`Providers/<SDK>/`, AppLovin 어댑터가
+   이 경로)과 패키지 바깥(SDK 설치 위치에 가까운 곳) 둘 다 유효합니다 — `FOUNDATIONDI_<SDK>`
+   심볼이 꺼진 프로젝트에서는 위치와 무관하게 asmdef 자체가 스킵되므로 "SDK 없이도 컴파일된다"는
+   보장에 영향이 없습니다. 패키지와 함께 SDK까지 배포하고 싶다면 안쪽을, SDK를 프로젝트마다
+   따로 설치/관리하게 하고 싶다면 바깥쪽을 고릅니다.
 4. 그 안에 `IAdProvider`/`IFullScreenAdapter`/`IBannerAdapter`를 구현하는
    `AdMobProvider`/`AdMobFullScreenAdapter`/`AdMobBannerAdapter`(예시)를 작성한다.
    구현 시 `docs/superpowers/specs/2026-08-20-adservice-design.md`의 **"3사 매핑표"**(6절)를
    대조하며 작성하고, 실제 SDK의 필드명이 표와 어긋나면 표를 갱신한다.
-5. **SDK 콜백을 메인 스레드로 마샬링한다.** `IFullScreenAdapter`/`IBannerAdapter`는 이벤트가
-   메인 스레드에서 발화된다고 전제하는 계약입니다(`IFullScreenAdapter.cs`/`IBannerAdapter.cs`
-   인터페이스 주석 참고) — `AdService`도 `Ads/` 정책 계층도 이걸 대신 해주지 않습니다.
-   AdMob/LevelPlay/AppLovin 모두 네이티브 스레드에서 콜백을 올릴 수 있으므로, SDK 콜백
-   핸들러 안에서 이벤트를 직접 발화시키지 말고 `_dispatcher.Post(() => Loaded?.Invoke())`처럼
-   `IAdDispatcher.Post`로 감싸 메인 스레드 큐에 넣은 뒤 발화시킵니다. Dummy provider가 이
-   단계를 생략하는 이유는 `DummyAdCanvas`/`DummyAdTicker`가 처음부터 Unity 메인 스레드
-   (`MonoBehaviour.Update`)에서만 콜백을 만들어내기 때문입니다 — 실제 SDK 어댑터는 이
-   전제가 없습니다.
+5. **SDK 콜백이 메인 스레드에서 오는지 직접 확인하고, 결과에 맞게 행동한다.**
+   `IFullScreenAdapter`/`IBannerAdapter`는 이벤트가 메인 스레드에서 발화된다고 전제하는
+   계약입니다(`IFullScreenAdapter.cs`/`IBannerAdapter.cs` 인터페이스 주석 참고) — `AdService`도
+   `Ads/` 정책 계층도 이걸 대신 해주지 않습니다. **"SDK가 알아서 마샬링해줄 것"이라고 가정하지
+   마세요 — SDK마다 답이 다르고, 한 SDK 안에서도 이벤트마다 다를 수 있습니다.** 벤더 SDK의
+   실제 소스(디컴파일이라도)를 읽고 어느 쪽인지 확인한 뒤, 다음 둘 중 하나를 하세요:
+   - **SDK가 마샬링하지 않으면**: 콜백 핸들러 안에서 이벤트를 직접 발화시키지 말고
+     `_dispatcher.Post(() => Loaded?.Invoke())`처럼 `IAdDispatcher.Post`로 감싸 메인 스레드
+     큐에 넣은 뒤 발화시킵니다.
+     Dummy provider가 이 단계를 생략하는 이유는 `DummyAdCanvas`/`DummyAdTicker`가 처음부터
+     Unity 메인 스레드(`MonoBehaviour.Update`)에서만 콜백을 만들어내기 때문입니다 — 실제 SDK
+     어댑터는 이 전제가 없습니다.
+   - **SDK가 이미 마샬링한다면**: 다시 감싸지 마세요 — 이미 메인 스레드인 콜백에 프레임
+     하나만큼의 지연을 매번 얹는 것뿐입니다. 단, "이 SDK가 마샬링한다"는 결론을 **모든
+     이벤트에** 일괄 적용하지 말고, 이벤트마다 개별적으로 확인하세요.
+
+   **AppLovin MAX의 실제 사정** (구현하며 확인함, `Providers/AppLovin/AppLovinAdProvider.cs`
+   참고): MAX Unity 플러그인은 대부분의 콜백을 `MaxEventExecutor`
+   (`Assets/MaxSdk/Scripts/MaxEventExecutor.cs`)로 메인 스레드 큐잉하지만 전부는 아닙니다.
+   `MaxSdkCallbacks`의 `InvokeEvent` 헬퍼들은 네이티브가 실어 보낸 `keepInBackground` 플래그가
+   참이면 `MaxEventExecutor`를 건너뛰고 콜백 스레드에서 그 자리에 곧바로 이벤트를 발화시킵니다
+   (`MaxSdkCallbacks.cs:965~1053`). iOS 플러그인은 **전면/보상의 수익 콜백**
+   (`OnAdRevenuePaidEvent`)에서 정확히 이 플래그를 참으로 채웁니다
+   (`Assets/MaxSdk/AppLovin/Plugins/iOS/MAUnityAdManager.m:1005`,
+   `args[@"keepInBackground"] = @([adFormat isFullscreenAd]);`) — 배너 수익은 영향받지
+   않습니다. 즉 **같은 SDK, 같은 이벤트 이름(`OnAdRevenuePaidEvent`)인데도 포맷에 따라
+   스레드가 다릅니다.** `MaxSdkBase.InvokeEventsOnUnityMainThread`(공개 `bool?` 세터)를
+   `true`로 설정하면 이 우회를 막고 모든 콜백이 `MaxEventExecutor`를 거치게 강제할 수
+   있습니다 — AppLovin 어댑터는 `InitializeAsync`의 모든 진입 경로(이미 초기화된 경우 포함)
+   맨 앞에서 이걸 세팅해, `_dispatcher.Post` 없이도 안전하게 감쌉니다. **이 문제는 Unity
+   에디터에서 재현되지 않습니다** — `MaxSdkUnityEditor`는 메인 스레드 코루틴으로만 콜백을
+   만들어내므로, 에디터에서 통과하는 코드가 디바이스에서 백그라운드 스레드 예외로 죽을 수
+   있습니다. Android는 이 리포지토리에 JVM 툴체인이 없어 `.aar` 역디컴파일로만 확인했지만
+   `keepInBackground`/`isMainThread` 리터럴과 `BackgroundCallbackProxy` 전달 경로가 나와
+   iOS와 동일한 것으로 간주했습니다.
 6. `AdProviderFactory.Build`는 옵셔널 어셈블리를 직접 `new`할 수 없다(참조 방향이 반대라
    순환 참조가 된다). 대신 `Providers/AdProviderRegistry.cs`(`FoundationDI` 어셈블리 소속)에
    creator를 등록한다. 옵셔널 어셈블리 안에 `[RuntimeInitializeOnLoadMethod]` 정적 메서드를
@@ -296,6 +330,13 @@ SDK 어셈블리를 참조하게 되어 SDK 미설치 프로젝트에서 컴파�
 
 `FullScreenAdUnit`을 수정해야만 어댑터가 붙는다면 seam 설계가 잘못됐다는 신호입니다 — 멈추고
 재검토합니다.
+
+**Unity 에디터 한계(AppLovin 어댑터로 확인됨)**: `MaxSdkUnityEditor.GetBannerLayout`은
+디바이스 레이아웃 없이 항상 `Rect.zero`를 돌려줍니다. `AppLovinBannerAdapter`는 배너 높이를
+이 API로 읽으므로, **에디터에서는 `IBannerAdapter.Height`/`HeightChanged`가 절대 0이 아닌
+값을 보고하지 않습니다.** 실기(스모크 테스트 포함)에서만 실제 높이를 검증할 수 있습니다 —
+에디터에서 배너가 뜨는데 높이가 계속 0이어도 그 자체는 결함이 아닙니다. SDK별 어댑터를
+새로 붙일 때도 "에디터 스텁이 실제 값을 주는가"를 먼저 확인하세요.
 
 ---
 
