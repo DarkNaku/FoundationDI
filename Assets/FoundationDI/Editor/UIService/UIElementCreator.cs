@@ -90,6 +90,12 @@ namespace DarkNaku.FoundationDI.Editor
 
             var prefabPath = request.PrefabPath;
 
+            // 스크립트·프리팹은 이미 만들어졌다 — 아래 프리팹 모드 진입이 지연되거나(드물게) 아예
+            // 일어나지 않더라도 사용자가 콘솔로 성공 여부를 알 수 있도록 여기서 동기적으로 남긴다.
+            Debug.Log(
+                $"[FoundationDI] '{request.Name}' {request.Mode} 생성 완료: {prefabPath} " +
+                "(프리팹 모드가 자동으로 열리지 않으면 프리팹을 더블클릭하세요.)");
+
             // [DidReloadScripts] 시점에는 에디터 창/도킹 시스템이 아직 완전히 자리잡지 않아
             // Selection 변경이나 AssetDatabase.OpenAsset을 그 자리에서 호출하면 프리팹 모드가
             // 조용히 열리지 않을 수 있다. 다음 에디터 업데이트로 미뤄야 안정적으로 진입한다.
@@ -109,8 +115,6 @@ namespace DarkNaku.FoundationDI.Editor
 
                 // 격리 프리팹 모드로 진입 → UI 편집 환경이 적용된 상태로 바로 작업 가능.
                 AssetDatabase.OpenAsset(freshPrefab);
-
-                Debug.Log($"[FoundationDI] '{request.Name}' {request.Mode} 생성 완료: {prefabPath}");
             };
         }
 
