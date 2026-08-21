@@ -77,7 +77,9 @@ public sealed class UIRoot : MonoBehaviour
 GameObject에 현재와 동일한 계층·설정을 조립하고, 부착된 `UIRoot` 컴포넌트를 반환한다
 (기준 해상도 1920x1080). 제로 설정으로도 동작하고 기존 테스트/샘플이 깨지지 않는다.
 이 팩토리는 3.2의 프리팹 생성 메뉴가 **동일하게 재사용**하므로, 코드 기본값과 프리팹이
-어긋날 수 없다.
+어긋날 수 없다. `CreateDefault()`는 `DontDestroyOnLoad`를 적용하지 않는다 — 에디터에서
+프리팹을 조립할 때도 쓰이기 때문이다. 상주화 책임은 `UIService`가 가지며, 프리팹 경로든
+폴백 경로든 얻은 루트에 대해 동일하게 적용한다.
 
 **깨지는 것 / 마이그레이션**: `UIServiceSettings.ReferenceResolution`이 사라진다.
 기존 사용자는 루트 프리팹을 생성(3.2 ①)해 Settings에 연결하고, 기준 해상도를 그 프리팹의
@@ -88,10 +90,10 @@ GameObject에 현재와 동일한 계층·설정을 조립하고, 부착된 `UIR
 
 새 폴더 `Assets/FoundationDI/Editor/UIService/` (기존 `FoundationDI.Editor` asmdef에 합류).
 
-**① `DarkNaku/UIService/Create UI Root Prefab...`**
+**① `Tools/FoundationDI/UI/Create UI Root Prefab...`**
 `UIRoot.CreateDefault()`로 계층을 만들고 4개 레이어 참조를 자동 연결해 프리팹으로 저장한다.
 
-**② `DarkNaku/UIService/Setup Prefab Editing Environment`**
+**② `Tools/FoundationDI/UI/Setup Prefab Editing Environment`**
 Settings에 연결된 루트 프리팹 인스턴스 하나만 든 씬(`UIEditingEnvironment.unity`)을
 생성하고 `EditorSettings.prefabUIEnvironment`에 지정한다. 해제용 메뉴도 함께 제공한다.
 프로젝트 설정을 변경하므로 **자동 실행 없이 명시적 메뉴 실행만** 한다.
@@ -108,12 +110,12 @@ Settings에 연결된 루트 프리팹 인스턴스 하나만 든 씬(`UIEditing
 
 ### 3.3 에디터 — UI 요소 생성 마법사
 
-**메뉴** `DarkNaku/UIService/Create UI Element...` — 이름과 모드(Page/Popup/Overlay)만
+**메뉴** `Tools/FoundationDI/UI/Create UI Element...` — 이름과 모드(Page/Popup/Overlay)만
 입력받고, 결과 경로는 미리보기로 표시한다.
 
 **프로젝트 기본값**은 `ScriptableSingleton<T>` +
 `[FilePath("ProjectSettings/FoundationDIUIEditor.asset", FilePathAttribute.Location.ProjectFolder)]`
-에 저장하고 `Project Settings/DarkNaku/UIService`에 노출한다. EditorPrefs가 아니라
+에 저장하고 `Project Settings/FoundationDI/UI`에 노출한다. EditorPrefs가 아니라
 ProjectSettings인 이유는 팀원 간 공유·커밋이 되어야 규약이 유지되기 때문이다.
 
 필드: 스크립트 루트 / 네임스페이스 / 프리팹 루트.
