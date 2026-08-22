@@ -20,8 +20,8 @@ Firebase Analytics를 기본으로 하되 MMP(AppsFlyer/Adjust/Singular/Airbridg
 - [x] CollectionEnabled가 false면 어떤 provider에도 전달되지 않는다
 - [x] CollectionEnabled를 바꾸면 모든 provider에 전파되고 같은 값 재설정은 전파되지 않는다
 - [x] Dispose하면 모든 provider가 Dispose되고 이후 호출은 무시된다
-- [ ] AnalyticsProviderFactory는 creator가 없는 provider만 건너뛰고 나머지를 생성한다
-- [ ] RegisterAnalyticsService로 IAnalyticsService가 싱글턴 등록된다
+- [x] AnalyticsProviderFactory는 creator가 없는 provider만 건너뛰고 나머지를 생성한다
+- [x] RegisterAnalyticsService로 IAnalyticsService가 싱글턴 등록된다
 
 구현만 있고 단위 테스트가 없는 항목(스모크로 검증): Debug provider, Firebase 어댑터.
 
