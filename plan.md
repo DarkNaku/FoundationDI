@@ -17,9 +17,9 @@ Firebase Analytics를 기본으로 하되 MMP(AppsFlyer/Adjust/Singular/Airbridg
 - [x] provider 하나가 초기화에 실패해도 초기화는 성공하고 실패한 provider에는 전달되지 않는다
 - [x] 모든 provider가 초기화에 실패하면 false를 반환하고 버퍼는 유지된다
 - [x] InitializeAsync는 재진입해도 초기화를 두 번 시작하지 않는다
-- [ ] CollectionEnabled가 false면 어떤 provider에도 전달되지 않는다
-- [ ] CollectionEnabled를 바꾸면 모든 provider에 전파되고 같은 값 재설정은 전파되지 않는다
-- [ ] Dispose하면 모든 provider가 Dispose되고 이후 호출은 무시된다
+- [x] CollectionEnabled가 false면 어떤 provider에도 전달되지 않는다
+- [x] CollectionEnabled를 바꾸면 모든 provider에 전파되고 같은 값 재설정은 전파되지 않는다
+- [x] Dispose하면 모든 provider가 Dispose되고 이후 호출은 무시된다
 - [ ] AnalyticsProviderFactory는 creator가 없는 provider만 건너뛰고 나머지를 생성한다
 - [ ] RegisterAnalyticsService로 IAnalyticsService가 싱글턴 등록된다
 

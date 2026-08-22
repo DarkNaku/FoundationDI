@@ -33,6 +33,7 @@ namespace DarkNaku.FoundationDI
         private bool _initializing;
 
         private bool _collectionEnabled;
+        private bool _disposed;
 
         public AnalyticsService(IReadOnlyList<IAnalyticsProvider> providers, AnalyticsServiceOptions options)
         {
@@ -45,14 +46,29 @@ namespace DarkNaku.FoundationDI
 
         public bool IsInitialized { get; private set; }
 
+        // 수집이 꺼져 있으면 버퍼에도 넣지 않는다. 동의 전에 쌓아 뒀다가 동의 시점에
+        // 소급 전송하는 것은 게이트를 두는 의미 자체를 없앤다.
+        private bool CanCollect => !_disposed && _collectionEnabled;
+
+        // false면 모든 로깅이 호출 즉시 드롭되고, provider에도 SDK 레벨로 끄라고 알린다.
+        // 후자가 없으면 게이트가 사실상 무력하다 — Firebase 같은 SDK는 우리가 LogEvent를
+        // 부르지 않아도 세션·화면 이벤트를 자동 수집하기 때문이다.
         public bool CollectionEnabled
         {
             get => _collectionEnabled;
-            set => _collectionEnabled = value;
+            set
+            {
+                if (_disposed) return;
+                if (_collectionEnabled == value) return;
+
+                _collectionEnabled = value;
+                Fanout(p => p.SetCollectionEnabled(value));
+            }
         }
 
         public Awaitable<bool> InitializeAsync()
         {
+            if (_disposed) return Completed(false);
             if (IsInitialized) return Completed(true);
 
             if (_initializing)
@@ -85,6 +101,8 @@ namespace DarkNaku.FoundationDI
 
         public void SetUserId(string userId)
         {
+            if (!CanCollect) return;
+
             if (!IsInitialized)
             {
                 _pendingUserId = userId;
@@ -97,6 +115,8 @@ namespace DarkNaku.FoundationDI
 
         public void SetUserProperty(string name, string value)
         {
+            if (!CanCollect) return;
+
             if (string.IsNullOrEmpty(name))
             {
                 Debug.LogWarning("[AnalyticsService] 이름이 비어 있는 유저 프로퍼티는 무시한다.");
@@ -114,6 +134,10 @@ namespace DarkNaku.FoundationDI
 
         public void Dispose()
         {
+            if (_disposed) return;
+
+            _disposed = true;
+
             foreach (var provider in _providers)
             {
                 try
@@ -194,6 +218,8 @@ namespace DarkNaku.FoundationDI
         // 초기화 전이면 큐에 담고, 초기화 후면 즉시 팬아웃한다.
         private void Dispatch(Action<IAnalyticsProvider> action)
         {
+            if (!CanCollect) return;
+
             if (!IsInitialized)
             {
                 _pendingEvents.Enqueue(action);
@@ -207,6 +233,9 @@ namespace DarkNaku.FoundationDI
         // 이벤트가 나가야 하기 때문이다 — 순서가 뒤집히면 첫 이벤트들이 익명으로 집계된다.
         private void Flush()
         {
+            var enabled = _collectionEnabled;
+            Fanout(p => p.SetCollectionEnabled(enabled));
+
             if (_hasPendingUserId)
             {
                 var userId = _pendingUserId;

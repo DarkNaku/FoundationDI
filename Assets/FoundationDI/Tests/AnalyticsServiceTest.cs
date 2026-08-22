@@ -12,6 +12,10 @@ public class AnalyticsServiceTest
     private static AnalyticsServiceOptions NewOptions(bool collectionEnabled = true) =>
         new(collectionEnabled);
 
+    // 초기화와 수집상태 전파는 어느 테스트에서든 배경 소음이다. 실제로 실린 데이터만 남긴다.
+    private static bool IsPayloadCall(string call) =>
+        !call.StartsWith("Initialize") && !call.StartsWith("SetCollectionEnabled");
+
     [Test]
     public void 컬렉션_초기화가_파라미터의_순서와_타입을_보존한다()
     {
@@ -90,9 +94,10 @@ public class AnalyticsServiceTest
 
         await sut.InitializeAsync();
 
+        // 이 테스트가 보는 것은 이벤트의 순서다. 초기화·수집상태 전파는 관심사가 아니다.
         CollectionAssert.AreEqual(
             new[] { "LogEvent:first", "LogPurchase:gem_pack", "LogEvent:second" },
-            provider.Calls.Where(c => !c.StartsWith("Initialize")).ToList());
+            provider.Calls.Where(IsPayloadCall).ToList());
     });
 
     [UnityTest]
@@ -130,7 +135,7 @@ public class AnalyticsServiceTest
 
         await sut.InitializeAsync();
 
-        var calls = provider.Calls.Where(c => !c.StartsWith("Initialize")).ToList();
+        var calls = provider.Calls.Where(IsPayloadCall).ToList();
         var userIdIndex = calls.IndexOf("SetUserId:player-a");
         var propertyIndex = calls.IndexOf("SetUserProperty:cohort=2026-08");
         var eventIndex = calls.IndexOf("LogEvent:tutorial_start");
@@ -212,5 +217,81 @@ public class AnalyticsServiceTest
         // 이미 초기화된 뒤의 호출은 즉시 true다.
         Assert.IsTrue(await sut.InitializeAsync());
         Assert.AreEqual(1, provider.InitializeCount);
+    });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator CollectionEnabled가_false면_어떤_provider에도_전달되지_않는다() =>
+        UniTask.ToCoroutine(async () =>
+    {
+        var provider = new FakeAnalyticsProvider();
+        var sut = new AnalyticsService(new IAnalyticsProvider[] { provider },
+                                       NewOptions(collectionEnabled: false));
+
+        sut.LogEvent("before_init");
+        sut.SetUserId("player-a");
+
+        await sut.InitializeAsync();
+
+        sut.LogEvent("after_init");
+        sut.SetUserProperty("cohort", "2026-08");
+        sut.LogPurchase(new PurchaseInfo("gem_pack", 4.99, "USD"));
+
+        Assert.AreEqual(0, provider.Events.Count, "수집이 꺼졌는데 이벤트가 전달됐다");
+        Assert.AreEqual(0, provider.UserIds.Count, "수집이 꺼졌는데 유저 ID가 전달됐다");
+        Assert.AreEqual(0, provider.Properties.Count, "수집이 꺼졌는데 유저 프로퍼티가 전달됐다");
+        Assert.AreEqual(0, provider.Purchases.Count, "수집이 꺼졌는데 구매가 전달됐다");
+
+        // SDK는 우리가 LogEvent를 부르지 않아도 세션·화면 이벤트를 자동 수집한다.
+        // 초기 수집 상태를 전파하지 않으면 게이트가 사실상 무력하다.
+        CollectionAssert.AreEqual(new[] { false }, provider.CollectionFlags,
+                                  "초기 수집 상태가 provider에 전파되지 않았다");
+    });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator CollectionEnabled를_바꾸면_모든_provider에_전파되고_같은_값_재설정은_전파되지_않는다() =>
+        UniTask.ToCoroutine(async () =>
+    {
+        var a = new FakeAnalyticsProvider("A");
+        var b = new FakeAnalyticsProvider("B");
+        var sut = new AnalyticsService(new IAnalyticsProvider[] { a, b }, NewOptions());
+
+        await sut.InitializeAsync();
+
+        CollectionAssert.AreEqual(new[] { true }, a.CollectionFlags);
+
+        sut.CollectionEnabled = false;
+        sut.CollectionEnabled = false;
+        sut.CollectionEnabled = true;
+
+        CollectionAssert.AreEqual(new[] { true, false, true }, a.CollectionFlags);
+        CollectionAssert.AreEqual(new[] { true, false, true }, b.CollectionFlags);
+    });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator Dispose하면_모든_provider가_Dispose되고_이후_호출은_무시된다() =>
+        UniTask.ToCoroutine(async () =>
+    {
+        var a = new FakeAnalyticsProvider("A");
+        var b = new FakeAnalyticsProvider("B");
+        var sut = new AnalyticsService(new IAnalyticsProvider[] { a, b }, NewOptions());
+
+        await sut.InitializeAsync();
+
+        sut.Dispose();
+        sut.Dispose();
+
+        Assert.AreEqual(1, a.DisposeCount, "A가 해제되지 않았거나 중복 해제됐다");
+        Assert.AreEqual(1, b.DisposeCount, "B가 해제되지 않았거나 중복 해제됐다");
+
+        sut.LogEvent("after_dispose");
+        sut.SetUserId("player-a");
+        sut.CollectionEnabled = false;
+
+        Assert.AreEqual(0, a.Events.Count, "해제 후 이벤트가 전달됐다");
+        Assert.AreEqual(0, a.UserIds.Count, "해제 후 유저 ID가 전달됐다");
+        Assert.IsFalse(await sut.InitializeAsync(), "해제 후 초기화가 성공으로 보고됐다");
     });
 }
