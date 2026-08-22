@@ -86,6 +86,16 @@ NuGet 의존성은 **NuGetForUnity**(`Assets/NuGet/`)가 `Assets/packages.config
   - **현재 Debug/Firebase provider만 구현됨.** Firebase는 `FOUNDATIONDI_FIREBASE` 심볼이 걸린 `FoundationDI.Firebase` asmdef(precompiled DLL 참조)에 있다. **`google-services.json`이 없어 실전송은 미검증.**
   - 상세: `Assets/FoundationDI/Runtime/Services/AnalyticsService/README.md`.
 
+- **IAPService** (`Services/IAPService/`): 모바일 인앱 구매 서비스. Google Play / App Store의 소모성·비소모성 상품을 `IIapService` 하나로 다룬다.
+  - **3계층**: `Providers/`(SDK seam, `IIapProvider`) → `IapService`(정책: 검증→지급→확정→소유 기록→이벤트) → `IIapService`(게임 표면). AdService와 같은 구조.
+  - **`IIapFulfillment`이 핵심 seam**: 지급이 `true`를 반환해야 `ConfirmPurchase`가 호출된다. 저장 실패 시 확정하지 않아 스토어가 다음 실행에 재전달한다. **신규 구매·재전달·복원이 전부 이 한 메서드로 들어온다.** 미등록 시 `AutoConfirmFulfillment`로 폴백.
+  - **`PurchaseAsync`는 `Awaitable<IapPurchaseResult>`**. 결과는 `Purchased/Restored/AlreadyOwned/UserCancelled/Deferred/NotReady/InvalidReceipt/Failed` 8종이며 `IsSuccess`가 앞 셋을 묶는다. 스토어 UI가 모달이라 동시 구매는 하나만 허용한다(두 번째는 `NotReady`).
+  - **iOS 로컬 검증은 불가능하다** — Unity IAP 5는 StoreKit 2를 쓰고 OS가 이미 검증한다. 로컬 검증은 Google Play 전용(`CrossPlatformValidator` + Tangle)이며 `GooglePlayTangle`은 Assembly-CSharp에 생성되므로 리플렉션으로 찾는다. Tangle이 없으면 경고 후 통과(개발 빌드가 막히지 않게).
+  - **Unity IAP는 옵셔널 어셈블리**: `FOUNDATIONDI_UNITYIAP` 심볼이 걸린 `FoundationDI.UnityIAP`. 코어는 `com.unity.purchasing`를 참조하지 않는다. 에디터에서는 `ForceDummyInEditor`로 Dummy provider가 전체 플로우를 대신한다.
+  - **AdService/AnalyticsService 연동은 수동 배선** — `_ads.AdsRemoved = _iap.IsOwned(...)`, `_iap.Purchased += p => _analytics.LogPurchase(...)`.
+  - 상품 상수는 `Tools/FoundationDI/IAP/Generate Product Constants`가 `IapProducts` 클래스로 생성한다(SoundService의 Generated/asmref 패턴).
+  - 상세: `Assets/FoundationDI/Runtime/Services/IAPService/README.md`.
+
 공통 패턴: 런타임에 리소스를 로드하는 서비스(PoolService, ResourceService 등)는 `Resources.Load<T>()`를 먼저 시도하고 실패 시 `Addressables.LoadAssetAsync<T>().WaitForCompletion()`으로 폴백한 뒤 핸들을 보관해 두었다가 dispose 시 해제한다. SoundService는 `SoundData`가 `AudioClip`을 컴파일 타임 직접 참조로 보유하므로 이 패턴에 해당하지 않는다.
 
 ### 네임스페이스
