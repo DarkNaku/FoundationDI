@@ -1,6 +1,12 @@
 # plan.md
 
-## 활성 계획: AnalyticsService — 다중 분석/MMP 팬아웃 서비스
+## 활성 계획: 없음
+
+다음 작업이 정해지면 여기에 테스트 목록을 채운다.
+
+---
+
+## 완료: AnalyticsService — 다중 분석/MMP 팬아웃 서비스
 
 Firebase Analytics를 기본으로 하되 MMP(AppsFlyer/Adjust/Singular/Airbridge)를 추가해도
 게임 코드는 `IAnalyticsService` API를 한 번만 호출하면 등록된 모든 provider로 브로드캐스트된다.

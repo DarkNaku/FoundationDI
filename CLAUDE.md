@@ -75,6 +75,16 @@ NuGet 의존성은 **NuGetForUnity**(`Assets/NuGet/`)가 `Assets/packages.config
   - **`AdsRemoved`는 포맷별로 다르게 게이트한다**: 전면·배너는 차단, 보상형은 계속 동작. `IAdRemovalStorage`(기본 `PlayerPrefsAdRemovalStorage`)로 영속화된다.
   - **현재 Dummy provider만 구현됨** — 3사 실제 어댑터는 각각 별도 계획.
   - 상세: `Assets/FoundationDI/Runtime/Services/AdService/README.md`.
+- **AnalyticsService** (`Services/AnalyticsService/`): 다중 분석/MMP 팬아웃 서비스. Firebase Analytics를 기본으로 하되 AppsFlyer/Adjust/Singular/Airbridge를 몇 개 붙이든 게임 코드는 `IAnalyticsService` API를 **한 번만** 호출하면 등록된 모든 provider로 브로드캐스트된다.
+  - **라우팅 규칙 없음** — 무엇을 무시할지는 각 어댑터가 결정한다. 정책(버퍼·예외 격리·수집 게이트)은 `AnalyticsService`가 혼자 갖고, 어댑터는 번역만 한다.
+  - **시맨틱 메서드는 최소 세트**: `LogEvent`(자유형) + `SetUserId` + `SetUserProperty` + `LogPurchase` + `LogAdImpression` + `CollectionEnabled`. 5사 전부가 예약 이름이나 전용 API를 가진 것만 시맨틱으로 둔다(Adjust는 이벤트 이름이 아니라 대시보드 발급 토큰을 요구하므로 자유형 문자열로는 매핑 불가).
+  - **`AnalyticsParams`는 컬렉션 초기화 구문**: `new AnalyticsParams { { "level", 12L } }`. `Add` 오버로드가 string/long/double 셋뿐이라 Firebase가 런타임에 조용히 버리는 타입이 컴파일 타임에 걸린다.
+  - **버퍼**: `InitializeAsync` 완료 전 이벤트는 순서 보존 큐(상한 없음), 유저 상태는 latest-wins 슬롯. flush 순서는 수집상태 → 유저상태 → 이벤트.
+  - **`AnalyticsProviderType`은 `[Flags]`** — AdService와 달리 provider가 동시에 여럿이다. creator가 없는 provider만 건너뛰고 Dummy로 폴백하지 않는다.
+  - **광고 수익 연동은 수동 배선** `_ads.Paid += _analytics.LogAdImpression;` — 두 서비스가 서로를 모르는 상태로 남긴다. 이 때문에 구조체 파라미터에 `in`을 쓰지 않는다(`in`이 붙으면 `Action<T>`에 대입 불가).
+  - **동의 판단은 범위 밖** — `CollectionEnabled` 세터만 제공하고 영속화하지 않는다. ATT는 OS가 강제하지만 GDPR형 동의는 앱이 직접 막아야 한다.
+  - **현재 Debug/Firebase provider만 구현됨.** Firebase는 `FOUNDATIONDI_FIREBASE` 심볼이 걸린 `FoundationDI.Firebase` asmdef(precompiled DLL 참조)에 있다. **`google-services.json`이 없어 실전송은 미검증.**
+  - 상세: `Assets/FoundationDI/Runtime/Services/AnalyticsService/README.md`.
 
 공통 패턴: 런타임에 리소스를 로드하는 서비스(PoolService, ResourceService 등)는 `Resources.Load<T>()`를 먼저 시도하고 실패 시 `Addressables.LoadAssetAsync<T>().WaitForCompletion()`으로 폴백한 뒤 핸들을 보관해 두었다가 dispose 시 해제한다. SoundService는 `SoundData`가 `AudioClip`을 컴파일 타임 직접 참조로 보유하므로 이 패턴에 해당하지 않는다.
 
