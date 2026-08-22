@@ -1,8 +1,38 @@
 # plan.md
 
-## 활성 계획: 없음
+## 활성 계획: IAPService — 모바일 인앱 구매 서비스
 
-다음 작업이 정해지면 여기에 테스트 목록을 채운다.
+게임 코드가 `IIapService` 하나로 Google Play / App Store의 소모성·비소모성 상품을 구매·복원한다.
+Unity IAP 5.4.2는 `FOUNDATIONDI_UNITYIAP` 심볼이 걸린 옵셔널 어셈블리에 격리하고, 코어는 Dummy provider로 완전히 동작한다.
+
+세부: `docs/superpowers/specs/2026-08-23-iapservice-design.md`
+계획: `docs/superpowers/plans/2026-08-23-iap-service.md`
+
+- [ ] IapProductId가 플랫폼 오버라이드를 고르고 비면 공용 ID로 폴백한다
+- [ ] 구매결과의 IsSuccess가 성공 결과에서만 참이다
+- [ ] 초기화하면 provider 상품이 노출된다
+- [ ] 초기화 전 구매는 NotReady다
+- [ ] InitializeAsync는 재진입해도 provider를 한 번만 초기화한다
+- [ ] 구매가 검증·지급·확정 순서로 진행된다
+- [ ] 지급이 실패하면 확정하지 않는다
+- [ ] 지급이 예외를 던져도 확정하지 않고 서비스가 살아있다
+- [ ] 영수증 검증에 실패하면 지급도 확정도 하지 않는다
+- [ ] 비소모성은 확정 후 소유로 기록되고 소모성은 아니다
+- [ ] 사용자 취소와 그 외 실패를 구분한다
+- [ ] 이미 소유한 비소모성은 스토어를 거치지 않는다
+- [ ] 구매가 진행 중이면 두 번째 호출은 즉시 NotReady다
+- [ ] provider가 구매 시작을 거부하면 Failed다
+- [ ] 카탈로그에 없는 상품 구매는 NotReady다
+- [ ] 미확정 구매는 초기화 때 지급되고 확정된다
+- [ ] 복원은 비소모성 소유를 되살리고 개수를 보고한다
+- [ ] 복원이 실패하면 Success가 거짓이다
+- [ ] 보류된 구매는 지급하지 않고 Deferred를 반환한다
+- [ ] Dispose하면 provider가 해제되고 이후 구매는 NotReady다
+- [ ] 저장한 소유 상태가 다시 읽힌다
+- [ ] IapProviderFactory가 강제 더미·미가용 심볼·미등록 creator를 처리한다
+- [ ] RegisterIapService로 IIapService가 싱글턴 등록된다
+
+구현만 있고 단위 테스트가 없는 항목(스모크로 검증): Unity IAP 어댑터, 상수 생성기.
 
 ---
 
