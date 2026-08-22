@@ -12,6 +12,8 @@ namespace DarkNaku.FoundationDI
         internal const int FulfillmentFailedCode = -1001;
         internal const int PurchaseStartFailedCode = -1002;
         internal const int DisposedCode = -1003;
+        internal const int NotInitializedCode = -1004;
+        internal const int RestoreFailedCode = -1005;
 
         private readonly IIapProvider _provider;
         private readonly IIapFulfillment _fulfillment;
@@ -33,6 +35,9 @@ namespace DarkNaku.FoundationDI
         // provider 이벤트에는 "어느 호출의 결과인가"가 실려 오지 않으므로 하나만 허용한다.
         private AwaitableCompletionSource<IapPurchaseResult> _pendingSource;
         private string _pendingProductId;
+
+        // RestoreAsync가 진행되는 동안 파이프라인을 통과한 복원 구매의 수.
+        private int _restoredCount;
 
         private bool _subscribed;
         private bool _disposed;
@@ -114,6 +119,17 @@ namespace DarkNaku.FoundationDI
                 return IapPurchaseResult.NotReady();
             }
 
+            // 비소모성은 스토어가 "이미 소유"로 거절하기 전에 우리가 먼저 답한다.
+            // 스토어 시트를 띄웠다가 에러로 닫히는 것보다 낫다.
+            if (definition.Type == IapProductType.NonConsumable && IsOwned(productId))
+            {
+                return IapPurchaseResult.AlreadyOwned(OwnedPurchaseOf(definition));
+            }
+
+            // 스토어 UI는 모달이라 동시에 두 개가 뜨지 않는다. provider 이벤트에 "어느 호출의
+            // 결과인가"가 실려 오지 않으므로, 겹치는 호출을 허용하면 결과를 잘못 짝지을 수 있다.
+            if (_pendingSource != null) return IapPurchaseResult.NotReady();
+
             _pendingSource = new AwaitableCompletionSource<IapPurchaseResult>();
             _pendingProductId = productId;
 
@@ -127,11 +143,25 @@ namespace DarkNaku.FoundationDI
             return await _pendingSource.Awaitable;
         }
 
-        public Awaitable<IapRestoreResult> RestoreAsync()
+        public async Awaitable<IapRestoreResult> RestoreAsync()
         {
-            var source = new AwaitableCompletionSource<IapRestoreResult>();
-            source.SetResult(IapRestoreResult.Ok(0));
-            return source.Awaitable;
+            if (_disposed || !IsInitialized)
+            {
+                return IapRestoreResult.Fail(new IapError(NotInitializedCode, "초기화되지 않았다"));
+            }
+
+            // 복원된 구매는 PurchasePending(IsRestored: true)로 들어와 같은 파이프라인을 탄다.
+            // 여기서는 그 사이에 몇 건이 지나갔는지만 센다.
+            _restoredCount = 0;
+
+            var success = await _provider.RestoreAsync();
+
+            if (!success)
+            {
+                return IapRestoreResult.Fail(new IapError(RestoreFailedCode, "복원에 실패했다"));
+            }
+
+            return IapRestoreResult.Ok(_restoredCount);
         }
 
         public void Dispose()
@@ -185,6 +215,8 @@ namespace DarkNaku.FoundationDI
             if (_subscribed) return;
 
             _provider.PurchasePending += HandlePending;
+            _provider.PurchaseFailed += HandleFailed;
+            _provider.PurchaseDeferred += HandleDeferred;
             _subscribed = true;
         }
 
@@ -193,7 +225,36 @@ namespace DarkNaku.FoundationDI
             if (!_subscribed) return;
 
             _provider.PurchasePending -= HandlePending;
+            _provider.PurchaseFailed -= HandleFailed;
+            _provider.PurchaseDeferred -= HandleDeferred;
             _subscribed = false;
+        }
+
+        private void HandleFailed(IapPurchaseFailure failure)
+        {
+            if (_disposed) return;
+
+            if (!_byStoreId.TryGetValue(failure.StoreId ?? string.Empty, out var definition)) return;
+
+            // 취소는 에러가 아니다. 로그로 남기면 정상 동작이 매번 소음이 된다.
+            if (!failure.IsUserCancelled)
+            {
+                Debug.LogWarning($"[IAPService] 구매에 실패했다: {definition.Id} {failure.Error}");
+            }
+
+            CompletePendingFor(definition.Id, failure.IsUserCancelled
+                ? IapPurchaseResult.UserCancelled()
+                : IapPurchaseResult.Failed(failure.Error));
+        }
+
+        // iOS Ask-to-Buy 등. 승인되면 나중에 PurchasePending으로 들어와 같은 파이프라인을 탄다.
+        private void HandleDeferred(string storeId)
+        {
+            if (_disposed) return;
+
+            if (!_byStoreId.TryGetValue(storeId ?? string.Empty, out var definition)) return;
+
+            CompletePendingFor(definition.Id, IapPurchaseResult.Deferred());
         }
 
         // provider 이벤트 핸들러라 반환값을 기다릴 주체가 없다 — 예외는 전부 안에서 잡는다.
@@ -249,6 +310,8 @@ namespace DarkNaku.FoundationDI
                 OwnedChanged?.Invoke(definition.Id);
             }
 
+            if (pending.IsRestored) _restoredCount++;
+
             Purchased?.Invoke(purchase);
 
             CompletePendingFor(definition.Id, pending.IsRestored
@@ -269,6 +332,22 @@ namespace DarkNaku.FoundationDI
 
             return new IapPurchase(definition.Id, definition.Type, pending.TransactionId,
                                    pending.Receipt, price, currency, pending.IsRestored);
+        }
+
+        // 이미 소유한 상품을 다시 사려 할 때 돌려줄 페이로드. 거래 정보는 없다 —
+        // 이번 세션에 일어난 거래가 아니기 때문이다.
+        private IapPurchase OwnedPurchaseOf(IapProductDefinition definition)
+        {
+            var price = 0.0;
+            var currency = string.Empty;
+
+            if (TryGetProduct(definition.Id, out var product))
+            {
+                price = product.Price;
+                currency = product.CurrencyCode;
+            }
+
+            return new IapPurchase(definition.Id, definition.Type, null, null, price, currency, true);
         }
 
         // 대기 중인 구매의 상품과 일치할 때만 완료시킨다. 재전달·복원처럼 아무도 기다리지
