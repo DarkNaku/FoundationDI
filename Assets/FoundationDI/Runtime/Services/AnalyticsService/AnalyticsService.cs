@@ -8,7 +8,12 @@ namespace DarkNaku.FoundationDI
     // 무엇을 무시할지는 각 어댑터(또는 MMP 대시보드)가 결정한다.
     public sealed class AnalyticsService : IAnalyticsService
     {
+        // 생성 시점에 받은 전부. 초기화에 실패한 provider도 여기 남는다 — 재시도의 대상이고,
+        // Dispose 대상이기도 하기 때문이다.
         private readonly List<IAnalyticsProvider> _providers;
+
+        // 초기화에 성공해 실제로 팬아웃을 받는 provider들.
+        private readonly List<IAnalyticsProvider> _active = new();
 
         // 초기화 전 이벤트. 순서가 의미를 가지므로 큐다. 상한을 두지 않는 이유:
         // 초기화는 보통 수 초 안에 끝나고 그 사이 이벤트는 기껏해야 수십 개다. 상한을 두면
@@ -21,6 +26,11 @@ namespace DarkNaku.FoundationDI
         private readonly Dictionary<string, string> _pendingProperties = new();
         private string _pendingUserId;
         private bool _hasPendingUserId;
+
+        // 진행 중인 초기화에 편승한 호출자들. Awaitable은 단일 사용이라 하나를 여럿이 await 할 수
+        // 없으므로, 호출자마다 별도의 완료 소스를 만들어 두었다가 한꺼번에 같은 결과로 완료시킨다.
+        private readonly List<AwaitableCompletionSource<bool>> _initWaiters = new();
+        private bool _initializing;
 
         private bool _collectionEnabled;
 
@@ -41,16 +51,19 @@ namespace DarkNaku.FoundationDI
             set => _collectionEnabled = value;
         }
 
-        public async Awaitable<bool> InitializeAsync()
+        public Awaitable<bool> InitializeAsync()
         {
-            foreach (var provider in _providers)
+            if (IsInitialized) return Completed(true);
+
+            if (_initializing)
             {
-                await provider.InitializeAsync();
+                var waiter = new AwaitableCompletionSource<bool>();
+                _initWaiters.Add(waiter);
+                return waiter.Awaitable;
             }
 
-            IsInitialized = true;
-            Flush();
-            return true;
+            _initializing = true;
+            return RunInitializeAsync();
         }
 
         public void LogEvent(string name) => LogEvent(name, null);
@@ -114,7 +127,68 @@ namespace DarkNaku.FoundationDI
             }
 
             _providers.Clear();
+            _active.Clear();
             ClearPending();
+        }
+
+        // provider 중 하나라도 살아나면 서비스는 초기화된 것으로 본다. Firebase 하나가 죽었다고
+        // 전체 분석이 멎을 이유가 없다. 전부 실패하면 초기화되지 않은 상태로 남고 버퍼도 유지되므로,
+        // 다시 호출하면 그대로 재시도된다 — 네트워크 없이 앱을 켠 경우가 실제로 이 경로다.
+        private async Awaitable<bool> RunInitializeAsync()
+        {
+            _active.Clear();
+
+            foreach (var provider in _providers)
+            {
+                var ok = false;
+
+                try
+                {
+                    ok = await provider.InitializeAsync();
+                }
+                catch (Exception e)
+                {
+                    Debug.LogError($"[AnalyticsService] {provider.Name} 초기화 중 예외: {e}");
+                }
+
+                if (ok)
+                {
+                    _active.Add(provider);
+                }
+                else
+                {
+                    Debug.LogError($"[AnalyticsService] {provider.Name} 초기화에 실패했다. 팬아웃에서 제외한다.");
+                }
+            }
+
+            var succeeded = _active.Count > 0;
+
+            if (succeeded)
+            {
+                IsInitialized = true;
+                Flush();
+            }
+
+            _initializing = false;
+            CompleteWaiters(succeeded);
+            return succeeded;
+        }
+
+        private void CompleteWaiters(bool result)
+        {
+            if (_initWaiters.Count == 0) return;
+
+            var waiters = new List<AwaitableCompletionSource<bool>>(_initWaiters);
+            _initWaiters.Clear();
+
+            foreach (var waiter in waiters) waiter.SetResult(result);
+        }
+
+        private static Awaitable<bool> Completed(bool value)
+        {
+            var source = new AwaitableCompletionSource<bool>();
+            source.SetResult(value);
+            return source.Awaitable;
         }
 
         // 초기화 전이면 큐에 담고, 초기화 후면 즉시 팬아웃한다.
@@ -168,9 +242,9 @@ namespace DarkNaku.FoundationDI
         // 분석은 게임 로직이 아니라 곁다리이므로, SDK 하나가 죽었다고 나머지까지 멎으면 안 된다.
         private void Fanout(Action<IAnalyticsProvider> action)
         {
-            for (var i = 0; i < _providers.Count; i++)
+            for (var i = 0; i < _active.Count; i++)
             {
-                var provider = _providers[i];
+                var provider = _active[i];
 
                 try
                 {

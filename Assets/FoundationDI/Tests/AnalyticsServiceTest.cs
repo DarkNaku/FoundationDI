@@ -141,4 +141,76 @@ public class AnalyticsServiceTest
         Assert.Less(userIdIndex, eventIndex, "유저 ID가 이벤트보다 늦게 전달됐다");
         Assert.Less(propertyIndex, eventIndex, "유저 프로퍼티가 이벤트보다 늦게 전달됐다");
     });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator provider_하나가_초기화에_실패해도_초기화는_성공하고_실패한_provider에는_전달되지_않는다() =>
+        UniTask.ToCoroutine(async () =>
+    {
+        var failing = new FakeAnalyticsProvider("Failing") { InitializeResult = false };
+        var healthy = new FakeAnalyticsProvider("Healthy");
+        var sut = new AnalyticsService(new IAnalyticsProvider[] { failing, healthy }, NewOptions());
+
+        LogAssert.Expect(LogType.Error, new Regex("Failing"));
+        var ok = await sut.InitializeAsync();
+
+        Assert.IsTrue(ok, "하나가 살아 있는데 초기화가 실패로 보고됐다");
+        Assert.IsTrue(sut.IsInitialized);
+
+        sut.LogEvent("after_init");
+
+        Assert.AreEqual(0, failing.Events.Count, "초기화에 실패한 provider에 이벤트가 전달됐다");
+        Assert.AreEqual(1, healthy.Events.Count, "살아남은 provider에 이벤트가 전달되지 않았다");
+    });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 모든_provider가_초기화에_실패하면_false를_반환하고_버퍼는_유지된다() =>
+        UniTask.ToCoroutine(async () =>
+    {
+        var provider = new FakeAnalyticsProvider("Only") { InitializeResult = false };
+        var sut = new AnalyticsService(new IAnalyticsProvider[] { provider }, NewOptions());
+
+        sut.LogEvent("before_init");
+
+        LogAssert.Expect(LogType.Error, new Regex("Only"));
+        var first = await sut.InitializeAsync();
+
+        Assert.IsFalse(first);
+        Assert.IsFalse(sut.IsInitialized);
+        Assert.AreEqual(0, provider.Events.Count);
+
+        // 네트워크 없이 앱을 켠 경우가 실제로 이 경로다. 한 번 실패했다고 세션 전체를 포기하지 않는다.
+        provider.InitializeResult = true;
+        var second = await sut.InitializeAsync();
+
+        Assert.IsTrue(second, "재시도가 성공하지 않았다");
+        Assert.AreEqual(2, provider.InitializeCount, "재시도 자체가 일어나지 않았다");
+        Assert.AreEqual(1, provider.Events.Count, "버퍼가 유지되지 않아 이벤트를 잃었다");
+        Assert.AreEqual("before_init", provider.Events[0].Name);
+    });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator InitializeAsync는_재진입해도_초기화를_두_번_시작하지_않는다() =>
+        UniTask.ToCoroutine(async () =>
+    {
+        var provider = new FakeAnalyticsProvider { DeferInitialize = true };
+        var sut = new AnalyticsService(new IAnalyticsProvider[] { provider }, NewOptions());
+
+        var first = sut.InitializeAsync();
+        var second = sut.InitializeAsync();
+
+        Assert.AreEqual(1, provider.InitializeCount, "초기화를 두 번 시작했다");
+
+        provider.CompleteInitialize(true);
+
+        Assert.IsTrue(await first);
+        Assert.IsTrue(await second, "편승한 호출자가 결과를 받지 못했다");
+        Assert.AreEqual(1, provider.InitializeCount);
+
+        // 이미 초기화된 뒤의 호출은 즉시 true다.
+        Assert.IsTrue(await sut.InitializeAsync());
+        Assert.AreEqual(1, provider.InitializeCount);
+    });
 }
