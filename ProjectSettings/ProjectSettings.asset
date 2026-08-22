@@ -782,9 +782,9 @@ PlayerSettings:
   webWasm2023: 0
   webEnableSubmoduleStrippingCompatibility: 0
   scriptingDefineSymbols:
-    Android: FOUNDATIONDI_FIREBASE
-    Standalone: LEVELPLAY_DEPENDENCIES_INSTALLED;FOUNDATIONDI_FIREBASE
-    iPhone: FOUNDATIONDI_FIREBASE
+    Android: FOUNDATIONDI_FIREBASE;FOUNDATIONDI_UNITYIAP
+    Standalone: LEVELPLAY_DEPENDENCIES_INSTALLED;FOUNDATIONDI_FIREBASE;FOUNDATIONDI_UNITYIAP
+    iPhone: FOUNDATIONDI_FIREBASE;FOUNDATIONDI_UNITYIAP
   additionalCompilerArguments: {}
   platformArchitecture: {}
   scriptingBackend:

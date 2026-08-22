@@ -1,0 +1,20 @@
+{
+    "name": "FoundationDI.UnityIAP",
+    "rootNamespace": "",
+    "references": [
+        "FoundationDI",
+        "Unity.Purchasing",
+        "Unity.Purchasing.Security"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "FOUNDATIONDI_UNITYIAP"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
