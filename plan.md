@@ -1,8 +1,29 @@
 # plan.md
 
-## 활성 계획: 없음
+## 활성 계획: AnalyticsService — 다중 분석/MMP 팬아웃 서비스
 
-다음 작업이 정해지면 여기에 테스트 목록을 채운다.
+Firebase Analytics를 기본으로 하되 MMP(AppsFlyer/Adjust/Singular/Airbridge)를 추가해도
+게임 코드는 `IAnalyticsService` API를 한 번만 호출하면 등록된 모든 provider로 브로드캐스트된다.
+
+세부: `docs/superpowers/specs/2026-08-23-analyticsservice-design.md`
+계획: `docs/superpowers/plans/2026-08-23-analytics-service.md`
+
+- [ ] 컬렉션 초기화가 파라미터의 순서와 타입을 보존한다
+- [ ] 이벤트를 발행하면 모든 provider가 각각 한 번씩 받는다
+- [ ] 한 provider가 예외를 던져도 나머지 provider는 호출된다
+- [ ] 초기화 전 이벤트는 버퍼링됐다가 초기화 후 순서대로 전달된다
+- [ ] 초기화 전 SetUserProperty는 같은 키의 마지막 값만 전달된다
+- [ ] 초기화 시 유저 상태가 버퍼된 이벤트보다 먼저 전달된다
+- [ ] provider 하나가 초기화에 실패해도 초기화는 성공하고 실패한 provider에는 전달되지 않는다
+- [ ] 모든 provider가 초기화에 실패하면 false를 반환하고 버퍼는 유지된다
+- [ ] InitializeAsync는 재진입해도 초기화를 두 번 시작하지 않는다
+- [ ] CollectionEnabled가 false면 어떤 provider에도 전달되지 않는다
+- [ ] CollectionEnabled를 바꾸면 모든 provider에 전파되고 같은 값 재설정은 전파되지 않는다
+- [ ] Dispose하면 모든 provider가 Dispose되고 이후 호출은 무시된다
+- [ ] AnalyticsProviderFactory는 creator가 없는 provider만 건너뛰고 나머지를 생성한다
+- [ ] RegisterAnalyticsService로 IAnalyticsService가 싱글턴 등록된다
+
+구현만 있고 단위 테스트가 없는 항목(스모크로 검증): Debug provider, Firebase 어댑터.
 
 ---
 
