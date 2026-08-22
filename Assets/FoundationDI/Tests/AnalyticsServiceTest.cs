@@ -73,4 +73,72 @@ public class AnalyticsServiceTest
 
         Assert.AreEqual(1, healthy.Events.Count, "예외 뒤의 정상 provider가 호출되지 않았다");
     });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 초기화_전_이벤트는_버퍼링됐다가_초기화_후_순서대로_전달된다() =>
+        UniTask.ToCoroutine(async () =>
+    {
+        var provider = new FakeAnalyticsProvider();
+        var sut = new AnalyticsService(new IAnalyticsProvider[] { provider }, NewOptions());
+
+        sut.LogEvent("first");
+        sut.LogPurchase(new PurchaseInfo("gem_pack", 4.99, "USD"));
+        sut.LogEvent("second");
+
+        Assert.AreEqual(0, provider.Events.Count, "초기화 전인데 provider로 새어 나갔다");
+
+        await sut.InitializeAsync();
+
+        CollectionAssert.AreEqual(
+            new[] { "LogEvent:first", "LogPurchase:gem_pack", "LogEvent:second" },
+            provider.Calls.Where(c => !c.StartsWith("Initialize")).ToList());
+    });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 초기화_전_SetUserProperty는_같은_키의_마지막_값만_전달된다() =>
+        UniTask.ToCoroutine(async () =>
+    {
+        var provider = new FakeAnalyticsProvider();
+        var sut = new AnalyticsService(new IAnalyticsProvider[] { provider }, NewOptions());
+
+        sut.SetUserProperty("player_level", "12");
+        sut.SetUserProperty("player_level", "24");
+        sut.SetUserProperty("player_level", "37");
+        sut.SetUserId("player-a");
+        sut.SetUserId("player-b");
+
+        await sut.InitializeAsync();
+
+        CollectionAssert.AreEqual(new[] { ("player_level", "37") }, provider.Properties);
+        CollectionAssert.AreEqual(new[] { "player-b" }, provider.UserIds);
+    });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 초기화_시_유저_상태가_버퍼된_이벤트보다_먼저_전달된다() =>
+        UniTask.ToCoroutine(async () =>
+    {
+        var provider = new FakeAnalyticsProvider();
+        var sut = new AnalyticsService(new IAnalyticsProvider[] { provider }, NewOptions());
+
+        // 이벤트를 먼저 발행해도, flush는 유저 귀속을 먼저 붙인 뒤 이벤트를 내보내야 한다.
+        sut.LogEvent("tutorial_start");
+        sut.SetUserId("player-a");
+        sut.SetUserProperty("cohort", "2026-08");
+
+        await sut.InitializeAsync();
+
+        var calls = provider.Calls.Where(c => !c.StartsWith("Initialize")).ToList();
+        var userIdIndex = calls.IndexOf("SetUserId:player-a");
+        var propertyIndex = calls.IndexOf("SetUserProperty:cohort=2026-08");
+        var eventIndex = calls.IndexOf("LogEvent:tutorial_start");
+
+        Assert.Greater(userIdIndex, -1, "SetUserId가 전달되지 않았다");
+        Assert.Greater(propertyIndex, -1, "SetUserProperty가 전달되지 않았다");
+        Assert.Greater(eventIndex, -1, "버퍼된 이벤트가 전달되지 않았다");
+        Assert.Less(userIdIndex, eventIndex, "유저 ID가 이벤트보다 늦게 전달됐다");
+        Assert.Less(propertyIndex, eventIndex, "유저 프로퍼티가 이벤트보다 늦게 전달됐다");
+    });
 }
