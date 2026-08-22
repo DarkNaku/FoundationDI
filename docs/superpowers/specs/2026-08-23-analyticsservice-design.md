@@ -181,8 +181,8 @@ public interface IAnalyticsService : IDisposable
 
     void LogEvent(string name);
     void LogEvent(string name, AnalyticsParams parameters);
-    void LogPurchase(in PurchaseInfo purchase);
-    void LogAdImpression(in AdImpression impression);
+    void LogPurchase(PurchaseInfo purchase);
+    void LogAdImpression(AdImpression impression);
 
     void SetUserId(string userId);              // null이면 해제
     void SetUserProperty(string name, string value);
@@ -196,6 +196,12 @@ public interface IAnalyticsService : IDisposable
 `InitializeAsync`는 **재진입 안전**하다(AdService와 동일). 진행 중에 다시 부르면 새 초기화를
 시작하지 않고 같은 결과에 편승하고, 이미 초기화됐으면 즉시 `true`를 반환한다.
 
+**구조체 파라미터에 `in`을 쓰지 않는다.** `in` 한정자가 붙은 메서드는 `Action<T>`에 대입할 수
+없어서, 이 설계의 핵심 사용례인 `_ads.Paid += _analytics.LogAdImpression;`이 컴파일되지 않는다.
+`PurchaseInfo`/`AdImpression`은 복사 비용이 무의미한 크기이고, 애초에 `in` 파라미터는 프로퍼티
+접근마다 방어적 복사를 유발하므로 얻는 것도 없다. `AdService`가 `event Action<AdImpression> Paid`로
+값 전달을 쓰는 것과도 일치한다.
+
 ### 3. Provider seam (`Providers/IAnalyticsProvider.cs`)
 
 공개 계약과 거의 동형이다. 팬아웃·버퍼·게이트는 전부 위 계층이 처리하므로, 어댑터는
@@ -208,8 +214,8 @@ public interface IAnalyticsProvider : IDisposable
     Awaitable<bool> InitializeAsync();
     void SetCollectionEnabled(bool enabled);
     void LogEvent(string name, AnalyticsParams parameters);
-    void LogPurchase(in PurchaseInfo purchase);
-    void LogAdImpression(in AdImpression impression);
+    void LogPurchase(PurchaseInfo purchase);
+    void LogAdImpression(AdImpression impression);
     void SetUserId(string userId);
     void SetUserProperty(string name, string value);
 }

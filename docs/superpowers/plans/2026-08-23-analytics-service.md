@@ -22,6 +22,10 @@
 - 메인 스레드 단독 접근 전제. 잠금 없음. SDK 콜백 마샬링은 어댑터 책임.
 - **Unity6 `Awaitable`은 단일 사용**이다 — `await` 이후 `.IsCompleted`에 접근하지 않는다. 테스트는 `await` 전에 단언한다.
 - 테스트 파일은 부분 수정이 아니라 **Write로 통째로** 쓴다(UnityMCP 편집 제약).
+- **테스트 더블은 NSubstitute가 아니라 손으로 쓴 fake를 쓴다** — `Assets/FoundationDI/Tests/AnalyticsTestDoubles.cs`에 `FakeAnalyticsProvider`를 두고, `AdTestDoubles.cs`의 `FakeAdProvider`를 본뜬다. 호출 순서·횟수를 직접 기록하므로 순서 검증(버퍼 flush 순서)이 명확하고, `AdService`의 선례와 일치한다.
+- **async 테스트는 `[UnityTest] [Timeout(5000)] public IEnumerator ... => UniTask.ToCoroutine(async () => { ... });`** 형태다(`AdServiceTest.cs` 관례). 프로덕션 코드는 `Awaitable`, 테스트 하네스만 UniTask다.
+- 예상되는 에러 로그는 `LogAssert.Expect(LogType.Error, new Regex("..."))`로 선언한다.
+- **구조체 파라미터에 `in`을 쓰지 않는다** — `in`이 붙으면 `Action<T>`에 대입할 수 없어 `_ads.Paid += _analytics.LogAdImpression;`이 컴파일되지 않는다.
 
 ---
 
@@ -97,8 +101,8 @@ public interface IAnalyticsService : IDisposable
     bool CollectionEnabled { get; set; }
     void LogEvent(string name);
     void LogEvent(string name, AnalyticsParams parameters);
-    void LogPurchase(in PurchaseInfo purchase);
-    void LogAdImpression(in AdImpression impression);
+    void LogPurchase(PurchaseInfo purchase);
+    void LogAdImpression(AdImpression impression);
     void SetUserId(string userId);
     void SetUserProperty(string name, string value);
 }
@@ -109,8 +113,8 @@ public interface IAnalyticsProvider : IDisposable
     Awaitable<bool> InitializeAsync();
     void SetCollectionEnabled(bool enabled);
     void LogEvent(string name, AnalyticsParams parameters);
-    void LogPurchase(in PurchaseInfo purchase);
-    void LogAdImpression(in AdImpression impression);
+    void LogPurchase(PurchaseInfo purchase);
+    void LogAdImpression(AdImpression impression);
     void SetUserId(string userId);
     void SetUserProperty(string name, string value);
 }
@@ -138,13 +142,12 @@ public static class AnalyticsProviderRegistry
 
 public interface IAnalyticsProviderFactory
 {
-    IReadOnlyList<IAnalyticsProvider> CreateAll(AnalyticsProviderType types,
-                                                in AnalyticsServiceOptions options);
+    IReadOnlyList<IAnalyticsProvider> CreateAll(AnalyticsProviderType types, AnalyticsServiceOptions options);
 }
 
 public sealed class AnalyticsService : IAnalyticsService
 {
-    public AnalyticsService(IReadOnlyList<IAnalyticsProvider> providers, in AnalyticsServiceOptions options);
+    public AnalyticsService(IReadOnlyList<IAnalyticsProvider> providers, AnalyticsServiceOptions options);
 }
 ```
 
@@ -207,42 +210,54 @@ public void 컬렉션_초기화가_파라미터의_순서와_타입을_보존해
 
 이 태스크에서는 **버퍼를 아직 만들지 않는다.** 테스트는 `InitializeAsync`를 먼저 await한 뒤 발행한다. 버퍼는 Task 3이다.
 
-- [ ] **Step 1: 테스트 두 개를 쓴다**
+- [ ] **Step 1: `AnalyticsTestDoubles.cs`에 `FakeAnalyticsProvider`를 만들고 테스트 두 개를 쓴다**
+
+`FakeAnalyticsProvider`는 `IAnalyticsProvider`를 구현하고 다음을 기록한다:
+`List<string> Calls`(호출을 `"LogEvent:boss_defeated"` 형태 문자열로 순서대로 누적),
+`List<(string, AnalyticsParams)> Events`, `List<PurchaseInfo> Purchases`,
+`List<(string,string)> Properties`, `List<string> UserIds`, `List<bool> CollectionFlags`,
+`int InitializeCount`, `int DisposeCount`, `bool InitializeResult = true`,
+`bool ThrowOnLogEvent`, `bool DeferInitialize` + `CompleteInitialize(bool)`
+(`AdTestDoubles.cs`의 `FakeAdProvider`와 같이 대기 중인 호출자마다
+`AwaitableCompletionSource<bool>`를 하나씩 만들어 리스트에 보관).
 
 ```csharp
-[Test]
-public async Task 이벤트를_발행하면_모든_provider가_각각_한_번씩_받아야_한다()
+[UnityTest]
+[Timeout(5000)]
+public IEnumerator 이벤트를_발행하면_모든_provider가_각각_한_번씩_받는다() =>
+    UniTask.ToCoroutine(async () =>
 {
-    var a = CreateProvider("A");
-    var b = CreateProvider("B");
-    var service = new AnalyticsService(new[] { a, b }, new AnalyticsServiceOptions(true));
+    var a = new FakeAnalyticsProvider("A");
+    var b = new FakeAnalyticsProvider("B");
+    var sut = new AnalyticsService(new IAnalyticsProvider[] { a, b }, new AnalyticsServiceOptions(true));
 
-    await service.InitializeAsync();
-    service.LogEvent("boss_defeated");
+    await sut.InitializeAsync();
+    sut.LogEvent("boss_defeated");
 
-    a.Received(1).LogEvent("boss_defeated", Arg.Any<AnalyticsParams>());
-    b.Received(1).LogEvent("boss_defeated", Arg.Any<AnalyticsParams>());
-}
+    Assert.AreEqual(1, a.Events.Count);
+    Assert.AreEqual("boss_defeated", a.Events[0].Item1);
+    Assert.AreEqual(1, b.Events.Count);
+    Assert.AreEqual("boss_defeated", b.Events[0].Item1);
+});
 
-[Test]
-public async Task 한_provider가_예외를_던져도_나머지_provider는_호출되어야_한다()
+[UnityTest]
+[Timeout(5000)]
+public IEnumerator 한_provider가_예외를_던져도_나머지_provider는_호출된다() =>
+    UniTask.ToCoroutine(async () =>
 {
-    var broken = CreateProvider("Broken");
-    broken.When(p => p.LogEvent(Arg.Any<string>(), Arg.Any<AnalyticsParams>()))
-          .Do(_ => throw new InvalidOperationException("boom"));
-    var healthy = CreateProvider("Healthy");
-    var service = new AnalyticsService(new[] { broken, healthy }, new AnalyticsServiceOptions(true));
+    var broken = new FakeAnalyticsProvider("Broken") { ThrowOnLogEvent = true };
+    var healthy = new FakeAnalyticsProvider("Healthy");
+    var sut = new AnalyticsService(new IAnalyticsProvider[] { broken, healthy },
+                                   new AnalyticsServiceOptions(true));
 
-    await service.InitializeAsync();
-    LogAssert.ignoreFailingMessages = true;
-    service.LogEvent("boss_defeated");
-    LogAssert.ignoreFailingMessages = false;
+    await sut.InitializeAsync();
 
-    healthy.Received(1).LogEvent("boss_defeated", Arg.Any<AnalyticsParams>());
-}
+    LogAssert.Expect(LogType.Error, new Regex("Broken"));
+    sut.LogEvent("boss_defeated");
+
+    Assert.AreEqual(1, healthy.Events.Count, "정상 provider가 호출되지 않았다");
+});
 ```
-
-`CreateProvider(name)` 헬퍼는 `Substitute.For<IAnalyticsProvider>()`를 만들고 `Name`을 세팅한 뒤 `InitializeAsync()`가 완료된 `Awaitable<bool>(true)`를 반환하도록 스텁한다. **`Awaitable<bool>`은 생성자가 없으므로** `AwaitableCompletionSource<bool>`로 만들어 `SetResult(true)` 한 것을 돌려준다.
 
 - [ ] **Step 2: 실패 확인**
 - [ ] **Step 3: 최소 구현** — `AnalyticsService`가 provider 목록을 들고 `Fanout(Action<IAnalyticsProvider>)` 하나로 순회하며 provider별 `try/catch`. catch에서 `Debug.LogError($"[AnalyticsService] {p.Name} 에서 예외: {e}")`. `InitializeAsync`는 지금은 전 provider의 `InitializeAsync`를 await하고 `IsInitialized = true`만 한다.
@@ -417,6 +432,6 @@ public async Task 한_provider가_예외를_던져도_나머지_provider는_호�
 | `AdImpression` 재사용 / 수동 배선 | Task 2(시그니처), Task 8(README에 문서화) |
 | 범위 밖 항목 명시 | Task 8 |
 
-**타입 일관성** — `CreateAll(AnalyticsProviderType, in AnalyticsServiceOptions)`, `Fanout`, `Flush`, `AnalyticsProviderRegistry.Reset()` 이름이 전 태스크에서 동일하게 쓰였는지 확인함. `AnalyticsServiceOptions`는 Task 2에서 처음 쓰이므로 **Task 1에서 함께 만든다**(위 확정 시그니처 블록에 포함).
+**타입 일관성** — `CreateAll(AnalyticsProviderType, AnalyticsServiceOptions)`, `Fanout`, `Flush`, `AnalyticsProviderRegistry.Reset()` 이름이 전 태스크에서 동일하게 쓰였는지 확인함. `AnalyticsServiceOptions`는 Task 2에서 처음 쓰이므로 **Task 1에서 함께 만든다**(위 확정 시그니처 블록에 포함).
 
 **미해결로 남긴 위험** — `Awaitable`의 단일 사용 제약이 `InitializeAsync` 재진입(Task 3-6)과 Firebase `Task` 브리지(Task 7-3) 두 곳에서 걸린다. 두 곳 모두 `AwaitableCompletionSource`를 **호출자마다 하나씩** 만드는 방식으로 회피하도록 계획에 명시했다. 구현 중 이 방식이 통하지 않으면 멈추고 재설계한다.
