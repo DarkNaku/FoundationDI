@@ -9,8 +9,8 @@ Firebase Analytics를 기본으로 하되 MMP(AppsFlyer/Adjust/Singular/Airbridg
 계획: `docs/superpowers/plans/2026-08-23-analytics-service.md`
 
 - [x] 컬렉션 초기화가 파라미터의 순서와 타입을 보존한다
-- [ ] 이벤트를 발행하면 모든 provider가 각각 한 번씩 받는다
-- [ ] 한 provider가 예외를 던져도 나머지 provider는 호출된다
+- [x] 이벤트를 발행하면 모든 provider가 각각 한 번씩 받는다
+- [x] 한 provider가 예외를 던져도 나머지 provider는 호출된다
 - [ ] 초기화 전 이벤트는 버퍼링됐다가 초기화 후 순서대로 전달된다
 - [ ] 초기화 전 SetUserProperty는 같은 키의 마지막 값만 전달된다
 - [ ] 초기화 시 유저 상태가 버퍼된 이벤트보다 먼저 전달된다

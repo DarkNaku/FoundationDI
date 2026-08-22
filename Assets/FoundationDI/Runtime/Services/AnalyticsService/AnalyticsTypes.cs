@@ -86,4 +86,42 @@ namespace DarkNaku.FoundationDI
 
         IEnumerator IEnumerable.GetEnumerator() => _items.GetEnumerator();
     }
+
+    // 구매 한 건. 5사가 전부 다른 예약 이벤트 이름과 매출 전달 방식을 갖고 있어서
+    // (Firebase는 purchase + value 파라미터, Adjust는 대시보드 토큰 + setRevenue 전용 API 등)
+    // 게임 코드가 SDK 중립적으로 넘길 수 있는 한 가지 모양이 필요하다. 번역은 어댑터가 한다.
+    public readonly struct PurchaseInfo
+    {
+        public string ProductId { get; }
+        public double Price { get; }          // 단가
+        public string Currency { get; }       // ISO 4217 ("USD", "KRW")
+        public int Quantity { get; }
+        public string TransactionId { get; }
+        public AnalyticsParams Extra { get; } // 게임 고유 컨텍스트. null 허용
+
+        public double Revenue => Price * Quantity;
+
+        public PurchaseInfo(string productId, double price, string currency,
+                            int quantity = 1, string transactionId = null, AnalyticsParams extra = null)
+        {
+            ProductId = productId;
+            Price = price;
+            Currency = currency;
+            Quantity = quantity;
+            TransactionId = transactionId;
+            Extra = extra;
+        }
+    }
+
+    // AnalyticsService가 ScriptableObject를 직접 참조하지 않게 하는 값 타입.
+    // EditMode 테스트가 SO 없이 서비스를 조립할 수 있다.
+    public readonly struct AnalyticsServiceOptions
+    {
+        public bool CollectionEnabledByDefault { get; }
+
+        public AnalyticsServiceOptions(bool collectionEnabledByDefault)
+        {
+            CollectionEnabledByDefault = collectionEnabledByDefault;
+        }
+    }
 }
