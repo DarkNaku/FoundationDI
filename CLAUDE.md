@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 프로젝트 개요
 
-FoundationDI는 DarkNaku의 DI(의존성 주입) 기반 Unity 게임 개발 파운데이션 패키지입니다. VContainer를 코어로 R3, UniTask, Addressables를 조합한 공통 서비스 계층을 제공합니다.
+FoundationDI는 DarkNaku의 DI(의존성 주입) 기반 Unity 게임 개발 파운데이션 패키지입니다. VContainer를 코어로 Addressables와 Unity `Awaitable`을 조합한 공통 서비스 계층을 제공합니다. **R3와 UniTask 의존은 제거됐다** — 런타임·테스트 모두 `Awaitable`만 쓴다.
 
 - **Unity 버전**: 6000.3.17f1 (`ProjectSettings/ProjectVersion.txt`)
 - **배포 형태**: UPM 패키지 (`Assets/FoundationDI/` = `com.darknaku.foundationdi`). 즉 이 리포지토리는 패키지 개발용 호스트 프로젝트이며, 재사용 코드는 모두 `Assets/FoundationDI/` 안에 있어야 한다. `Assets/Scripts/`는 패키지를 시험하는 호스트 프로젝트 전용 코드다.
@@ -32,9 +32,10 @@ Unity 프로젝트이므로 CLI 빌드 명령은 없다. **모든 컴파일·테
 - 스크립트 생성/수정 후에는 `read_console`로 **컴파일 에러를 먼저 확인**한다. 컴파일이 끝나야(`editor_state.isCompiling == false`) 새 타입을 쓸 수 있다.
 - 테스트는 Unity Test Framework로 실행한다: UnityMCP의 `run_tests` 사용 (EditMode/PlayMode).
 - 모킹은 **NSubstitute 5.3.0** (`Assets/Packages/`, NuGetForUnity로 관리)을 사용한다.
+- **async 테스트는 `AwaitableTest`(`Tests/Support/`, asmdef `FoundationDI.TestSupport`)를 쓴다.** `AwaitableTest.Run(async () => {...})`이 async 본문을 `[UnityTest]`의 `IEnumerator`로 잇고, 프레임 대기는 `NextFrame`/`Delay`/`WaitUntil`로 한다. **EditMode에서 `Awaitable.NextFrameAsync()`와 `WaitForSecondsAsync()`는 영원히 완료되지 않는다**(플레이어 루프가 돌지 않음) — 그래서 `AwaitableTest`가 EditMode에서는 `EditorApplication.update`로 완료 소스를 깨운다. 이 헬퍼를 우회해 `Awaitable`의 프레임 대기를 직접 쓰면 EditMode 테스트가 멈춘다.
 - 테스트는 `Assets/FoundationDI/Tests/`의 `FoundationDI.Tests`(EditMode) asmdef에 있다. `FoundationDI` 런타임 asmdef와 NSubstitute/NUnit을 참조한다.
 
-NuGet 의존성은 **NuGetForUnity**(`Assets/NuGet/`)가 `Assets/packages.config`로 관리하며, `Assets/Packages/`에 풀린다. UPM 의존성은 `Packages/manifest.json`에 있다 (VContainer, R3, UniTask, Director 등은 git URL로 참조).
+NuGet 의존성은 **NuGetForUnity**(`Assets/NuGet/`)가 `Assets/packages.config`로 관리하며, `Assets/Packages/`에 풀린다. UPM 의존성은 `Packages/manifest.json`에 있다 (VContainer, Director 등은 git URL로 참조).
 
 ## 아키텍처
 
@@ -45,7 +46,7 @@ NuGet 의존성은 **NuGetForUnity**(`Assets/NuGet/`)가 `Assets/packages.config
 모든 런타임 코드는 단일 asmdef `FoundationDI`(`Runtime/FoundationDI.asmdef`)에 들어간다.
 
 - **MessageService** (`Services/MessageService/`): 외부 라이브러리 없는 인-메모리 pub-sub. 타입을 채널로 삼는 `Dictionary<Type, Delegate>` 하나가 전부다. 공개 API는 `Publish<T>`/`Subscribe<T>`/`Dispose` 셋뿐이며 메시지 타입에 제약이 없다.
-  - `Subscribe`는 `IDisposable`을 반환한다. R3의 `AddTo(this)`로 MonoBehaviour 수명에 묶을 수 있다.
+  - `Subscribe`는 `IDisposable`을 반환한다. R3를 쓰는 프로젝트라면 `AddTo(this)`로 MonoBehaviour 수명에 묶을 수 있다(패키지 자체는 R3에 의존하지 않는다).
   - 발행은 `GetInvocationList()` 스냅샷으로 진행하므로 핸들러 안에서 구독/해제해도 안전하고, 핸들러별 try/catch로 예외를 격리한다.
   - 메인 스레드 전제(잠금 없음). DI 등록은 `builder.RegisterMessageService()`.
   - 상세: `Assets/FoundationDI/Runtime/Services/MessageService/README.md`.
@@ -129,7 +130,7 @@ PrimeTween(트위닝, tgz로 로컬 설치), Director(DarkNaku의 씬/플로우 
 ## 리소스 로딩은 ResourceService에 위임한다
 
 - **에셋 로딩이 필요한 모든 서비스/시스템은 직접 `Addressables`/`Resources`를 호출하지 말고 `IResourceService`에 위임한다.** (Addressables 호출과 핸들 생명주기가 한 곳에서 참조 카운팅으로 관리되도록.)
-- `IResourceService` API: `UniTask<T> LoadAsync<T>(string key)`, `T Load<T>(string key)`(동기, `WaitForCompletion`), `void Release(string key)`, `Dispose()`. 모두 `where T : UnityEngine.Object`.
+- `IResourceService` API: `Awaitable<T> LoadAsync<T>(string key)`, `T Load<T>(string key)`(동기, `WaitForCompletion`), `void Release(string key)`, `Dispose()`. 모두 `where T : UnityEngine.Object`.
 - 키 단위 캐싱 + 참조 카운팅: 로드 1회 ↔ `Release` 1회 짝을 맞춘다. 참조가 0이 되면 실제 핸들이 해제된다.
 - 같은 키 동시 `LoadAsync`는 내부에서 중복 제거되어 Addressables 로드가 1회만 발생한다.
 - ResourceService가 캐시·반환하는 것은 **에셋 원본**이다(인스턴스 아님). 프리팹은 받아서 호출자가 `Instantiate`한다.

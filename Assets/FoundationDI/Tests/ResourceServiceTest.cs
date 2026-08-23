@@ -1,5 +1,4 @@
 using System.Collections;
-using Cysharp.Threading.Tasks;
 using DarkNaku.FoundationDI;
 using NSubstitute;
 using NUnit.Framework;
@@ -18,7 +17,7 @@ public class ResourceServiceTest
     }
 
     [UnityTest]
-    public IEnumerator 첫_로드시_provider를_호출하고_에셋을_반환한다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 첫_로드시_provider를_호출하고_에셋을_반환한다() => AwaitableTest.Run(async () =>
     {
         var asset = new GameObject("asset");
         var provider = Substitute.For<IResourceProvider>();
@@ -32,7 +31,7 @@ public class ResourceServiceTest
     });
 
     [UnityTest]
-    public IEnumerator 같은_키_재로드시_provider를_다시_호출하지_않고_캐시에서_반환한다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 같은_키_재로드시_provider를_다시_호출하지_않고_캐시에서_반환한다() => AwaitableTest.Run(async () =>
     {
         var asset = new GameObject("asset");
         var provider = Substitute.For<IResourceProvider>();
@@ -48,7 +47,7 @@ public class ResourceServiceTest
     });
 
     [UnityTest]
-    public IEnumerator Release시_참조가_남아있으면_provider_Release를_호출하지_않는다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator Release시_참조가_남아있으면_provider_Release를_호출하지_않는다() => AwaitableTest.Run(async () =>
     {
         var asset = new GameObject("asset");
         var provider = Substitute.For<IResourceProvider>();
@@ -63,7 +62,7 @@ public class ResourceServiceTest
     });
 
     [UnityTest]
-    public IEnumerator 참조가_0이_되면_provider_Release를_호출한다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 참조가_0이_되면_provider_Release를_호출한다() => AwaitableTest.Run(async () =>
     {
         var asset = new GameObject("asset");
         var provider = Substitute.For<IResourceProvider>();
@@ -77,7 +76,7 @@ public class ResourceServiceTest
     });
 
     [UnityTest]
-    public IEnumerator 해제된_키를_다시_로드하면_provider를_재호출한다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 해제된_키를_다시_로드하면_provider를_재호출한다() => AwaitableTest.Run(async () =>
     {
         var asset = new GameObject("asset");
         var provider = Substitute.For<IResourceProvider>();
@@ -92,7 +91,7 @@ public class ResourceServiceTest
     });
 
     [UnityTest]
-    public IEnumerator 보유_참조보다_많이_Release하면_안전하게_무시한다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 보유_참조보다_많이_Release하면_안전하게_무시한다() => AwaitableTest.Run(async () =>
     {
         var asset = new GameObject("asset");
         var provider = Substitute.For<IResourceProvider>();
@@ -107,7 +106,7 @@ public class ResourceServiceTest
     });
 
     [UnityTest]
-    public IEnumerator Dispose시_남은_모든_키의_핸들을_해제한다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator Dispose시_남은_모든_키의_핸들을_해제한다() => AwaitableTest.Run(async () =>
     {
         var assetA = new GameObject("assetA");
         var assetB = new GameObject("assetB");
@@ -125,7 +124,7 @@ public class ResourceServiceTest
     });
 
     [UnityTest]
-    public IEnumerator 로드_진행중_재호출시_provider를_중복_호출하지_않는다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 로드_진행중_재호출시_provider를_중복_호출하지_않는다() => AwaitableTest.Run(async () =>
     {
         var asset = new GameObject("asset");
         var source = new AwaitableCompletionSource<GameObject>();
@@ -189,7 +188,7 @@ public class ResourceServiceTest
     }
 
     [UnityTest]
-    public IEnumerator 비동기_로드_실패시_캐시하지_않아_다음_로드는_provider를_다시_호출한다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 비동기_로드_실패시_캐시하지_않아_다음_로드는_provider를_다시_호출한다() => AwaitableTest.Run(async () =>
     {
         var provider = Substitute.For<IResourceProvider>();
         provider.LoadAsync<GameObject>("missing").Returns(_ => Completed(null));

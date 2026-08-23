@@ -1,6 +1,5 @@
 using System.Collections;
 using System.Threading;
-using Cysharp.Threading.Tasks;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
@@ -11,7 +10,7 @@ public class UIViewTransitionResolveTests
     private sealed class ResolveTestView : UIView { }
 
     [UnityTest]
-    public IEnumerator 부착된_트랜지션_컴포넌트를_해석한다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 부착된_트랜지션_컴포넌트를_해석한다() => AwaitableTest.Run(async () =>
     {
         var go = TransitionTestHelpers.NewUINode("view", typeof(CanvasGroup), typeof(FadeTransition), typeof(ResolveTestView));
         var cg = go.GetComponent<CanvasGroup>();
@@ -27,7 +26,7 @@ public class UIViewTransitionResolveTests
     });
 
     [UnityTest]
-    public IEnumerator 트랜지션_컴포넌트없으면_Noop으로_즉시완료() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 트랜지션_컴포넌트없으면_Noop으로_즉시완료() => AwaitableTest.Run(async () =>
     {
         var go = TransitionTestHelpers.NewUINode("view", typeof(CanvasGroup), typeof(ResolveTestView));
         var view = go.GetComponent<ResolveTestView>();

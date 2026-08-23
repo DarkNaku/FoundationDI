@@ -1,6 +1,5 @@
 using System;
 using System.Collections;
-using Cysharp.Threading.Tasks;
 using DarkNaku.FoundationDI;
 using NUnit.Framework;
 using UnityEngine.TestTools;
@@ -136,7 +135,7 @@ public class FullScreenAdUnitTest
     [UnityTest]
     [Timeout(5000)]
     public IEnumerator 준비되지_않은_상태의_ShowAsync는_NotReady를_반환하고_로드를_시작한다() =>
-        UniTask.ToCoroutine(async () =>
+        AwaitableTest.Run(async () =>
     {
         var adapter = new FakeFullScreenAdapter { IsReady = false };
         var dispatcher = new FakeAdDispatcher();
@@ -151,7 +150,7 @@ public class FullScreenAdUnitTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator 표시에_실패하면_Failed와_에러를_반환한다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 표시에_실패하면_Failed와_에러를_반환한다() => AwaitableTest.Run(async () =>
     {
         var adapter = new FakeFullScreenAdapter();
         var dispatcher = new FakeAdDispatcher();
@@ -173,7 +172,7 @@ public class FullScreenAdUnitTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator 표시_중에_ShowAsync를_다시_호출하면_Failed를_반환한다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 표시_중에_ShowAsync를_다시_호출하면_Failed를_반환한다() => AwaitableTest.Run(async () =>
     {
         var adapter = new FakeFullScreenAdapter();
         var dispatcher = new FakeAdDispatcher();
@@ -196,7 +195,7 @@ public class FullScreenAdUnitTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator 표시_중인_배치명이_Paid_임프레션에_찍힌다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 표시_중인_배치명이_Paid_임프레션에_찍힌다() => AwaitableTest.Run(async () =>
     {
         var adapter = new FakeFullScreenAdapter();
         var dispatcher = new FakeAdDispatcher();
@@ -253,7 +252,7 @@ public class FullScreenAdUnitTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator 보상_이벤트_후_닫히면_Rewarded와_보상정보를_반환한다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 보상_이벤트_후_닫히면_Rewarded와_보상정보를_반환한다() => AwaitableTest.Run(async () =>
     {
         var adapter = new FakeFullScreenAdapter();
         var dispatcher = new FakeAdDispatcher();
@@ -276,7 +275,7 @@ public class FullScreenAdUnitTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator 보상없이_닫히면_Dismissed를_반환한다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 보상없이_닫히면_Dismissed를_반환한다() => AwaitableTest.Run(async () =>
     {
         var adapter = new FakeFullScreenAdapter();
         var dispatcher = new FakeAdDispatcher();
@@ -297,7 +296,7 @@ public class FullScreenAdUnitTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator 전면광고는_보상없이_닫히면_Shown을_반환한다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 전면광고는_보상없이_닫히면_Shown을_반환한다() => AwaitableTest.Run(async () =>
     {
         var adapter = new FakeFullScreenAdapter();
         var dispatcher = new FakeAdDispatcher();
@@ -318,7 +317,7 @@ public class FullScreenAdUnitTest
     [UnityTest]
     [Timeout(5000)]
     public IEnumerator 닫힘이_보상보다_먼저_와도_유예_프레임_안에서_Rewarded로_확정된다() =>
-        UniTask.ToCoroutine(async () =>
+        AwaitableTest.Run(async () =>
     {
         // 일부 미디에이션 네트워크가 실제로 이 순서로 이벤트를 보낸다.
         // 유예 프레임이 없으면 유저가 광고를 다 봤는데도 보상을 잃는다.
@@ -342,7 +341,7 @@ public class FullScreenAdUnitTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator 유예_프레임이_0이면_닫힘_즉시_확정한다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 유예_프레임이_0이면_닫힘_즉시_확정한다() => AwaitableTest.Run(async () =>
     {
         var adapter = new FakeFullScreenAdapter();
         var dispatcher = new FakeAdDispatcher();
@@ -361,7 +360,7 @@ public class FullScreenAdUnitTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator 늦게_도착한_보상이_다음_쇼로_새지_않는다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 늦게_도착한_보상이_다음_쇼로_새지_않는다() => AwaitableTest.Run(async () =>
     {
         var adapter = new FakeFullScreenAdapter();
         var dispatcher = new FakeAdDispatcher();
@@ -398,7 +397,7 @@ public class FullScreenAdUnitTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator 표시_실패_전에_래치된_보상이_다음_쇼로_새지_않는다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 표시_실패_전에_래치된_보상이_다음_쇼로_새지_않는다() => AwaitableTest.Run(async () =>
     {
         var adapter = new FakeFullScreenAdapter();
         var dispatcher = new FakeAdDispatcher();
@@ -434,7 +433,7 @@ public class FullScreenAdUnitTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator 중복된_Closed는_Closed_이벤트를_한_번만_발화한다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 중복된_Closed는_Closed_이벤트를_한_번만_발화한다() => AwaitableTest.Run(async () =>
     {
         var adapter = new FakeFullScreenAdapter();
         var dispatcher = new FakeAdDispatcher();
@@ -485,7 +484,7 @@ public class FullScreenAdUnitTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator 늦은_Closed는_다음_쇼를_확정시키지_않는다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 늦은_Closed는_다음_쇼를_확정시키지_않는다() => AwaitableTest.Run(async () =>
     {
         var adapter = new FakeFullScreenAdapter();
         var dispatcher = new FakeAdDispatcher();
@@ -531,7 +530,7 @@ public class FullScreenAdUnitTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator Dispose는_대기_중인_ShowAsync를_Failed로_완료시킨다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator Dispose는_대기_중인_ShowAsync를_Failed로_완료시킨다() => AwaitableTest.Run(async () =>
     {
         var adapter = new FakeFullScreenAdapter();
         var dispatcher = new FakeAdDispatcher();
@@ -549,7 +548,7 @@ public class FullScreenAdUnitTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator 광고가_닫히면_다음_광고를_자동으로_로드한다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 광고가_닫히면_다음_광고를_자동으로_로드한다() => AwaitableTest.Run(async () =>
     {
         var adapter = new FakeFullScreenAdapter();
         var dispatcher = new FakeAdDispatcher();
@@ -569,7 +568,7 @@ public class FullScreenAdUnitTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator 표시에_실패하면_다음_광고를_자동으로_로드한다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 표시에_실패하면_다음_광고를_자동으로_로드한다() => AwaitableTest.Run(async () =>
     {
         // 표시 실패는 대개 만료·소진된 광고가 원인이라 즉시 새로 받아와야 한다.
         var adapter = new FakeFullScreenAdapter();
@@ -611,7 +610,7 @@ public class FullScreenAdUnitTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator 해제된_뒤의_ShowAsync는_Failed를_반환한다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 해제된_뒤의_ShowAsync는_Failed를_반환한다() => AwaitableTest.Run(async () =>
     {
         var adapter = new FakeFullScreenAdapter();
         var dispatcher = new FakeAdDispatcher();
@@ -628,7 +627,7 @@ public class FullScreenAdUnitTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator 중복된_표시_실패는_재로드를_한_번만_한다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 중복된_표시_실패는_재로드를_한_번만_한다() => AwaitableTest.Run(async () =>
     {
         var adapter = new FakeFullScreenAdapter();
         var dispatcher = new FakeAdDispatcher();
@@ -656,7 +655,7 @@ public class FullScreenAdUnitTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator 광고제거_상태에서_전면광고는_Blocked를_반환한다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 광고제거_상태에서_전면광고는_Blocked를_반환한다() => AwaitableTest.Run(async () =>
     {
         var adapter = new FakeFullScreenAdapter();
         var dispatcher = new FakeAdDispatcher();
@@ -672,7 +671,7 @@ public class FullScreenAdUnitTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator 광고제거_상태에서도_보상형_광고는_정상_표시된다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 광고제거_상태에서도_보상형_광고는_정상_표시된다() => AwaitableTest.Run(async () =>
     {
         // 보상형은 유저가 자발적으로 보는 것이라 광고제거 대상이 아니다.
         var adapter = new FakeFullScreenAdapter();
@@ -696,7 +695,7 @@ public class FullScreenAdUnitTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator 전면광고는_표시_후_쿨다운_동안_재표시가_Blocked된다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 전면광고는_표시_후_쿨다운_동안_재표시가_Blocked된다() => AwaitableTest.Run(async () =>
     {
         var adapter = new FakeFullScreenAdapter();
         var dispatcher = new FakeAdDispatcher();
@@ -718,7 +717,7 @@ public class FullScreenAdUnitTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator 쿨다운이_지나면_전면광고가_다시_표시된다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 쿨다운이_지나면_전면광고가_다시_표시된다() => AwaitableTest.Run(async () =>
     {
         var adapter = new FakeFullScreenAdapter();
         var dispatcher = new FakeAdDispatcher();
@@ -754,7 +753,7 @@ public class FullScreenAdUnitTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator CanShow은_쿨다운_동안_거짓이고_지나면_참이다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator CanShow은_쿨다운_동안_거짓이고_지나면_참이다() => AwaitableTest.Run(async () =>
     {
         var adapter = new FakeFullScreenAdapter();
         var dispatcher = new FakeAdDispatcher();
@@ -803,7 +802,7 @@ public class FullScreenAdUnitTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator 쿨다운이_0이면_표시_직후에도_다시_표시할_수_있다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 쿨다운이_0이면_표시_직후에도_다시_표시할_수_있다() => AwaitableTest.Run(async () =>
     {
         var adapter = new FakeFullScreenAdapter();
         var dispatcher = new FakeAdDispatcher();
@@ -843,7 +842,7 @@ public class FullScreenAdUnitTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator 쿨다운은_표시_요청이_아니라_실제_표시_시점에_시작된다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 쿨다운은_표시_요청이_아니라_실제_표시_시점에_시작된다() => AwaitableTest.Run(async () =>
     {
         // StartCooldown이 ShowAsync(요청 시점)가 아니라 OnDisplayed(표시 시점)에서 불려야 한다.
         // 표시에 실패한(유저가 광고를 보지 못한) 쇼는 쿨다운을 걸면 안 된다 — 요청 시점에
@@ -868,7 +867,7 @@ public class FullScreenAdUnitTest
     [UnityTest]
     [Timeout(5000)]
     public IEnumerator 쿨다운_중에는_준비_여부보다_먼저_Blocked를_반환하고_로드를_트리거하지_않는다() =>
-        UniTask.ToCoroutine(async () =>
+        AwaitableTest.Run(async () =>
     {
         // ShowAsync 가드 순서: 쿨다운 검사가 !IsReady 검사보다 먼저다. 순서가 뒤바뀌면
         // 쿨다운 중에도 NotReady로 오판해 불필요한 Load()가 트리거된다 — 낭비되는 SDK 요청이다.
@@ -894,7 +893,7 @@ public class FullScreenAdUnitTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator 표시_중_재진입은_쿨다운보다_먼저_Failed로_진단된다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 표시_중_재진입은_쿨다운보다_먼저_Failed로_진단된다() => AwaitableTest.Run(async () =>
     {
         // ShowAsync 가드 순서: _showCompletion(이미 표시 중) 검사가 쿨다운 검사보다 먼저다.
         // 재진입은 "이미 표시 중"이라는 더 정확한 진단(Failed(-2))을 받아야 하고, 쿨다운으로
@@ -943,7 +942,7 @@ public class FullScreenAdUnitTest
     [UnityTest]
     [Timeout(5000)]
     public IEnumerator 로드가_진행_중이면_ShowAsync는_NotReady를_반환하되_어댑터에_중복_로드를_요청하지_않는다() =>
-        UniTask.ToCoroutine(async () =>
+        AwaitableTest.Run(async () =>
     {
         // AppLovin MAX는 같은 광고 단위에 로드가 진행 중일 때 다시 Load하면 경고를 찍고
         // 무시한다. 폴링(show → NotReady → 대기 → show)이 매 시도마다 어댑터를 다시

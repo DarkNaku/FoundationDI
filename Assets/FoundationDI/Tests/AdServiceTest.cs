@@ -1,6 +1,5 @@
 using System.Collections;
 using System.Collections.Generic;
-using Cysharp.Threading.Tasks;
 using DarkNaku.FoundationDI;
 using NUnit.Framework;
 using UnityEngine.TestTools;
@@ -32,7 +31,7 @@ public class AdServiceTest
     [UnityTest]
     [Timeout(5000)]
     public IEnumerator 초기화에_성공하면_IsInitialized가_참이_되고_전면과_보상을_로드한다() =>
-        UniTask.ToCoroutine(async () =>
+        AwaitableTest.Run(async () =>
     {
         var provider = new FakeAdProvider();
         var sut = new AdService(provider, new FakeAdDispatcher(), NewOptions(), new FakeRemovalStorage());
@@ -51,7 +50,7 @@ public class AdServiceTest
     [UnityTest]
     [Timeout(5000)]
     public IEnumerator 초기화에_실패하면_false를_반환하고_광고를_요청하지_않는다() =>
-        UniTask.ToCoroutine(async () =>
+        AwaitableTest.Run(async () =>
     {
         var provider = new FakeAdProvider { InitializeResult = false };
         var sut = new AdService(provider, new FakeAdDispatcher(), NewOptions(), new FakeRemovalStorage());
@@ -69,7 +68,7 @@ public class AdServiceTest
     [UnityTest]
     [Timeout(5000)]
     public IEnumerator 자동로드가_꺼져있으면_초기화해도_광고를_로드하지_않는다() =>
-        UniTask.ToCoroutine(async () =>
+        AwaitableTest.Run(async () =>
     {
         var provider = new FakeAdProvider();
         var sut = new AdService(provider, new FakeAdDispatcher(),
@@ -83,7 +82,7 @@ public class AdServiceTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator 어댑터_이벤트가_포맷과_함께_서비스_이벤트로_전파된다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 어댑터_이벤트가_포맷과_함께_서비스_이벤트로_전파된다() => AwaitableTest.Run(async () =>
     {
         var provider = new FakeAdProvider();
         var dispatcher = new FakeAdDispatcher();
@@ -126,7 +125,7 @@ public class AdServiceTest
     [UnityTest]
     [Timeout(5000)]
     public IEnumerator 어댑터_임프레션과_provider_전역_임프레션이_모두_Paid로_합류한다() =>
-        UniTask.ToCoroutine(async () =>
+        AwaitableTest.Run(async () =>
     {
         // LevelPlay는 전역 경로, AdMob/MAX는 어댑터 경로를 쓴다. 둘 다 새지 않아야 한다.
         var provider = new FakeAdProvider();
@@ -156,7 +155,7 @@ public class AdServiceTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator 광고제거_상태는_저장소에_영속화되고_생성시_복원된다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 광고제거_상태는_저장소에_영속화되고_생성시_복원된다() => AwaitableTest.Run(async () =>
     {
         var storage = new FakeRemovalStorage { Value = true };
         var sut = new AdService(new FakeAdProvider(), new FakeAdDispatcher(), NewOptions(), storage);
@@ -176,12 +175,12 @@ public class AdServiceTest
         Assert.AreEqual(saveCountBefore, storage.SaveCount, "값이 안 바뀌었는데 저장했다");
         Assert.AreEqual(1, changes.Count, "값이 안 바뀌었는데 이벤트를 쐈다");
 
-        await UniTask.Yield();
+        await AwaitableTest.NextFrame();
     });
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator 광고제거를_켜면_배너가_사라진다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 광고제거를_켜면_배너가_사라진다() => AwaitableTest.Run(async () =>
     {
         var provider = new FakeAdProvider();
         var sut = new AdService(provider, new FakeAdDispatcher(), NewOptions(), new FakeRemovalStorage());
@@ -199,7 +198,7 @@ public class AdServiceTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator Dispose는_provider와_모든_광고_유닛을_해제한다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator Dispose는_provider와_모든_광고_유닛을_해제한다() => AwaitableTest.Run(async () =>
     {
         var provider = new FakeAdProvider();
         var sut = new AdService(provider, new FakeAdDispatcher(), NewOptions(), new FakeRemovalStorage());
@@ -227,7 +226,7 @@ public class AdServiceTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator 초기화_전에_Dispose를_호출해도_안전하다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 초기화_전에_Dispose를_호출해도_안전하다() => AwaitableTest.Run(async () =>
     {
         var provider = new FakeAdProvider();
         var sut = new AdService(provider, new FakeAdDispatcher(), NewOptions(), new FakeRemovalStorage());
@@ -236,13 +235,13 @@ public class AdServiceTest
         Assert.IsTrue(provider.IsDisposed);
         Assert.IsFalse(sut.IsInitialized);
 
-        await UniTask.Yield();
+        await AwaitableTest.NextFrame();
     });
 
     [UnityTest]
     [Timeout(5000)]
     public IEnumerator Dispose_이후에는_InitializeAsync가_거짓을_반환하고_다시_초기화하지_않는다() =>
-        UniTask.ToCoroutine(async () =>
+        AwaitableTest.Run(async () =>
     {
         var provider = new FakeAdProvider();
         var storage = new FakeRemovalStorage();
@@ -266,7 +265,7 @@ public class AdServiceTest
     [UnityTest]
     [Timeout(5000)]
     public IEnumerator 초기화_진행중에_다시_호출하면_새로_시작하지_않고_같은_결과에_편승한다() =>
-        UniTask.ToCoroutine(async () =>
+        AwaitableTest.Run(async () =>
     {
         // 부트스트랩 시퀀스와 UI 화면이 같은 프레임에 각각 초기화를 기다리는 상황.
         var provider = new FakeAdProvider { DeferInitialize = true };
@@ -301,7 +300,7 @@ public class AdServiceTest
     [UnityTest]
     [Timeout(5000)]
     public IEnumerator 초기화_시_비어있는_광고단위ID는_포맷명과_함께_에러_로그를_남긴다() =>
-        UniTask.ToCoroutine(async () =>
+        AwaitableTest.Run(async () =>
     {
         // AdUnitId.IsValid가 있어도 아무도 부르지 않으면 빈 ID가 그대로 SDK로 넘어가
         // 원인이 안 보이는 로드 에러로만 드러난다. 여기서 미리 잡아 포맷명을 남긴다.
@@ -326,7 +325,7 @@ public class AdServiceTest
     [UnityTest]
     [Timeout(5000)]
     public IEnumerator Dummy_provider는_비어있는_광고단위ID여도_에러를_남기지_않는다() =>
-        UniTask.ToCoroutine(async () =>
+        AwaitableTest.Run(async () =>
     {
         // Dummy provider는 미설정 ID로 정상 동작하도록 설계됐다 — 실기 스모크마다
         // 매번 에러 로그가 찍히면 안 된다.
@@ -351,7 +350,7 @@ public class AdServiceTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator 초기화에_실패한_뒤_다시_호출하면_새로_시도한다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 초기화에_실패한_뒤_다시_호출하면_새로_시도한다() => AwaitableTest.Run(async () =>
     {
         var provider = new FakeAdProvider { DeferInitialize = true };
         var sut = new AdService(provider, new FakeAdDispatcher(), NewOptions(), new FakeRemovalStorage());
@@ -379,7 +378,7 @@ public class AdServiceTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator 설정된_전면_쿨다운은_보상형에는_적용되지_않는다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 설정된_전면_쿨다운은_보상형에는_적용되지_않는다() => AwaitableTest.Run(async () =>
     {
         // BuildAdUnits이 옵션의 쿨다운을 전면에만 흘려보내고 보상에는 0을 넘기는지 확인한다.
         var provider = new FakeAdProvider();

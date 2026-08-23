@@ -1,7 +1,6 @@
 using System.Collections;
 using System.Linq;
 using System.Text.RegularExpressions;
-using Cysharp.Threading.Tasks;
 using DarkNaku.FoundationDI;
 using NUnit.Framework;
 using UnityEngine;
@@ -46,7 +45,7 @@ public class AnalyticsServiceTest
     [UnityTest]
     [Timeout(5000)]
     public IEnumerator 이벤트를_발행하면_모든_provider가_각각_한_번씩_받는다() =>
-        UniTask.ToCoroutine(async () =>
+        AwaitableTest.Run(async () =>
     {
         var a = new FakeAnalyticsProvider("A");
         var b = new FakeAnalyticsProvider("B");
@@ -64,7 +63,7 @@ public class AnalyticsServiceTest
     [UnityTest]
     [Timeout(5000)]
     public IEnumerator 한_provider가_예외를_던져도_나머지_provider는_호출된다() =>
-        UniTask.ToCoroutine(async () =>
+        AwaitableTest.Run(async () =>
     {
         var broken = new FakeAnalyticsProvider("Broken") { ThrowOnLogEvent = true };
         var healthy = new FakeAnalyticsProvider("Healthy");
@@ -81,7 +80,7 @@ public class AnalyticsServiceTest
     [UnityTest]
     [Timeout(5000)]
     public IEnumerator 초기화_전_이벤트는_버퍼링됐다가_초기화_후_순서대로_전달된다() =>
-        UniTask.ToCoroutine(async () =>
+        AwaitableTest.Run(async () =>
     {
         var provider = new FakeAnalyticsProvider();
         var sut = new AnalyticsService(new IAnalyticsProvider[] { provider }, NewOptions());
@@ -103,7 +102,7 @@ public class AnalyticsServiceTest
     [UnityTest]
     [Timeout(5000)]
     public IEnumerator 초기화_전_SetUserProperty는_같은_키의_마지막_값만_전달된다() =>
-        UniTask.ToCoroutine(async () =>
+        AwaitableTest.Run(async () =>
     {
         var provider = new FakeAnalyticsProvider();
         var sut = new AnalyticsService(new IAnalyticsProvider[] { provider }, NewOptions());
@@ -123,7 +122,7 @@ public class AnalyticsServiceTest
     [UnityTest]
     [Timeout(5000)]
     public IEnumerator 초기화_시_유저_상태가_버퍼된_이벤트보다_먼저_전달된다() =>
-        UniTask.ToCoroutine(async () =>
+        AwaitableTest.Run(async () =>
     {
         var provider = new FakeAnalyticsProvider();
         var sut = new AnalyticsService(new IAnalyticsProvider[] { provider }, NewOptions());
@@ -150,7 +149,7 @@ public class AnalyticsServiceTest
     [UnityTest]
     [Timeout(5000)]
     public IEnumerator provider_하나가_초기화에_실패해도_초기화는_성공하고_실패한_provider에는_전달되지_않는다() =>
-        UniTask.ToCoroutine(async () =>
+        AwaitableTest.Run(async () =>
     {
         var failing = new FakeAnalyticsProvider("Failing") { InitializeResult = false };
         var healthy = new FakeAnalyticsProvider("Healthy");
@@ -171,7 +170,7 @@ public class AnalyticsServiceTest
     [UnityTest]
     [Timeout(5000)]
     public IEnumerator 모든_provider가_초기화에_실패하면_false를_반환하고_버퍼는_유지된다() =>
-        UniTask.ToCoroutine(async () =>
+        AwaitableTest.Run(async () =>
     {
         var provider = new FakeAnalyticsProvider("Only") { InitializeResult = false };
         var sut = new AnalyticsService(new IAnalyticsProvider[] { provider }, NewOptions());
@@ -198,7 +197,7 @@ public class AnalyticsServiceTest
     [UnityTest]
     [Timeout(5000)]
     public IEnumerator InitializeAsync는_재진입해도_초기화를_두_번_시작하지_않는다() =>
-        UniTask.ToCoroutine(async () =>
+        AwaitableTest.Run(async () =>
     {
         var provider = new FakeAnalyticsProvider { DeferInitialize = true };
         var sut = new AnalyticsService(new IAnalyticsProvider[] { provider }, NewOptions());
@@ -222,7 +221,7 @@ public class AnalyticsServiceTest
     [UnityTest]
     [Timeout(5000)]
     public IEnumerator CollectionEnabled가_false면_어떤_provider에도_전달되지_않는다() =>
-        UniTask.ToCoroutine(async () =>
+        AwaitableTest.Run(async () =>
     {
         var provider = new FakeAnalyticsProvider();
         var sut = new AnalyticsService(new IAnalyticsProvider[] { provider },
@@ -251,7 +250,7 @@ public class AnalyticsServiceTest
     [UnityTest]
     [Timeout(5000)]
     public IEnumerator CollectionEnabled를_바꾸면_모든_provider에_전파되고_같은_값_재설정은_전파되지_않는다() =>
-        UniTask.ToCoroutine(async () =>
+        AwaitableTest.Run(async () =>
     {
         var a = new FakeAnalyticsProvider("A");
         var b = new FakeAnalyticsProvider("B");
@@ -272,7 +271,7 @@ public class AnalyticsServiceTest
     [UnityTest]
     [Timeout(5000)]
     public IEnumerator Dispose하면_모든_provider가_Dispose되고_이후_호출은_무시된다() =>
-        UniTask.ToCoroutine(async () =>
+        AwaitableTest.Run(async () =>
     {
         var a = new FakeAnalyticsProvider("A");
         var b = new FakeAnalyticsProvider("B");
