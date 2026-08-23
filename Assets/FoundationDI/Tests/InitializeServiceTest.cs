@@ -2,7 +2,6 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
-using Cysharp.Threading.Tasks;
 using DarkNaku.FoundationDI;
 using NSubstitute;
 using NUnit.Framework;
@@ -53,7 +52,7 @@ public class InitializeServiceTest
     }
 
     [UnityTest]
-    public IEnumerator 카탈로그_아이템을_선언_순서대로_초기화한다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 카탈로그_아이템을_선언_순서대로_초기화한다() => AwaitableTest.Run(async () =>
     {
         var log = new List<string>();
         var a = NewItem("A", log);
@@ -67,7 +66,7 @@ public class InitializeServiceTest
     });
 
     [UnityTest]
-    public IEnumerator 각_아이템에_resolver를_전달한다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 각_아이템에_resolver를_전달한다() => AwaitableTest.Run(async () =>
     {
         var resolver = Substitute.For<IObjectResolver>();
         var a = NewItem("A");
@@ -80,7 +79,7 @@ public class InitializeServiceTest
     });
 
     [UnityTest]
-    public IEnumerator 이미_초기화된_아이템은_다시_초기화하지_않는다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 이미_초기화된_아이템은_다시_초기화하지_않는다() => AwaitableTest.Run(async () =>
     {
         var a = NewItem("A");
         var catalog = NewCatalog(a);
@@ -93,7 +92,7 @@ public class InitializeServiceTest
     });
 
     [UnityTest]
-    public IEnumerator 완료된_카탈로그_재호출은_조기반환한다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 완료된_카탈로그_재호출은_조기반환한다() => AwaitableTest.Run(async () =>
     {
         var a = NewItem("A");
         var catalog = NewCatalog(a);
@@ -111,7 +110,7 @@ public class InitializeServiceTest
     });
 
     [UnityTest]
-    public IEnumerator 두_카탈로그에_겹치는_아이템은_한번만_초기화된다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 두_카탈로그에_겹치는_아이템은_한번만_초기화된다() => AwaitableTest.Run(async () =>
     {
         var shared = NewItem("S");
         var catalog1 = NewCatalog(shared);
@@ -125,7 +124,7 @@ public class InitializeServiceTest
     });
 
     [UnityTest]
-    public IEnumerator 아이템이_예외를_던지면_중단하고_예외를_전파한다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 아이템이_예외를_던지면_중단하고_예외를_전파한다() => AwaitableTest.Run(async () =>
     {
         var boom = new InvalidOperationException("boom");
         var a = NewItem("A", throwOn: boom);
@@ -142,7 +141,7 @@ public class InitializeServiceTest
     });
 
     [UnityTest]
-    public IEnumerator 실패후_재호출하면_완료된_아이템은_스킵하고_실패지점부터_재개한다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 실패후_재호출하면_완료된_아이템은_스킵하고_실패지점부터_재개한다() => AwaitableTest.Run(async () =>
     {
         var a = NewItem("A");
         var b = NewItem("B", throwOn: new InvalidOperationException("boom"));
@@ -165,7 +164,7 @@ public class InitializeServiceTest
     });
 
     [UnityTest]
-    public IEnumerator Dispose후에는_세션상태가_초기화되어_다시_실행된다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator Dispose후에는_세션상태가_초기화되어_다시_실행된다() => AwaitableTest.Run(async () =>
     {
         var a = NewItem("A");
         var catalog = NewCatalog(a);
@@ -179,7 +178,7 @@ public class InitializeServiceTest
     });
 
     [UnityTest]
-    public IEnumerator 카탈로그의_null_아이템은_건너뛴다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 카탈로그의_null_아이템은_건너뛴다() => AwaitableTest.Run(async () =>
     {
         var a = NewItem("A");
         var b = NewItem("B");

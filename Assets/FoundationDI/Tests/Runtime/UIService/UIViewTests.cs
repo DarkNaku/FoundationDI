@@ -1,6 +1,5 @@
 using System.Collections;
 using System.Threading;
-using Cysharp.Threading.Tasks;
 using NSubstitute;
 using NUnit.Framework;
 using UnityEngine;
@@ -34,7 +33,7 @@ public class UIViewTests
     }
 
     [UnityTest]
-    public IEnumerator Transition_오버라이드는_ShowAsync와_HideAsync에_모두_적용된다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator Transition_오버라이드는_ShowAsync와_HideAsync에_모두_적용된다() => AwaitableTest.Run(async () =>
     {
         var go = new GameObject("v", typeof(RectTransform), typeof(CanvasGroup));
         var view = go.AddComponent<TestView>();

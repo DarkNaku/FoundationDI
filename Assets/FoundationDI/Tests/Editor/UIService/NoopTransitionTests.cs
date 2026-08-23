@@ -1,6 +1,5 @@
 using System.Collections;
 using System.Threading;
-using Cysharp.Threading.Tasks;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
@@ -9,7 +8,7 @@ using DarkNaku.FoundationDI;
 public class NoopTransitionTests
 {
     [UnityTest]
-    public IEnumerator Noop은_즉시_완료된다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator Noop은_즉시_완료된다() => AwaitableTest.Run(async () =>
     {
         var go = new GameObject("t", typeof(RectTransform));
         var rt = go.GetComponent<RectTransform>();

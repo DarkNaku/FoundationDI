@@ -1,6 +1,5 @@
 using System.Collections;
 using System.Collections.Generic;
-using Cysharp.Threading.Tasks;
 using DarkNaku.FoundationDI;
 using NUnit.Framework;
 using UnityEngine;
@@ -30,7 +29,7 @@ public class DummyIapProviderTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator 초기화하면_카탈로그가_가짜_가격으로_노출된다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 초기화하면_카탈로그가_가짜_가격으로_노출된다() => AwaitableTest.Run(async () =>
     {
         var provider = NewProvider();
 
@@ -45,7 +44,7 @@ public class DummyIapProviderTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator 구매하면_미확정_구매가_발행된다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 구매하면_미확정_구매가_발행된다() => AwaitableTest.Run(async () =>
     {
         var provider = NewProvider();
         await provider.InitializeAsync(Context());
@@ -65,7 +64,7 @@ public class DummyIapProviderTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator 모르는_상품은_구매를_시작하지_않는다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 모르는_상품은_구매를_시작하지_않는다() => AwaitableTest.Run(async () =>
     {
         var provider = NewProvider();
         await provider.InitializeAsync(Context());
@@ -77,7 +76,7 @@ public class DummyIapProviderTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator AlwaysCancel과_AlwaysFail이_실패_경로를_재현한다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator AlwaysCancel과_AlwaysFail이_실패_경로를_재현한다() => AwaitableTest.Run(async () =>
     {
         var cancelling = NewProvider(alwaysCancel: true);
         await cancelling.InitializeAsync(Context());
@@ -104,7 +103,7 @@ public class DummyIapProviderTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator 확정한_비소모성만_복원된다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 확정한_비소모성만_복원된다() => AwaitableTest.Run(async () =>
     {
         var provider = NewProvider();
         await provider.InitializeAsync(Context());

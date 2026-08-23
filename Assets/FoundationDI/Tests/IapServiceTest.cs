@@ -1,6 +1,5 @@
 using System.Collections;
 using System.Text.RegularExpressions;
-using Cysharp.Threading.Tasks;
 using DarkNaku.FoundationDI;
 using NUnit.Framework;
 using UnityEngine;
@@ -27,7 +26,7 @@ public class IapServiceTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator 초기화하면_provider_상품이_노출된다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 초기화하면_provider_상품이_노출된다() => AwaitableTest.Run(async () =>
     {
         var provider = new FakeIapProvider();
         var sut = NewService(provider);
@@ -44,7 +43,7 @@ public class IapServiceTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator 초기화에_실패하면_상품이_비고_구매는_NotReady다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 초기화에_실패하면_상품이_비고_구매는_NotReady다() => AwaitableTest.Run(async () =>
     {
         var provider = new FakeIapProvider { InitializeResult = false };
         var sut = NewService(provider);
@@ -61,7 +60,7 @@ public class IapServiceTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator 초기화_전_구매는_NotReady다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 초기화_전_구매는_NotReady다() => AwaitableTest.Run(async () =>
     {
         var sut = NewService(new FakeIapProvider());
 
@@ -72,7 +71,7 @@ public class IapServiceTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator InitializeAsync는_재진입해도_provider를_한_번만_초기화한다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator InitializeAsync는_재진입해도_provider를_한_번만_초기화한다() => AwaitableTest.Run(async () =>
     {
         var provider = new FakeIapProvider();
         var sut = NewService(provider);
@@ -91,7 +90,7 @@ public class IapServiceTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator 구매가_검증_지급_확정_순서로_진행된다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 구매가_검증_지급_확정_순서로_진행된다() => AwaitableTest.Run(async () =>
     {
         var provider = new FakeIapProvider();
         var fulfillment = new FakeFulfillment();
@@ -124,7 +123,7 @@ public class IapServiceTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator 지급이_실패하면_확정하지_않는다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 지급이_실패하면_확정하지_않는다() => AwaitableTest.Run(async () =>
     {
         var provider = new FakeIapProvider();
         var fulfillment = new FakeFulfillment { Result = false };
@@ -146,7 +145,7 @@ public class IapServiceTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator 지급이_예외를_던져도_확정하지_않고_서비스가_살아있다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 지급이_예외를_던져도_확정하지_않고_서비스가_살아있다() => AwaitableTest.Run(async () =>
     {
         var provider = new FakeIapProvider();
         var sut = NewService(provider, new FakeFulfillment { Throw = true });
@@ -164,7 +163,7 @@ public class IapServiceTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator 영수증_검증에_실패하면_지급도_확정도_하지_않는다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 영수증_검증에_실패하면_지급도_확정도_하지_않는다() => AwaitableTest.Run(async () =>
     {
         var provider = new FakeIapProvider();
         var fulfillment = new FakeFulfillment();
@@ -185,7 +184,7 @@ public class IapServiceTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator 비소모성은_확정_후_소유로_기록되고_소모성은_아니다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 비소모성은_확정_후_소유로_기록되고_소모성은_아니다() => AwaitableTest.Run(async () =>
     {
         var provider = new FakeIapProvider();
         var sut = NewService(provider);
@@ -210,7 +209,7 @@ public class IapServiceTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator 카탈로그에_없는_구매가_도착하면_확정하지_않고_경고한다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 카탈로그에_없는_구매가_도착하면_확정하지_않고_경고한다() => AwaitableTest.Run(async () =>
     {
         var provider = new FakeIapProvider();
         var fulfillment = new FakeFulfillment();
@@ -220,7 +219,7 @@ public class IapServiceTest
         LogAssert.Expect(LogType.Warning, new Regex("IAPService"));
 
         provider.RaisePending(new IapPendingPurchase("unknown_store", "tx-x", "r", false));
-        await UniTask.Yield();
+        await AwaitableTest.NextFrame();
 
         Assert.IsEmpty(fulfillment.Calls);
         Assert.IsEmpty(provider.ConfirmCalls, "지급할 수 없는 구매를 확정하면 영영 되찾을 수 없다");
@@ -228,7 +227,7 @@ public class IapServiceTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator 사용자_취소와_그_외_실패를_구분한다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 사용자_취소와_그_외_실패를_구분한다() => AwaitableTest.Run(async () =>
     {
         var provider = new FakeIapProvider();
         var sut = NewService(provider);
@@ -248,7 +247,7 @@ public class IapServiceTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator 다른_상품의_실패는_대기_중인_구매를_끝내지_않는다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 다른_상품의_실패는_대기_중인_구매를_끝내지_않는다() => AwaitableTest.Run(async () =>
     {
         var provider = new FakeIapProvider();
         var sut = NewService(provider);
@@ -264,7 +263,7 @@ public class IapServiceTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator 이미_소유한_비소모성은_스토어를_거치지_않는다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 이미_소유한_비소모성은_스토어를_거치지_않는다() => AwaitableTest.Run(async () =>
     {
         var provider = new FakeIapProvider();
         var entitlements = new FakeEntitlementStorage();
@@ -282,7 +281,7 @@ public class IapServiceTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator 구매가_진행_중이면_두_번째_호출은_즉시_NotReady다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 구매가_진행_중이면_두_번째_호출은_즉시_NotReady다() => AwaitableTest.Run(async () =>
     {
         var provider = new FakeIapProvider();
         var sut = NewService(provider);
@@ -300,7 +299,7 @@ public class IapServiceTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator provider가_구매_시작을_거부하면_Failed다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator provider가_구매_시작을_거부하면_Failed다() => AwaitableTest.Run(async () =>
     {
         var provider = new FakeIapProvider { PurchaseResult = false };
         var sut = NewService(provider);
@@ -318,7 +317,7 @@ public class IapServiceTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator 카탈로그에_없는_상품_구매는_NotReady다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 카탈로그에_없는_상품_구매는_NotReady다() => AwaitableTest.Run(async () =>
     {
         var sut = NewService(new FakeIapProvider());
         await sut.InitializeAsync();
@@ -330,7 +329,7 @@ public class IapServiceTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator 미확정_구매는_초기화_때_지급되고_확정된다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 미확정_구매는_초기화_때_지급되고_확정된다() => AwaitableTest.Run(async () =>
     {
         var provider = new FakeIapProvider();
         provider.PendingOnInitialize.Add(new IapPendingPurchase("gems_store", "tx-old", "r", false));
@@ -338,7 +337,7 @@ public class IapServiceTest
         var sut = NewService(provider, fulfillment);
 
         await sut.InitializeAsync();
-        await UniTask.Yield();   // async void 핸들러가 끝날 틈을 준다
+        await AwaitableTest.NextFrame();   // async void 핸들러가 끝날 틈을 준다
 
         Assert.AreEqual(1, fulfillment.Calls.Count, "재전달된 구매가 지급되지 않았다");
         CollectionAssert.AreEqual(new[] { "tx-old" }, provider.ConfirmCalls);
@@ -346,7 +345,7 @@ public class IapServiceTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator 복원은_비소모성_소유를_되살리고_개수를_보고한다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 복원은_비소모성_소유를_되살리고_개수를_보고한다() => AwaitableTest.Run(async () =>
     {
         var provider = new FakeIapProvider();
         provider.PendingOnRestore.Add(new IapPendingPurchase("remove_ads_store", "tx-r", "r", true));
@@ -367,7 +366,7 @@ public class IapServiceTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator 복원이_실패하면_Success가_거짓이다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 복원이_실패하면_Success가_거짓이다() => AwaitableTest.Run(async () =>
     {
         var provider = new FakeIapProvider { RestoreResult = false };
         var sut = NewService(provider);
@@ -381,7 +380,7 @@ public class IapServiceTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator 초기화_전_복원은_실패한다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 초기화_전_복원은_실패한다() => AwaitableTest.Run(async () =>
     {
         var sut = NewService(new FakeIapProvider());
 
@@ -392,7 +391,7 @@ public class IapServiceTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator 보류된_구매는_지급하지_않고_Deferred를_반환한다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 보류된_구매는_지급하지_않고_Deferred를_반환한다() => AwaitableTest.Run(async () =>
     {
         var provider = new FakeIapProvider();
         var fulfillment = new FakeFulfillment();
@@ -408,7 +407,7 @@ public class IapServiceTest
 
         // 나중에 승인되면 같은 파이프라인으로 들어와 지급된다.
         provider.RaisePending(new IapPendingPurchase("gems_store", "tx-late", "r", false));
-        await UniTask.Yield();
+        await AwaitableTest.NextFrame();
 
         Assert.AreEqual(1, fulfillment.Calls.Count);
         CollectionAssert.AreEqual(new[] { "tx-late" }, provider.ConfirmCalls);
@@ -416,7 +415,7 @@ public class IapServiceTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator Dispose하면_provider가_해제되고_이후_구매는_NotReady다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator Dispose하면_provider가_해제되고_이후_구매는_NotReady다() => AwaitableTest.Run(async () =>
     {
         var provider = new FakeIapProvider();
         var sut = NewService(provider);
@@ -432,7 +431,7 @@ public class IapServiceTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator Dispose하면_대기_중인_구매가_매달리지_않는다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator Dispose하면_대기_중인_구매가_매달리지_않는다() => AwaitableTest.Run(async () =>
     {
         var provider = new FakeIapProvider();
         var sut = NewService(provider);

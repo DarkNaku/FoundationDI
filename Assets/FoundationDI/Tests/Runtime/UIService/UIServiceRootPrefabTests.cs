@@ -1,6 +1,5 @@
 using System.Collections;
 using System.Text.RegularExpressions;
-using Cysharp.Threading.Tasks;
 using NSubstitute;
 using NUnit.Framework;
 using UnityEngine;
@@ -54,14 +53,14 @@ public class UIServiceRootPrefabTests
     }
 
     [UnityTest]
-    public IEnumerator Settings에_루트프리팹이_지정되면_그_프리팹을_인스턴스화한다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator Settings에_루트프리팹이_지정되면_그_프리팹을_인스턴스화한다() => AwaitableTest.Run(async () =>
     {
         var settings = ScriptableObject.CreateInstance<UIServiceSettings>();
         settings.RootPrefab = _rootTemplate;
 
         var service = CreateService(settings);
         var p = service.Page<P>();
-        await UniTask.WaitUntil(() => p.Shown);
+        await AwaitableTest.WaitUntil(() => p.Shown);
 
         var clone = p.ViewBase.transform.root.GetComponent<UIRoot>();
 
@@ -76,7 +75,7 @@ public class UIServiceRootPrefabTests
     });
 
     [UnityTest]
-    public IEnumerator Settings에_루트프리팹이_없으면_코드_기본값으로_폴백한다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator Settings에_루트프리팹이_없으면_코드_기본값으로_폴백한다() => AwaitableTest.Run(async () =>
     {
         var settings = ScriptableObject.CreateInstance<UIServiceSettings>();
 
@@ -86,7 +85,7 @@ public class UIServiceRootPrefabTests
 
         var service = CreateService(settings);
         var p = service.Page<P>();
-        await UniTask.WaitUntil(() => p.Shown);
+        await AwaitableTest.WaitUntil(() => p.Shown);
 
         var root = p.ViewBase.transform.root.GetComponent<UIRoot>();
 
@@ -99,7 +98,7 @@ public class UIServiceRootPrefabTests
     });
 
     [UnityTest]
-    public IEnumerator 루트프리팹의_레이어가_비어있으면_에러를_로그하고_UI는_계속_표시된다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 루트프리팹의_레이어가_비어있으면_에러를_로그하고_UI는_계속_표시된다() => AwaitableTest.Run(async () =>
     {
         // PageLayer를 파괴해 fake-null로 만든다 — SetParent(null, false)는 예외를 던지지 않으므로
         // 검증이 없으면 UI가 조용히 씬 루트로 떨어져 화면에서 사라진다(Finding 1).
@@ -112,7 +111,7 @@ public class UIServiceRootPrefabTests
 
         var service = CreateService(settings);
         var p = service.Page<P>();
-        await UniTask.WaitUntil(() => p.Shown);
+        await AwaitableTest.WaitUntil(() => p.Shown);
 
         Assert.IsTrue(p.Shown, "레이어가 비어 있어도 크래시 없이 표시(비록 화면 밖이라도)는 계속되어야 한다");
 

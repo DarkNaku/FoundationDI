@@ -1,6 +1,5 @@
 using System.Collections;
 using System.Threading;
-using Cysharp.Threading.Tasks;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.UI;
@@ -28,7 +27,7 @@ public class SlideTransitionTests
     }
 
     [UnityTest]
-    public IEnumerator Show_완료후_컨텐츠는_home으로_배경알파는_1이다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator Show_완료후_컨텐츠는_home으로_배경알파는_1이다() => AwaitableTest.Run(async () =>
     {
         var slide = NewSlide(out var root, out var content, out var bg);
         TransitionTestHelpers.SetPrivate(slide, "_content", content);
@@ -42,7 +41,7 @@ public class SlideTransitionTests
     });
 
     [UnityTest]
-    public IEnumerator Show_완료후_배경은_디자인알파까지_페이드된다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator Show_완료후_배경은_디자인알파까지_페이드된다() => AwaitableTest.Run(async () =>
     {
         var slide = NewSlide(out var root, out var content, out var bg);
         bg.color = new Color(0f, 0f, 0f, 0.6f); // 반투명 dim 배경
@@ -56,7 +55,7 @@ public class SlideTransitionTests
     });
 
     [UnityTest]
-    public IEnumerator Hide_완료후_컨텐츠는_home으로_복원_배경알파는_0() => UniTask.ToCoroutine(async () =>
+    public IEnumerator Hide_완료후_컨텐츠는_home으로_복원_배경알파는_0() => AwaitableTest.Run(async () =>
     {
         var slide = NewSlide(out var root, out var content, out var bg);
         TransitionTestHelpers.SetPrivate(slide, "_content", content);
@@ -70,7 +69,7 @@ public class SlideTransitionTests
     });
 
     [UnityTest]
-    public IEnumerator 배경이_null이면_페이드생략하고_컨텐츠만_이동() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 배경이_null이면_페이드생략하고_컨텐츠만_이동() => AwaitableTest.Run(async () =>
     {
         var slide = NewSlide(out var root, out var content, out var bg);
         TransitionTestHelpers.SetPrivate(slide, "_content", content);
@@ -83,7 +82,7 @@ public class SlideTransitionTests
     });
 
     [UnityTest]
-    public IEnumerator 컨텐츠가_null이면_루트가_이동대상() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 컨텐츠가_null이면_루트가_이동대상() => AwaitableTest.Run(async () =>
     {
         var slide = NewSlide(out var root, out var content, out var bg);
         var rootRt = (RectTransform)root.transform;

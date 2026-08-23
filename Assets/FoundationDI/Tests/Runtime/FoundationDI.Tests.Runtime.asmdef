@@ -2,7 +2,7 @@
     "name": "FoundationDI.Tests.Runtime",
     "references": [
         "FoundationDI",
-        "UniTask",
+        "FoundationDI.TestSupport",
         "VContainer",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"

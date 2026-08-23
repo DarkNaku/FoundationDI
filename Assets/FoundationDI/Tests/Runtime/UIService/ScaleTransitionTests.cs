@@ -1,6 +1,5 @@
 using System.Collections;
 using System.Threading;
-using Cysharp.Threading.Tasks;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.UI;
@@ -10,7 +9,7 @@ using DarkNaku.FoundationDI;
 public class ScaleTransitionTests
 {
     [UnityTest]
-    public IEnumerator Show_완료후_컨텐츠스케일1_배경알파1() => UniTask.ToCoroutine(async () =>
+    public IEnumerator Show_완료후_컨텐츠스케일1_배경알파1() => AwaitableTest.Run(async () =>
     {
         var root = TransitionTestHelpers.NewUINode("scale", typeof(ScaleTransition));
         var contentGo = TransitionTestHelpers.NewUINode("content");
@@ -33,7 +32,7 @@ public class ScaleTransitionTests
     });
 
     [UnityTest]
-    public IEnumerator Show_완료후_배경은_디자인알파까지_페이드된다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator Show_완료후_배경은_디자인알파까지_페이드된다() => AwaitableTest.Run(async () =>
     {
         var root = TransitionTestHelpers.NewUINode("scale", typeof(ScaleTransition));
         var contentGo = TransitionTestHelpers.NewUINode("content");
@@ -56,7 +55,7 @@ public class ScaleTransitionTests
     });
 
     [UnityTest]
-    public IEnumerator 배경이_null이면_스케일만_수행() => UniTask.ToCoroutine(async () =>
+    public IEnumerator 배경이_null이면_스케일만_수행() => AwaitableTest.Run(async () =>
     {
         var root = TransitionTestHelpers.NewUINode("scale", typeof(ScaleTransition));
         var contentGo = TransitionTestHelpers.NewUINode("content");

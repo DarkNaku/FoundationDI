@@ -1,6 +1,5 @@
 using System.Collections;
 using System.Threading;
-using Cysharp.Threading.Tasks;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
@@ -9,7 +8,7 @@ using DarkNaku.FoundationDI;
 public class FadeTransitionTests
 {
     [UnityTest]
-    public IEnumerator Show_완료후_알파는_1이다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator Show_완료후_알파는_1이다() => AwaitableTest.Run(async () =>
     {
         var go = TransitionTestHelpers.NewUINode("fade", typeof(CanvasGroup), typeof(FadeTransition));
         var cg = go.GetComponent<CanvasGroup>();
@@ -24,7 +23,7 @@ public class FadeTransitionTests
     });
 
     [UnityTest]
-    public IEnumerator Hide_완료후_알파는_0이다() => UniTask.ToCoroutine(async () =>
+    public IEnumerator Hide_완료후_알파는_0이다() => AwaitableTest.Run(async () =>
     {
         var go = TransitionTestHelpers.NewUINode("fade", typeof(CanvasGroup), typeof(FadeTransition));
         var cg = go.GetComponent<CanvasGroup>();

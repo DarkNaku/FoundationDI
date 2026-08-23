@@ -2,8 +2,8 @@
     "name": "FoundationDI.Tests.Editor",
     "references": [
         "FoundationDI",
+        "FoundationDI.TestSupport",
         "FoundationDI.Editor",
-        "UniTask",
         "VContainer",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
