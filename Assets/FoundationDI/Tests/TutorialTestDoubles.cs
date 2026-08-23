@@ -115,6 +115,17 @@ public sealed class FakeModule : ITutorialModule
     }
 }
 
+/// <summary>오써링 테스트용 최소 모듈. 추적 콜백은 호출만 세고 아무것도 그리지 않는다.</summary>
+public sealed class FakeModuleBehaviour : TutorialModuleBehaviour
+{
+    public int TrackCount { get; private set; }
+    public int LostCount { get; private set; }
+
+    protected override void OnTrack(Rect screenRect) => TrackCount++;
+
+    protected override void OnTargetLost() => LostCount++;
+}
+
 public sealed class FakeProgressStorage : ITutorialProgressStorage
 {
     private readonly Dictionary<string, TutorialState> _states = new();

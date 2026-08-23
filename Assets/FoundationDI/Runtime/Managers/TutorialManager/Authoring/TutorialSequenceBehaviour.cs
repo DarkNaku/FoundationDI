@@ -60,7 +60,7 @@ namespace DarkNaku.FoundationDI
             enabled = false;
         }
 
-        private TutorialSequence BuildSequence()
+        internal TutorialSequence BuildSequence()
         {
             var steps = new List<TutorialStep>();
 
