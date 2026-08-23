@@ -34,7 +34,13 @@ namespace DarkNaku.FoundationDI
 
         public event Action<IapPendingPurchase> PurchasePending;
         public event Action<IapPurchaseFailure> PurchaseFailed;
+
+        // Dummy는 보류(iOS Ask-to-Buy)를 흉내내지 않는다 — 승인 주체가 없으니 재현할 대상이
+        // 없기 때문이다. IIapProvider가 요구하는 멤버라 선언은 남기고 경고만 끈다.
+        // (Dispose에서 null을 대입하므로 CS0067이 아니라 CS0414가 뜬다.)
+#pragma warning disable CS0414
         public event Action<string> PurchaseDeferred;
+#pragma warning restore CS0414
 
         public Awaitable<bool> InitializeAsync(IapProviderContext context)
         {

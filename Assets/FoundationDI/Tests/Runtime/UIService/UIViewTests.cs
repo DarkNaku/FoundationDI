@@ -47,8 +47,8 @@ public class UIViewTests
         await view.ShowAsync(default);
         await view.HideAsync(default);
 
-        transition.Received(1).ShowAsync(view.RectTransform, Arg.Any<CancellationToken>());
-        transition.Received(1).HideAsync(view.RectTransform, Arg.Any<CancellationToken>());
+        _ = transition.Received(1).ShowAsync(view.RectTransform, Arg.Any<CancellationToken>());
+        _ = transition.Received(1).HideAsync(view.RectTransform, Arg.Any<CancellationToken>());
 
         Object.DestroyImmediate(go);
     });

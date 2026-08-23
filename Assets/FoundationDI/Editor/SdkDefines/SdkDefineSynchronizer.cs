@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Text;
 using UnityEditor;
 using UnityEditor.Build;
+using UnityEditor.Compilation;
 using UnityEngine;
 
 namespace DarkNaku.FoundationDI.Editor
@@ -32,6 +33,19 @@ namespace DarkNaku.FoundationDI.Editor
         {
             // 도메인 리로드 직후에는 PlayerSettings 쓰기가 무시될 수 있다. 한 틱 미룬다.
             EditorApplication.delayCall += () => Sync(verbose: false);
+        }
+
+        // 에셋이 들어오고 나가는 시점에도 확인한다. 도메인 리로드만으로는 부족하다 —
+        // SDK를 지우면 심볼이 아직 켜져 있어 어댑터 컴파일이 실패하고, 컴파일이 실패하면
+        // 도메인이 리로드되지 않아 [InitializeOnLoad]가 다시 돌지 않는다. 이 훅은 삭제가
+        // 반영되는 순간(아직 낡은 도메인이 살아 있을 때) 실행되므로 그 교착을 미리 끊는다.
+        private class AssetHook : AssetPostprocessor
+        {
+            private static void OnPostprocessAllAssets(string[] imported, string[] deleted,
+                                                       string[] moved, string[] movedFrom)
+            {
+                EditorApplication.delayCall += () => Sync(verbose: false);
+            }
         }
 
         public static bool AutoManage
@@ -68,11 +82,12 @@ namespace DarkNaku.FoundationDI.Editor
 
         private static void Apply(bool verbose)
         {
-            // 컴파일 중에는 아직 로드되지 않은 어셈블리가 있을 수 있다. 그 상태로 판정하면
-            // 있는 SDK를 없다고 보고 심볼을 지워버린다. 다음 리로드에서 다시 돌면 된다.
+            // 임포트가 끝나지 않은 상태에서는 CompilationPipeline이 아직 반영되지 않은
+            // 어셈블리를 빼놓고 답할 수 있다. 그 상태로 판정하면 있는 SDK를 없다고 보고
+            // 심볼을 지운다. 다음 리로드나 다음 임포트 훅에서 다시 돌면 된다.
             if (EditorApplication.isCompiling || EditorApplication.isUpdating) return;
 
-            var present = DetectPresentSdks();
+            var present = DetectPresent(CollectAvailableAssemblyNames());
             var changes = new List<string>();
 
             foreach (var target in Targets)
@@ -109,28 +124,52 @@ namespace DarkNaku.FoundationDI.Editor
             }
         }
 
-        private static Dictionary<string, bool> DetectPresentSdks()
+        // 로드된 어셈블리(AppDomain)로 판정하면 안 된다. .NET 어셈블리는 DLL을 지워도
+        // 도메인이 살아 있는 한 언로드되지 않기 때문이다. 게다가 SDK를 지우면 심볼이 아직
+        // 켜져 있어 어댑터 컴파일이 실패하고, 컴파일이 실패하면 도메인이 리로드되지 않는다 —
+        // 그 낡은 도메인에는 지운 SDK가 그대로 로드돼 있으므로 "있음"으로 오판하고,
+        // 심볼이 영영 안 빠지는 데드락이 된다.
+        //
+        // CompilationPipeline은 도메인이 아니라 디스크 현재 상태를 본다. 컴파일이 깨진
+        // 상태에서도 정확하다.
+        private static List<string> CollectAvailableAssemblyNames()
         {
-            var wanted = new Dictionary<string, string>();     // 마커 타입 → 심볼
+            var names = new List<string>();
+
+            // precompiled DLL로 오는 SDK (Firebase 등)
+            names.AddRange(CompilationPipeline.GetPrecompiledAssemblyNames());
+
+            // asmdef로 오는 SDK (Unity.Purchasing, MaxSdk.Scripts 등)
+            foreach (var assembly in CompilationPipeline.GetAssemblies(AssembliesType.Editor))
+            {
+                names.Add(assembly.name);
+            }
+
+            return names;
+        }
+
+        // 순수 함수. 어셈블리 이름 목록만 주면 심볼별 존재 여부를 낸다.
+        internal static Dictionary<string, bool> DetectPresent(IEnumerable<string> availableAssemblyNames)
+        {
+            var available = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var raw in availableAssemblyNames)
+            {
+                if (string.IsNullOrEmpty(raw)) continue;
+
+                // GetPrecompiledAssemblyNames는 "Firebase.Analytics.dll"처럼 확장자를 달고 온다.
+                var name = raw.EndsWith(".dll", StringComparison.OrdinalIgnoreCase)
+                    ? raw.Substring(0, raw.Length - 4)
+                    : raw;
+
+                available.Add(name);
+            }
+
             var present = new Dictionary<string, bool>();
 
             foreach (var entry in SdkDefineTable.Entries)
             {
-                wanted[entry.MarkerType] = entry.Symbol;
-                present[entry.Symbol] = false;
-            }
-
-            // 어셈블리별 GetType 호출은 로드된 어셈블리 수(수백)만큼만 돌고 도메인 리로드당
-            // 한 번뿐이다. Type.GetType("이름, 어셈블리")를 쓰지 않는 이유는 SDK 버전에 따라
-            // 어셈블리 이름이 바뀌기 때문이다.
-            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                foreach (var pair in wanted)
-                {
-                    if (present[pair.Value]) continue;
-
-                    if (assembly.GetType(pair.Key, false) != null) present[pair.Value] = true;
-                }
+                present[entry.Symbol] = available.Contains(entry.AssemblyName);
             }
 
             return present;
