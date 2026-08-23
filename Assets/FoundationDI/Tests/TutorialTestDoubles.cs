@@ -4,6 +4,11 @@ using System.Threading;
 using DarkNaku.FoundationDI;
 using UnityEngine;
 
+/// <summary>
+/// 지연은 기록만 하고 즉시 끝내되, 프레임 대기는 진짜로 한 프레임 양보한다.
+/// 프레임 대기까지 즉시 끝내면 무한 타임아웃 폴링 루프가 제어를 절대 반환하지 않아
+/// 테스트가 그대로 멈춘다.
+/// </summary>
 public sealed class FakeClock : ITutorialClock
 {
     public float TotalDelay { get; private set; }
@@ -12,23 +17,28 @@ public sealed class FakeClock : ITutorialClock
     public Awaitable DelayAsync(float seconds, CancellationToken token)
     {
         TotalDelay += seconds;
-        return Completed(token);
-    }
 
-    public Awaitable NextFrameAsync(CancellationToken token)
-    {
-        FrameCount++;
-        return Completed(token);
-    }
-
-    private static Awaitable Completed(CancellationToken token)
-    {
         var source = new AwaitableCompletionSource();
 
         if (token.IsCancellationRequested) source.SetCanceled();
         else source.SetResult();
 
         return source.Awaitable;
+    }
+
+    public Awaitable NextFrameAsync(CancellationToken token)
+    {
+        FrameCount++;
+
+        var first = true;
+
+        return AwaitableTest.WaitUntil(() =>
+        {
+            if (!first) return true;
+
+            first = false;
+            return false;
+        }, 5f, token);
     }
 }
 
