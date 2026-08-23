@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace DarkNaku.FoundationDI
 {
@@ -29,6 +30,16 @@ namespace DarkNaku.FoundationDI
             _canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             _canvas.overrideSorting = true;
             _canvas.sortingOrder = _sortingOrder;
+
+            // 손가락은 "이걸 누르세요"라고 가리키는 물건이라 절대 그 버튼의 클릭을 먹으면 안 된다.
+            // 이 캔버스에 GraphicRaycaster를 붙이지 않는 게 1차 방어지만,
+            // 프리팹에 실수로 붙어도 안전하도록 그래픽 자체를 레이캐스트 대상에서 뺀다.
+            if (_hand == null) return;
+
+            foreach (var graphic in _hand.GetComponentsInChildren<Graphic>(true))
+            {
+                graphic.raycastTarget = false;
+            }
         }
 
         protected override void OnTrack(Rect screenRect)

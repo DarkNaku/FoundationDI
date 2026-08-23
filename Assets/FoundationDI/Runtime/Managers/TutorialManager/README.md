@@ -164,12 +164,22 @@ public sealed class MyArrowModule : TutorialModuleBehaviour
 
 **모듈은 타깃을 자식으로 삼지 않습니다.** 스크린 rect만 읽으므로 타깃이 `UIRoot`(DontDestroyOnLoad) 안에 있든, 씬 캔버스에 있든, 3D 월드에 있든 똑같이 동작합니다. `TutorialScreenRect`가 `RectTransform`이면 코너 4점을, 일반 `Transform`이면 `Renderer`/`Collider` 바운즈를 스크린으로 투영합니다.
 
-**정렬**: 자기 root `Canvas`를 `ScreenSpaceOverlay` + 높은 `sortingOrder`로 들면 UIService 팝업 위에 그려집니다. `ScreenSpaceOverlay` 캔버스는 하이어라키가 아니라 `sortingOrder`로 전역 정렬되기 때문입니다. 기본 모듈 2종이 이렇게 되어 있습니다(`HighlightModule` 32000, `HandPointerModule` 32001).
+### 정렬 — 기존 UI를 가리거나 가려지지 않나?
+
+**가려지지 않습니다.** UIService의 `UIRoot`는 `sortingOrder = 0`짜리 캔버스 **하나**이고, Page/Popup/Overlay 레이어들은 자기 `Canvas` 없이 그 안에서 하이어라키 순서로만 정렬됩니다. 튜토리얼 모듈은 자기 root `Canvas`를 `ScreenSpaceOverlay` + 높은 `sortingOrder`로 들고 있어서 팝업이든 오버레이든 전부 위에 그려집니다(`HighlightModule` 32000, `HandPointerModule` 32001). `ScreenSpaceOverlay` 캔버스는 하이어라키가 아니라 `sortingOrder`로 전역 정렬되기 때문입니다.
+
+`UIServiceSettings.RootPrefab`으로 `UIRoot`를 `ScreenSpaceCamera`로 바꿔도 안전합니다 — Overlay 캔버스는 Camera 캔버스보다 항상 위에 그려집니다.
+
+> `overrideSorting`은 **중첩 캔버스에서만** 의미가 있습니다. 모듈 프리팹을 루트에 두면 Unity가 이 값을 무시하고 `sortingOrder` 하나로 정렬합니다. 모듈이 코드에서 켜두는 건 프리팹을 다른 `Canvas` 밑에 넣었을 때를 대비한 것입니다.
+
+**입력 차단은 `GraphicRaycaster`가 있어야 동작합니다.** 딤 패널의 `raycastTarget`만으로는 아무것도 막지 못합니다 — 그 캔버스에 레이캐스터가 있어야 그래픽이 레이캐스트 대상이 됩니다. `HighlightModule`은 `[RequireComponent(typeof(Canvas), typeof(GraphicRaycaster))]`로 이를 강제하고, `Block Outside Click`을 끄면 레이캐스터도 함께 꺼집니다.
+
+반대로 **하이라이트 구멍과 손가락은 클릭을 먹지 않습니다.** 둘 다 `Awake`에서 자기 그래픽의 `raycastTarget`을 끕니다 — 안 그러면 "이 버튼을 누르세요"라고 가리켜 놓고 정작 그 버튼을 막게 됩니다.
 
 기본 제공:
 
 - **`HighlightModule`** — 타깃만 남기고 화면을 덮고 바깥 클릭을 막습니다. 셰이더 없이 구멍 이미지 1장 + 딤 패널 4장(위/아래/왼/오른 순서로 인스펙터에 넣습니다).
-- **`HandPointerModule`** — 타깃 위에 손가락 + 탭 루프 애니메이션(`AnimationCurve`).
+- **`HandPointerModule`** — 타깃 위에 손가락 + 탭 루프 애니메이션(`AnimationCurve`). 레이캐스터를 붙이지 않습니다.
 
 ### 6) 게임 코드가 쓰는 표면
 

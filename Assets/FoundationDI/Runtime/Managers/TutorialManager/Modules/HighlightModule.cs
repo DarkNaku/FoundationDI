@@ -11,7 +11,7 @@ namespace DarkNaku.FoundationDI
     /// 자기 root Canvas를 sortingOrder 높게 들고 있으므로 UIService의 UIRoot(DontDestroyOnLoad)
     /// 위에 그려진다 — ScreenSpaceOverlay 캔버스는 하이어라키가 아니라 sortingOrder로 전역 정렬된다.
     /// </summary>
-    [RequireComponent(typeof(Canvas))]
+    [RequireComponent(typeof(Canvas), typeof(GraphicRaycaster))]
     public sealed class HighlightModule : TutorialModuleBehaviour
     {
         private const int PanelTop = 0;
@@ -37,9 +37,25 @@ namespace DarkNaku.FoundationDI
             _canvas.overrideSorting = true;
             _canvas.sortingOrder = _sortingOrder;
 
+            // 딤 패널의 raycastTarget만으로는 클릭이 막히지 않는다 — 그 캔버스에
+            // GraphicRaycaster가 있어야 그래픽이 레이캐스트 대상이 된다.
+            // (UIService의 UIRoot는 자기 레이캐스터를 갖고 있고 우리 캔버스와는 별개다.)
+            var raycaster = GetComponent<GraphicRaycaster>();
+
+            if (raycaster != null) raycaster.enabled = _blockOutsideClick;
+
             foreach (var panel in _dimPanels)
             {
                 if (panel != null) panel.raycastTarget = _blockOutsideClick;
+            }
+
+            // 구멍은 절대 클릭을 먹으면 안 된다 — 하이라이트한 바로 그 버튼을 막게 된다.
+            if (_hole != null)
+            {
+                foreach (var graphic in _hole.GetComponentsInChildren<Graphic>(true))
+                {
+                    graphic.raycastTarget = false;
+                }
             }
         }
 
