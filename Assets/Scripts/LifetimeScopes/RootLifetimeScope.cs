@@ -15,6 +15,9 @@ public class RootLifetimeScope : LifetimeScope
     // 인스펙터에서 Assets/Settings/AnalyticsServiceSettings.asset 을 연결한다.
     [SerializeField] private AnalyticsServiceSettings _analyticsServiceSettings;
 
+    // 인스펙터에서 Assets/Settings/IapServiceSettings.asset 을 연결한다.
+    [SerializeField] private IapServiceSettings _iapServiceSettings;
+
     protected override void Configure(IContainerBuilder builder)
     {
         // 프리팹 로드는 Resources 백엔드 ResourceService에 위임한다.
@@ -27,6 +30,7 @@ public class RootLifetimeScope : LifetimeScope
         builder.RegisterInitializeService();
         builder.RegisterAdService(_adServiceSettings);
         builder.RegisterAnalyticsService(_analyticsServiceSettings);
+        builder.RegisterIapService(_iapServiceSettings);
         builder.RegisterEntryPoint<TestHubBootstrap>();
     }
 }
