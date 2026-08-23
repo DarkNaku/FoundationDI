@@ -50,6 +50,12 @@ FoundationDI는 다음 패키지를 전제로 합니다. 먼저 설치되어 있
 | AnalyticsService | Firebase Analytics SDK | `FOUNDATIONDI_FIREBASE` |
 | AdService | AppLovin MAX SDK | `FOUNDATIONDI_APPLOVIN` |
 
+**심볼은 직접 정의하지 않아도 됩니다.** SDK를 임포트하면 자동으로 켜지고, 지우면 자동으로 꺼집니다(Android/iOS/Standalone 동시 적용). 감지는 SDK 대표 타입의 존재 여부로 하므로 SDK 폴더를 옮겨도, UPM 패키지로 설치해도 동작합니다.
+
+- 끄고 싶으면 `Tools > FoundationDI > SDK Defines > Auto Manage` 체크를 해제합니다.
+- 수동으로 한 번만 맞추려면 `Sync Now`를 실행합니다.
+- 관리 대상 심볼만 건드리므로 프로젝트의 다른 심볼은 그대로 보존됩니다.
+
 심볼이 없으면 각각 Dummy/Debug provider로 폴백해 에디터에서 전체 플로우를 그대로 확인할 수 있습니다.
 
 ## 빠른 시작

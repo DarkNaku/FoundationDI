@@ -251,7 +251,9 @@ _analytics.CollectionEnabled = false;   // 게임이 판단해서 밀어 넣는�
 정책 계층(`AnalyticsService`)은 건드리지 않습니다. `AdService` README 5절과 같은 절차입니다.
 
 1. SDK를 설치한다.
-2. `Player Settings > Scripting Define Symbols`에 `FOUNDATIONDI_APPSFLYER` 같은 심볼을 정의한다.
+2. `SdkDefineTable.Entries`(`Editor/SdkDefines/`)에 한 줄 추가한다 — 심볼, SDK 대표 타입,
+   표시 이름. SDK를 임포트하면 `FOUNDATIONDI_APPSFLYER` 같은 심볼이 자동으로 켜지고
+   SDK를 지우면 꺼진다. 자동 관리를 쓰지 않는다면 심볼을 직접 정의해도 된다.
 3. `FoundationDI.AppsFlyer` asmdef를 만든다. `references`에 `FoundationDI`, `defineConstraints`에
    2번 심볼을 넣는다. **`defineConstraints`가 충족되지 않으면 Unity는 이 asmdef를 통째로
    건너뛰므로** SDK 없는 프로젝트에서도 컴파일이 깨지지 않는다.
