@@ -516,6 +516,9 @@ PlayerSettings:
   - serializedVersion: 3
     m_BuildTarget: Android
     m_Formats: 01000000
+  - serializedVersion: 3
+    m_BuildTarget: iOS
+    m_Formats: 03000000
   playModeTestRunnerEnabled: 0
   runPlayModeTestAsEditModeTest: 0
   actionOnDotNetUnhandledException: 1
@@ -782,9 +785,9 @@ PlayerSettings:
   webWasm2023: 0
   webEnableSubmoduleStrippingCompatibility: 0
   scriptingDefineSymbols:
-    Android: FOUNDATIONDI_FIREBASE;FOUNDATIONDI_UNITYIAP
-    Standalone: LEVELPLAY_DEPENDENCIES_INSTALLED;FOUNDATIONDI_FIREBASE;FOUNDATIONDI_UNITYIAP
-    iPhone: FOUNDATIONDI_FIREBASE;FOUNDATIONDI_UNITYIAP
+    Android: FOUNDATIONDI_UNITYIAP
+    Standalone: LEVELPLAY_DEPENDENCIES_INSTALLED;FOUNDATIONDI_UNITYIAP
+    iPhone: FOUNDATIONDI_UNITYIAP
   additionalCompilerArguments: {}
   platformArchitecture: {}
   scriptingBackend:

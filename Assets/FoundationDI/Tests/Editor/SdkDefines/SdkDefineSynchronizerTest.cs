@@ -118,11 +118,64 @@ public class SdkDefineSynchronizerTest
         var symbols = new List<string>();
         foreach (var entry in SdkDefineTable.Entries)
         {
-            Assert.IsNotEmpty(entry.MarkerType, $"{entry.Symbol}에 마커 타입이 없다");
+            Assert.IsNotEmpty(entry.AssemblyName, $"{entry.Symbol}에 마커 어셈블리가 없다");
             Assert.IsNotEmpty(entry.DisplayName, $"{entry.Symbol}에 표시 이름이 없다");
             symbols.Add(entry.Symbol);
         }
 
         CollectionAssert.AreEquivalent(new[] { Firebase, UnityIap, AppLovin }, symbols);
+    }
+
+    [Test]
+    public void 어셈블리가_있으면_present이고_없으면_아니다()
+    {
+        var available = new[] { "Unity.Purchasing", "UnityEngine.UI" };
+
+        var present = SdkDefineSynchronizer.DetectPresent(available);
+
+        Assert.IsTrue(present[UnityIap]);
+        Assert.IsFalse(present[Firebase]);
+        Assert.IsFalse(present[AppLovin]);
+    }
+
+    [Test]
+    public void 확장자와_대소문자를_무시하고_맞춘다()
+    {
+        // GetPrecompiledAssemblyNames는 "Firebase.Analytics.dll"처럼 확장자를 달고 온다.
+        var available = new[] { "firebase.analytics.DLL", "MAXSDK.SCRIPTS" };
+
+        var present = SdkDefineSynchronizer.DetectPresent(available);
+
+        Assert.IsTrue(present[Firebase]);
+        Assert.IsTrue(present[AppLovin]);
+        Assert.IsFalse(present[UnityIap]);
+    }
+
+    [Test]
+    public void 목록이_비면_모두_없음으로_본다()
+    {
+        var present = SdkDefineSynchronizer.DetectPresent(new string[0]);
+
+        foreach (var entry in SdkDefineTable.Entries) Assert.IsFalse(present[entry.Symbol], entry.Symbol);
+    }
+
+    [Test]
+    public void 감지_결과는_표의_모든_심볼을_키로_갖는다()
+    {
+        var present = SdkDefineSynchronizer.DetectPresent(new[] { "Unity.Purchasing" });
+
+        Assert.AreEqual(SdkDefineTable.Entries.Count, present.Count);
+        foreach (var entry in SdkDefineTable.Entries) Assert.IsTrue(present.ContainsKey(entry.Symbol), entry.Symbol);
+    }
+
+    [Test]
+    public void 삭제된_SDK가_Resolve까지_이어져_심볼을_떨어뜨린다()
+    {
+        // 회귀 방지: Firebase DLL을 지웠는데 심볼이 남아 컴파일이 깨지던 상황.
+        var present = SdkDefineSynchronizer.DetectPresent(new[] { "Unity.Purchasing" });
+
+        var result = SdkDefineSynchronizer.Resolve($"{Firebase};{UnityIap}", present);
+
+        Assert.AreEqual(UnityIap, result);
     }
 }
