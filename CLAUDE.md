@@ -97,6 +97,18 @@ NuGet 의존성은 **NuGetForUnity**(`Assets/NuGet/`)가 `Assets/packages.config
   - 상품 상수는 `Tools/FoundationDI/IAP/Generate Product Constants`가 `IapProducts` 클래스로 생성한다(SoundService의 Generated/asmref 패턴).
   - 상세: `Assets/FoundationDI/Runtime/Services/IAPService/README.md`.
 
+- **TutorialManager** (`Managers/TutorialManager/`): 조건 기반 튜토리얼 진행 엔진. "1레벨 시작 시 조작 안내, 3레벨에서 새 시스템, 5레벨에서 특정 아이템 등장 시" 같이 **게임 조건에 따라 나뉘어 발동**하는 튜토리얼을 다룬다. `Service`가 아니라 `Manager`인 이유는 씬 수명이기 때문이다(PoolManager와 같은 자리).
+  - **시퀀스는 순차 리스트가 아니라 조건부 후보 집합**이다. 각 `TutorialSequence`가 자기 `StartTrigger`로 발동하며, 앞의 것이 끝나서 뜨는 게 아니다. 한 번에 하나만 실행되고 겹치면 `Order` 오름차순 대기열로 직렬화한다.
+  - **진행도는 인덱스가 아니라 시퀀스 ID로 저장한다** — 시퀀스를 중간에 추가·삭제해도 기존 유저 진행도가 어긋나지 않는다. `ITutorialProgressStorage`(기본 `PlayerPrefsTutorialProgressStorage`) seam.
+  - **두 층 분리**: 진행 규칙은 순수 C#(`TutorialManager`/`TutorialSequence`/`TutorialStep`)이라 씬·프리팹 없이 EditMode에서 전부 테스트되고, 씬 오써링은 얇은 MonoBehaviour 어댑터(`TutorialSequenceBehaviour`/`TutorialStepBehaviour`)가 인스펙터 데이터를 넘기기만 한다.
+  - **트리거는 arm/disarm 구독 모델** (`ITutorialTrigger`, `Awaitable` 아님) — `IMessageService.Subscribe`가 구독 모델이고, `[SerializeReference]` 객체라 생성자 주입이 안 되며(의존은 `Arm`의 `TutorialTriggerContext`로 받는다), 테스트 검증이 호출 확인으로 끝나기 때문. 기본 4종 `Auto`/`Manual`/`ButtonClick`/`MessageTrigger<T>`. **Collision/Distance는 일부러 뺐다**(프레임 펌프와 물리 가정을 엔진에 끌어들인다).
+  - **`MessageTrigger<T>`는 구체 서브클래스 한 줄**로 인스펙터 드롭다운에 뜬다. 게임 코드는 원래 발행하던 메시지만 발행하고 튜토리얼을 모른다.
+  - **타깃은 `TutorialTargetRef`(직접 참조 | 키)** — UIService가 런타임 생성하는 View 내부 버튼도 `TutorialTarget` 컴포넌트가 키로 등록해 가리킬 수 있다. **모듈은 타깃을 리페어런팅하지 않고 스크린 rect만 추적**하므로 `UIRoot`의 `DontDestroyOnLoad`와 무관하게 동작한다. 타깃 소실/복귀는 `TutorialTargetHandle`이 흡수한다.
+  - **시계는 `ITutorialClock` seam** — EditMode에서 `Awaitable.WaitForSecondsAsync`/`NextFrameAsync`가 완료되지 않아 지연 경로를 테스트할 수 없기 때문이다.
+  - **연출은 인터페이스만 개방** — `ITutorialModule` + 기본 2종(`HighlightModule`, `HandPointerModule`). 나머지는 `TutorialModuleBehaviour`를 상속해 프로젝트가 만든다.
+  - ⚠️ **`RegisterTutorialManager`는 `RegisterInjector`와 같은 스코프에 등록한다.** `InjectorService`가 정적 컨테이너 참조 하나를 공유하는 단일 컨테이너 모델이라, 씬(자식) 스코프에 두면 루트 리졸버가 `ITutorialManager`를 해결하지 못해 주입이 **조용히 실패**한다. 씬 스코프에 두려면 그 스코프에서 `RegisterComponentInHierarchy<TutorialSequenceBehaviour>()`를 함께 부른다.
+  - 상세: `Assets/FoundationDI/Runtime/Managers/TutorialManager/README.md`.
+
 ### SDK 스크립팅 심볼 자동 관리
 
 3사 SDK 어댑터를 게이트하는 `FOUNDATIONDI_*` 심볼은 **손으로 정의하지 않는다.** `Assets/FoundationDI/Editor/SdkDefines/`의 `SdkDefineSynchronizer`가 도메인 리로드마다 SDK 대표 타입의 존재 여부를 보고 Android/iOS/Standalone 심볼을 켜거나 끈다.

@@ -361,6 +361,22 @@ public class SceneLifetimeScope : LifetimeScope   // 씬에 배치
 
 전제: 부모(루트) 스코프에 `IMessageService`와 `InjectorService`가 이미 등록되어 있어야 한다.
 
+> **구현 중 발견한 제약 (2026-08-24).** `InjectorService`는 정적 컨테이너 참조 하나를 공유하는
+> 단일 컨테이너 모델이다. 따라서 `RegisterTutorialManager`를 자식(씬) 스코프에 두고
+> `RegisterInjector`를 루트에 두면, 루트 리졸버가 `ITutorialManager`를 해결하지 못해
+> `TutorialSequenceBehaviour`/`TutorialTarget` 주입이 **조용히 실패**한다(에러 로그도 없다).
+> 시퀀스가 영영 등록되지 않는다.
+>
+> 대응은 둘 중 하나다.
+> 1. `RegisterTutorialManager`를 `RegisterInjector`와 같은 스코프(보통 루트)에 둔다. 이 경우
+>    매니저 인스턴스는 전역 수명이지만 내용물은 여전히 씬 수명이다 — 시퀀스는 `OnDestroy`에서
+>    `Unregister`하고, 타깃은 `OnDisable`에서 해제한다.
+> 2. 씬 스코프에 두되 그 스코프에서 컴포넌트를 직접 등록한다:
+>    `builder.RegisterComponentInHierarchy<TutorialSequenceBehaviour>();`
+>
+> 이 제약은 `PoolManager`에는 없었다. `PoolManager`의 소비자는 전부 생성자 주입이라
+> `InjectorService`를 거치지 않기 때문이다.
+
 ### 9. 게임 코드 사용 예
 
 게임 코드는 원래 하던 대로 메시지만 발행한다.
