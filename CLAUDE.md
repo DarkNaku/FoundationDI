@@ -96,6 +96,16 @@ NuGet 의존성은 **NuGetForUnity**(`Assets/NuGet/`)가 `Assets/packages.config
   - 상품 상수는 `Tools/FoundationDI/IAP/Generate Product Constants`가 `IapProducts` 클래스로 생성한다(SoundService의 Generated/asmref 패턴).
   - 상세: `Assets/FoundationDI/Runtime/Services/IAPService/README.md`.
 
+### SDK 스크립팅 심볼 자동 관리
+
+3사 SDK 어댑터를 게이트하는 `FOUNDATIONDI_*` 심볼은 **손으로 정의하지 않는다.** `Assets/FoundationDI/Editor/SdkDefines/`의 `SdkDefineSynchronizer`가 도메인 리로드마다 SDK 대표 타입의 존재 여부를 보고 Android/iOS/Standalone 심볼을 켜거나 끈다.
+
+- 관리 대상은 `SdkDefineTable.Entries` 한 곳에 있다. 어댑터를 추가하면 여기에 한 줄 넣는다(심볼·마커 타입·표시 이름).
+- **관리 대상 심볼만 건드린다** — `LEVELPLAY_DEPENDENCIES_INSTALLED` 같은 남의 심볼은 순서까지 보존한다.
+- `FOUNDATIONDI_ADMOB`/`FOUNDATIONDI_LEVELPLAY`는 어댑터 어셈블리가 없어 표에서 일부러 빠져 있다. 켜면 `AdProviderFactory`가 "creator 없음" 에러를 낸다.
+- 계산은 순수 함수 `SdkDefineSynchronizer.Resolve(current, present)`로 분리돼 EditMode에서 검증된다. 쓰기는 값이 실제로 달라질 때만 일어난다(안 그러면 재컴파일 무한 루프).
+- 옵트아웃은 `Tools/FoundationDI/SDK Defines/Auto Manage` 토글(EditorPrefs).
+
 공통 패턴: 런타임에 리소스를 로드하는 서비스(PoolService, ResourceService 등)는 `Resources.Load<T>()`를 먼저 시도하고 실패 시 `Addressables.LoadAssetAsync<T>().WaitForCompletion()`으로 폴백한 뒤 핸들을 보관해 두었다가 dispose 시 해제한다. SoundService는 `SoundData`가 `AudioClip`을 컴파일 타임 직접 참조로 보유하므로 이 패턴에 해당하지 않는다.
 
 ### 네임스페이스
