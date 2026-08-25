@@ -1,0 +1,19 @@
+{
+    "name": "FoundationDI.LevelPlay",
+    "rootNamespace": "",
+    "references": [
+        "FoundationDI",
+        "Unity.LevelPlay"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "FOUNDATIONDI_LEVELPLAY"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
