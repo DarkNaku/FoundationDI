@@ -74,7 +74,8 @@ NuGet 의존성은 **NuGetForUnity**(`Assets/NuGet/`)가 `Assets/packages.config
   - **3계층**: `Providers/`(SDK seam, `IAdProvider`/`IFullScreenAdapter`/`IBannerAdapter`) → `Ads/`(정책 계층, `FullScreenAdUnit`/`BannerAdUnit` — 재시도 백오프·보상 래치·자동 재로드·광고제거 게이트) → `AdService`(조립 + 이벤트 합류). 어댑터를 추가해도 정책 계층은 건드리지 않는 것이 설계 원칙.
   - **`ShowAsync`는 `Awaitable<AdShowResult>`**. `UnityAdDispatcher`가 `[AdService] Runner`(`HideAndDontSave`)를 통해 지연·프레임 대기를 펌프한다. `IAdDispatcher.Post`(메인스레드 마샬링)는 서비스 어디서도 쓰지 않는다 — **SDK 콜백을 메인 스레드로 마샬링하는 책임은 3사 어댑터 구현체에 있다.**
   - **`AdsRemoved`는 포맷별로 다르게 게이트한다**: 전면·배너는 차단, 보상형은 계속 동작. `IAdRemovalStorage`(기본 `PlayerPrefsAdRemovalStorage`)로 영속화된다.
-  - **현재 Dummy provider만 구현됨** — 3사 실제 어댑터는 각각 별도 계획.
+  - **구현된 provider는 Dummy / AppLovin MAX / LevelPlay 셋** — AdMob 어댑터만 아직 없다. 3사 어댑터는 각각 `FoundationDI.AppLovin` / `FoundationDI.LevelPlay` 옵셔널 어셈블리이며 `[RuntimeInitializeOnLoadMethod]`에서 `AdProviderRegistry`에 스스로를 등록한다(코어는 역참조 불가).
+  - **LevelPlay 어댑터의 임프레션은 어댑터별 `Paid`로만 흘린다.** 9.5.1은 각 광고 객체에 `OnAdImpressionDataReady`가 있고 전역 `LevelPlay.OnImpressionDataReady`는 `[Obsolete]`다 — 둘 다 구독하면 수익이 이중 계상된다. 이 콜백은 **메인 스레드 보장이 없어**(Android는 `ThreadUtil`을 거치지 않는다) `IAdDispatcher.Post`로 마샬링한다. 나머지 수명주기 콜백은 SDK가 이미 메인 스레드로 넘겨 준다.
   - 상세: `Assets/FoundationDI/Runtime/Services/AdService/README.md`.
 - **AnalyticsService** (`Services/AnalyticsService/`): 다중 분석/MMP 팬아웃 서비스. Firebase Analytics를 기본으로 하되 AppsFlyer/Adjust/Singular/Airbridge를 몇 개 붙이든 게임 코드는 `IAnalyticsService` API를 **한 번만** 호출하면 등록된 모든 provider로 브로드캐스트된다.
   - **라우팅 규칙 없음** — 무엇을 무시할지는 각 어댑터가 결정한다. 정책(버퍼·예외 격리·수집 게이트)은 `AnalyticsService`가 혼자 갖고, 어댑터는 번역만 한다.
@@ -115,7 +116,7 @@ NuGet 의존성은 **NuGetForUnity**(`Assets/NuGet/`)가 `Assets/packages.config
 
 - 관리 대상은 `SdkDefineTable.Entries` 한 곳에 있다. 어댑터를 추가하면 여기에 한 줄 넣는다(심볼·마커 타입·표시 이름).
 - **관리 대상 심볼만 건드린다** — `LEVELPLAY_DEPENDENCIES_INSTALLED` 같은 남의 심볼은 순서까지 보존한다.
-- `FOUNDATIONDI_ADMOB`/`FOUNDATIONDI_LEVELPLAY`는 어댑터 어셈블리가 없어 표에서 일부러 빠져 있다. 켜면 `AdProviderFactory`가 "creator 없음" 에러를 낸다.
+- `FOUNDATIONDI_ADMOB`는 어댑터 어셈블리가 없어 표에서 일부러 빠져 있다. 켜면 `AdProviderFactory`가 "creator 없음" 에러를 낸다.
 - 계산은 순수 함수 `SdkDefineSynchronizer.Resolve(current, present)`로 분리돼 EditMode에서 검증된다. 쓰기는 값이 실제로 달라질 때만 일어난다(안 그러면 재컴파일 무한 루프).
 - 옵트아웃은 `Tools/FoundationDI/SDK Defines/Auto Manage` 토글(EditorPrefs).
 

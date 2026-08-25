@@ -5,9 +5,14 @@
 재시도·백오프, 보상 확정, 광고제거 게이트 같은 정책은 provider(SDK 어댑터)가 아니라
 서비스 자신이 갖고 있어서, 세 SDK 어댑터마다 같은 로직을 복붙하지 않습니다.
 
-현재 실제로 구현된 provider는 **Dummy 하나**뿐입니다. SDK 없이 로드 지연·실패·보상·임프레션을
-흉내 내어 전체 흐름(재시도 백오프, `AdServiceRunner` 펌프, `Awaitable` 완료)을 실기에서
-검증할 수 있게 하기 위한 것입니다. AdMob/LevelPlay/AppLovin 실제 어댑터는 각각 별도 계획으로 붙습니다.
+현재 구현된 provider는 **Dummy · AppLovin MAX · LevelPlay** 셋입니다. AdMob 어댑터는 아직
+없습니다.
+
+Dummy는 SDK 없이 로드 지연·실패·보상·임프레션을 흉내 내어 전체 흐름(재시도 백오프,
+`AdServiceRunner` 펌프, `Awaitable` 완료)을 실기에서 검증할 수 있게 하기 위한 것입니다.
+AppLovin(`FoundationDI.AppLovin`)과 LevelPlay(`FoundationDI.LevelPlay`)는 각각
+`FOUNDATIONDI_APPLOVIN` / `FOUNDATIONDI_LEVELPLAY` 심볼이 걸린 옵셔널 어셈블리라, SDK가 없는
+프로젝트에서는 컴파일 대상에서 아예 빠집니다.
 
 ---
 

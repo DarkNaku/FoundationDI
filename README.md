@@ -1,7 +1,7 @@
 # FoundationDI
 
 ![Unity](https://img.shields.io/badge/Unity-6000.3%2B-black?logo=unity)
-![Version](https://img.shields.io/badge/version-0.5.3-blue)
+![Version](https://img.shields.io/badge/version-0.7.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Author](https://img.shields.io/badge/author-DarkNaku-orange)
 
@@ -49,6 +49,7 @@ FoundationDI는 다음 패키지를 전제로 합니다. 먼저 설치되어 있
 | IAPService | `com.unity.purchasing` (5.4.2+) | `FOUNDATIONDI_UNITYIAP` |
 | AnalyticsService | Firebase Analytics SDK | `FOUNDATIONDI_FIREBASE` |
 | AdService | AppLovin MAX SDK | `FOUNDATIONDI_APPLOVIN` |
+| AdService | `com.unity.services.levelplay` (9.5.1+) | `FOUNDATIONDI_LEVELPLAY` |
 
 **심볼은 직접 정의하지 않아도 됩니다.** SDK를 임포트하면 자동으로 켜지고, 지우면 자동으로 꺼집니다(Android/iOS/Standalone 동시 적용). 감지는 SDK 대표 타입의 존재 여부로 하므로 SDK 폴더를 옮겨도, UPM 패키지로 설치해도 동작합니다.
 
