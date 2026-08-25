@@ -7,6 +7,7 @@ public class SdkDefineSynchronizerTest
     private const string Firebase = "FOUNDATIONDI_FIREBASE";
     private const string UnityIap = "FOUNDATIONDI_UNITYIAP";
     private const string AppLovin = "FOUNDATIONDI_APPLOVIN";
+    private const string LevelPlay = "FOUNDATIONDI_LEVELPLAY";
 
     private static Dictionary<string, bool> Present(bool firebase = false, bool unityIap = false,
                                                     bool appLovin = false) =>
@@ -102,18 +103,18 @@ public class SdkDefineSynchronizerTest
     }
 
     [Test]
-    public void 관리_대상_표에_AdMob과_LevelPlay는_없다()
+    public void 관리_대상_표에_AdMob은_없다()
     {
         // 어댑터 어셈블리가 없는 심볼을 켜면 AdProviderFactory가 "creator 없음" 에러를 낸다.
+        // LevelPlay는 FoundationDI.LevelPlay 어셈블리가 생겼으므로 표에 들어와 있다.
         foreach (var entry in SdkDefineTable.Entries)
         {
             Assert.AreNotEqual("FOUNDATIONDI_ADMOB", entry.Symbol);
-            Assert.AreNotEqual("FOUNDATIONDI_LEVELPLAY", entry.Symbol);
         }
     }
 
     [Test]
-    public void 관리_대상_표가_게이트되는_세_어셈블리를_모두_덮는다()
+    public void 관리_대상_표가_게이트되는_네_어셈블리를_모두_덮는다()
     {
         var symbols = new List<string>();
         foreach (var entry in SdkDefineTable.Entries)
@@ -123,7 +124,18 @@ public class SdkDefineSynchronizerTest
             symbols.Add(entry.Symbol);
         }
 
-        CollectionAssert.AreEquivalent(new[] { Firebase, UnityIap, AppLovin }, symbols);
+        CollectionAssert.AreEquivalent(new[] { Firebase, UnityIap, AppLovin, LevelPlay }, symbols);
+    }
+
+    [Test]
+    public void LevelPlay_심볼은_Unity_LevelPlay_어셈블리로_판정한다()
+    {
+        // 어댑터 asmdef가 참조하는 어셈블리 이름과 같아야 한다
+        // (com.unity.services.levelplay의 Runtime/Unity.LevelPlay.asmdef).
+        var present = SdkDefineSynchronizer.DetectPresent(new[] { "Unity.LevelPlay" });
+
+        Assert.IsTrue(present[LevelPlay]);
+        Assert.IsFalse(present[AppLovin]);
     }
 
     [Test]
@@ -136,6 +148,7 @@ public class SdkDefineSynchronizerTest
         Assert.IsTrue(present[UnityIap]);
         Assert.IsFalse(present[Firebase]);
         Assert.IsFalse(present[AppLovin]);
+        Assert.IsFalse(present[LevelPlay]);
     }
 
     [Test]

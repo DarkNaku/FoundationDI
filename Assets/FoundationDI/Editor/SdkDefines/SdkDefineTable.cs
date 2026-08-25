@@ -31,8 +31,8 @@ namespace DarkNaku.FoundationDI.Editor
 
     public static class SdkDefineTable
     {
-        // FOUNDATIONDI_ADMOB / FOUNDATIONDI_LEVELPLAY는 일부러 빠져 있다.
-        // 두 심볼은 어댑터 어셈블리가 아직 없어서, 켜면 AdProviderFactory.IsAvailable이
+        // FOUNDATIONDI_ADMOB는 일부러 빠져 있다.
+        // 이 심볼은 어댑터 어셈블리가 아직 없어서, 켜면 AdProviderFactory.IsAvailable이
         // true가 되고 곧바로 "creator가 없다"는 에러 로그로 이어진다.
         // 어댑터가 생기는 시점에 여기에 한 줄 추가한다.
         public static readonly IReadOnlyList<SdkDefineEntry> Entries = new[]
@@ -48,6 +48,10 @@ namespace DarkNaku.FoundationDI.Editor
             new SdkDefineEntry("FOUNDATIONDI_APPLOVIN",
                                "MaxSdk.Scripts",
                                "AppLovin MAX"),
+
+            new SdkDefineEntry("FOUNDATIONDI_LEVELPLAY",
+                               "Unity.LevelPlay",
+                               "Unity LevelPlay"),
         };
     }
 }
