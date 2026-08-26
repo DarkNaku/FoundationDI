@@ -99,6 +99,13 @@ namespace DarkNaku.FoundationDI
             // OnInitSuccess add에서 GetInvocationList().Contains 검사) 여러 번 불러도 안전하다.
             InstallInitLatch();
 
+            // context 반영은 **이미 초기화가 끝난 경우를 포함해** 모든 진입 경로에서 한다.
+            // 아래 _initCompleted 조기 반환 뒤에 두면, 두 번째 AdService 인스턴스가 다른
+            // VerboseLogging을 들고 와도 조용히 무시된다(AppLovinAdProvider가
+            // MaxSdk.SetVerboseLogging을 MaxSdk.IsInitialized() 검사보다 먼저 부르는 것과
+            // 같은 이유).
+            ApplyContext(context);
+
             // 이미 초기화가 끝난 뒤라면 콜백은 다시 오지 않는다. 래치가 없으면 여기서
             // 영원히 기다리게 된다.
             if (_initCompleted)
@@ -106,8 +113,6 @@ namespace DarkNaku.FoundationDI
                 source.TrySetResult(_initSucceeded);
                 return source.Awaitable;
             }
-
-            ApplyContext(context);
 
             Action<bool> handler = null;
             handler = success =>
@@ -138,6 +143,20 @@ namespace DarkNaku.FoundationDI
             {
                 _initializeRequested = true;
                 LevelPlay.Init(context.AppKey);
+            }
+            else if (!_initializeRequested)
+            {
+                // appKey가 비어 Init을 부르지 않은 경로. 이 호출은 이제 오직 LevelPlay의 자동
+                // 초기화가 콜백을 낼 때만 완료되는데, 그 설정이 꺼져 있으면 아무 콜백도 오지
+                // 않는다. AdService.InitializeAsync에는 타임아웃이 없어(AdService.cs의
+                // _initWaiters 참고) 초기화를 기다리는 부트스트랩 전체가 조용히 멈춘다.
+                // 그래서 반드시 경고를 남긴다 — VerboseLogging으로 게이트하지 않는다.
+                // 위쪽 ApplyContext의 안내 로그들과 달리 이건 "안 쓰는 설정" 안내가 아니라
+                // 초기화가 끝나지 않을 수 있다는 고장 신호다.
+                Debug.LogWarning(
+                    "[AdService] LevelPlay appKey가 비어 있어 LevelPlay.Init을 호출하지 않았다. " +
+                    "LevelPlay 자동 초기화(Mediation Settings > Enable Ironsource SDK Init API)가 " +
+                    "꺼져 있으면 초기화가 영원히 완료되지 않는다. AdServiceSettings의 App Key를 채워라.");
             }
 
             return source.Awaitable;
