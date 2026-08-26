@@ -50,8 +50,16 @@ namespace DarkNaku.FoundationDI
         IFullScreenAdapter CreateRewarded(string adUnitId);
         IBannerAdapter CreateBanner(string adUnitId, BannerOptions options);
 
-        // 전역/미매칭 임프레션 경로. LevelPlay는 임프레션 데이터가 광고 객체가 아니라
-        // SDK 전역 이벤트 하나로 오기 때문에 어댑터별 Paid만으로는 배너 갱신 수익이 누락된다.
+        // 전역/미매칭 임프레션 경로. 임프레션 데이터가 광고 객체가 아니라 SDK 전역 이벤트
+        // 하나로만 오는 SDK를 위한 seam이다 — 그런 SDK에서는 어댑터별 Paid만으로는 특히
+        // 배너 자동 갱신 수익이 어떤 어댑터에도 매칭되지 않아 조용히 누락된다.
+        //
+        // **현재 구현된 세 provider(Dummy/AppLovin/LevelPlay) 중 이 경로를 쓰는 것은 없다.**
+        // 원래 이 주석은 LevelPlay를 그 사례로 지목했지만, LevelPlay 9.5.1은 전면·보상·배너
+        // 각 광고 객체가 자기 OnAdImpressionDataReady를 갖고 있고 전역
+        // LevelPlay.OnImpressionDataReady는 [Obsolete]다 — 그래서 LevelPlay 어댑터도 어댑터별
+        // Paid로만 흘린다(LevelPlayAdProvider의 ImpressionPaid 주석 참고). 한 임프레션이 두
+        // 경로로 올라오면 수익이 이중 계상되므로 새 어댑터는 반드시 둘 중 하나만 고른다.
         event Action<AdImpression> ImpressionPaid;
     }
 }

@@ -200,17 +200,21 @@ _ads.Paid += impression =>
 
 1. **어댑터별 `Paid`** — `IFullScreenAdapter`/`IBannerAdapter` 각각에 달린 임프레션 이벤트.
    AdMob, AppLovin MAX처럼 광고 객체 단위로 수익 콜백이 오는 SDK가 이 경로를 씁니다.
-2. **provider 전역 `IAdProvider.ImpressionPaid`** — LevelPlay처럼 임프레션 데이터가 광고 객체가
-   아니라 **SDK 전역 이벤트 하나**로 오는 SDK를 위한 경로입니다. 어댑터별 `Paid`만 있으면 특히
-   **배너 자동 갱신 임프레션**이 어떤 어댑터에도 매칭되지 않아 조용히 누락됩니다.
+2. **provider 전역 `IAdProvider.ImpressionPaid`** — 임프레션 데이터가 광고 객체가 아니라
+   **SDK 전역 이벤트 하나**로만 오는 SDK를 위한 경로입니다. 그런 SDK에서는 어댑터별 `Paid`만
+   있으면 특히 **배너 자동 갱신 임프레션**이 어떤 어댑터에도 매칭되지 않아 조용히 누락됩니다.
+   **다만 현재 구현된 세 provider 중 이 경로를 쓰는 것은 없습니다** — LevelPlay 9.5.1은 각 광고
+   객체가 `OnAdImpressionDataReady`를 갖고 있고 전역 `LevelPlay.OnImpressionDataReady`는
+   `[Obsolete]`라, LevelPlay 어댑터도 어댑터별 경로를 씁니다. AdMob 어댑터를 붙일 때 다시
+   판단할 seam입니다.
 
 `AdService.BuildAdUnits()`가 두 경로를 모두 `OnPaid`로 구독해 하나의 공개 `Paid`로 합류시킵니다.
 **Dummy provider는 `ImpressionPaid`를 절대 발화하지 않습니다** — `DummyAdProvider`의 더미
 임프레션은 전부 어댑터별 `Paid`로만 옵니다(no-op 이벤트로 인터페이스 계약만 지킵니다). 만약
 Dummy provider가 `ImpressionPaid`도 함께 발화했다면, 어댑터 경로와 provider 경로 양쪽에서
 같은 임프레션이 올라와 `Paid`가 두 번 발화되고 수익이 이중 집계됩니다. 실제 SDK 어댑터를
-작성할 때는 **한 임프레션이 두 경로 중 정확히 하나로만 나가도록** 해야 합니다(AdMob/MAX는
-어댑터 경로, LevelPlay는 provider 경로).
+작성할 때는 **한 임프레션이 두 경로 중 정확히 하나로만 나가도록** 해야 합니다(현재는 Dummy·
+AppLovin MAX·LevelPlay 셋 모두 어댑터 경로만 씁니다).
 
 ### 4.3 `Placement`는 정책 계층이 채운다
 
@@ -235,12 +239,15 @@ public string Placement { get; }  // 게임이 ShowAsync에 넘긴 배치명
 `null`입니다 — 전면·보상이어도 마찬가지입니다.** `Placement` 스탬핑은 `FullScreenAdUnit.OnPaid`
 (4.2절의 "어댑터별 `Paid`" 경로)에만 있습니다. `AdService.cs`는 `_provider.ImpressionPaid`를
 그대로 공개 `Paid`로 흘려보낼 뿐 어떤 배치명도 채우지 않습니다(`AdService.cs:163,174`).
-이 경로는 LevelPlay를 위해 존재하는데, LevelPlay 실제 어댑터가 붙으면 **전면·보상 임프레션이
-게임이 `ShowAsync`에 넘긴 배치명을 넘겼더라도 `Placement`가 `null`로 옵니다.** 의도적으로
-고치지 않았습니다 — "지금 표시 중인 유닛"을 provider 레벨에서 추적하려면 두 포맷이 겹쳐
-표시되는 상황(예: 전면이 뜬 채로 보상 로드가 끝나는 경우)에서 어떤 유닛의 배치명을 찍어야
-하는지 오귀속 위험이 생기고, 실제 LevelPlay 어댑터 없이는 그 설계를 검증할 방법이 없습니다.
-**LevelPlay 어댑터를 붙이는 작업이 이 결정을 다시 검토해야 합니다.**
+의도적으로 고치지 않았습니다 — "지금 표시 중인 유닛"을 provider 레벨에서 추적하려면 두 포맷이
+겹쳐 표시되는 상황(예: 전면이 뜬 채로 보상 로드가 끝나는 경우)에서 어떤 유닛의 배치명을 찍어야
+하는지 오귀속 위험이 생기기 때문입니다.
+
+**이 결정은 LevelPlay 어댑터 작업에서 재검토했고, 그대로 두기로 했습니다.** LevelPlay 9.5.1이
+광고 객체별 임프레션 콜백을 제공해 어댑터가 전역 경로 대신 어댑터별 `Paid`를 쓰기 때문에,
+LevelPlay의 전면·보상 임프레션도 `FullScreenAdUnit`이 정상적으로 배치명을 스탬프합니다.
+전역 경로를 쓰는 provider는 현재 하나도 없으므로, 이 문단은 앞으로 그런 SDK가 붙을 때를 위한
+서술입니다.
 
 ---
 
@@ -416,8 +423,12 @@ AdService/
 
 ## 7. 알려진 범위 밖
 
-- **AdMob/LevelPlay/AppLovin 실제 어댑터** — seam과 매핑표만 준비돼 있고, SDK 설치 후 별도
-  계획으로 진행합니다.
+- **AdMob 어댑터** — seam과 매핑표만 준비돼 있고, SDK 설치 후 별도 계획으로 진행합니다.
+- **AppLovin MAX·LevelPlay 어댑터의 컴파일·실기 검증** — 두 어댑터는 구현돼 있지만 **두 SDK
+  모두 이 리포지토리에 설치돼 있지 않습니다.** 어댑터 asmdef가 `defineConstraints`로 컴파일
+  대상에서 빠져 있어, SDK를 설치하기 전까지는 이 코드가 한 번도 컴파일되지 않습니다 — SDK
+  API 표면(타입명·시그니처)과 실기 동작은 아직 검증되지 않았습니다. 단위 테스트도 같은 이유로
+  없으며, SDK 설치 시점에 같은 `defineConstraints`를 건 테스트 어셈블리를 함께 추가합니다.
 - **IAP(인앱 구매)** — `AdsRemoved`는 세터만 제공합니다. 구매 검증·복원·상점 연동은 이 서비스의
   책임이 아닙니다.
 - **AppOpen / MREC / Native 광고 포맷** — `AdFormat`은 `Banner`/`Interstitial`/`Rewarded` 셋뿐입니다.

@@ -206,7 +206,9 @@ MessagePipe 래퍼를 폐기하고 `Dictionary<Type, Delegate>` 기반 자체 �
 - [x] Dummy provider가 지연·실패·보상·임프레션을 시뮬레이션한다
 - [x] 설정과 스크립팅 심볼로 provider를 고르고 없으면 Dummy로 폴백한다
 
-**후속 예정**: AdMob/LevelPlay/AppLovin 실제 어댑터 (spec의 3사 매핑표 참조)
+**후속 예정**: AdMob 어댑터 (spec의 3사 매핑표 참조). AppLovin MAX·LevelPlay 어댑터는 구현
+완료 — 다만 두 SDK 모두 이 리포지토리에 미설치라 어댑터 어셈블리가 컴파일된 적이 없다.
+컴파일·실기 검증과 테스트 어셈블리 추가는 SDK 설치 시점의 과제로 남아 있다.
 
 ---
 
