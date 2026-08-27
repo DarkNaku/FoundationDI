@@ -4,7 +4,8 @@
     "references": [
         "FoundationDI",
         "Unity.Purchasing",
-        "Unity.Purchasing.Security"
+        "Unity.Purchasing.Security",
+        "Unity.Purchasing.SecurityCore"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
