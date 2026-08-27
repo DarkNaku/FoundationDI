@@ -52,6 +52,10 @@ namespace DarkNaku.FoundationDI.Editor
             new SdkDefineEntry("FOUNDATIONDI_LEVELPLAY",
                                "Unity.LevelPlay",
                                "Unity LevelPlay"),
+
+            new SdkDefineEntry("FOUNDATIONDI_ADJUST",
+                               "AdjustSdk.Scripts",
+                               "Adjust"),
         };
     }
 }
