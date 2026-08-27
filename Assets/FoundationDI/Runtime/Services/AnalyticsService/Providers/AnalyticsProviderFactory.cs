@@ -21,11 +21,13 @@ namespace DarkNaku.FoundationDI
         // AdService의 팩토리와 달리 Dummy로 폴백하지 않는다. provider가 여럿인 이상,
         // 하나를 만들지 못했다고 나머지까지 버리거나 가짜로 대체할 이유가 없다 —
         // 만들지 못한 것만 에러 로그와 함께 건너뛰고 나머지는 그대로 동작시킨다.
-        public IReadOnlyList<IAnalyticsProvider> CreateAll(AnalyticsProviderType types,
-                                                           AnalyticsServiceOptions options)
+        public IReadOnlyList<IAnalyticsProvider> CreateAll(
+            AnalyticsProviderType types,
+            AnalyticsServiceOptions options,
+            IReadOnlyList<AnalyticsProviderSettings> providerSettings = null)
         {
             var providers = new List<IAnalyticsProvider>();
-            var context = new AnalyticsProviderCreationContext(options);
+            var context = new AnalyticsProviderCreationContext(options, providerSettings);
 
             foreach (var type in _all)
             {

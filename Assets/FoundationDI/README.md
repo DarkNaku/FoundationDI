@@ -49,9 +49,11 @@ FoundationDI는 다음 패키지를 전제로 합니다. 먼저 설치되어 있
 | --- | --- | --- |
 | IAPService | `com.unity.purchasing` (5.4.2+) | `FOUNDATIONDI_UNITYIAP` |
 | AnalyticsService | Firebase Analytics SDK | `FOUNDATIONDI_FIREBASE` |
+| AnalyticsService | Adjust SDK (`com.adjust.sdk` 5.x) | `FOUNDATIONDI_ADJUST` |
 | AdService | AppLovin MAX SDK | `FOUNDATIONDI_APPLOVIN` |
+| AdService | Unity LevelPlay (`com.unity.services.levelplay`) | `FOUNDATIONDI_LEVELPLAY` |
 
-**심볼은 직접 정의하지 않아도 됩니다.** SDK를 임포트하면 자동으로 켜지고, 지우면 자동으로 꺼집니다(Android/iOS/Standalone 동시 적용). 감지는 SDK 대표 타입의 존재 여부로 하므로 SDK 폴더를 옮겨도, UPM 패키지로 설치해도 동작합니다.
+**심볼은 직접 정의하지 않아도 됩니다.** SDK를 임포트하면 자동으로 켜지고, 지우면 자동으로 꺼집니다(Android/iOS/Standalone 동시 적용). 감지는 SDK 대표 어셈블리의 존재 여부로 하므로 SDK 폴더를 옮겨도, UPM 패키지로 설치해도 동작합니다.
 
 - 끄고 싶으면 `Tools > FoundationDI > SDK Defines > Auto Manage` 체크를 해제합니다.
 - 수동으로 한 번만 맞추려면 `Sync Now`를 실행합니다.

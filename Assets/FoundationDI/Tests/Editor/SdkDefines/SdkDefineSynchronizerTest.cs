@@ -8,6 +8,7 @@ public class SdkDefineSynchronizerTest
     private const string UnityIap = "FOUNDATIONDI_UNITYIAP";
     private const string AppLovin = "FOUNDATIONDI_APPLOVIN";
     private const string LevelPlay = "FOUNDATIONDI_LEVELPLAY";
+    private const string Adjust = "FOUNDATIONDI_ADJUST";
 
     private static Dictionary<string, bool> Present(bool firebase = false, bool unityIap = false,
                                                     bool appLovin = false) =>
@@ -114,7 +115,7 @@ public class SdkDefineSynchronizerTest
     }
 
     [Test]
-    public void 관리_대상_표가_게이트되는_네_어셈블리를_모두_덮는다()
+    public void 관리_대상_표가_게이트되는_모든_어셈블리를_덮는다()
     {
         var symbols = new List<string>();
         foreach (var entry in SdkDefineTable.Entries)
@@ -124,7 +125,7 @@ public class SdkDefineSynchronizerTest
             symbols.Add(entry.Symbol);
         }
 
-        CollectionAssert.AreEquivalent(new[] { Firebase, UnityIap, AppLovin, LevelPlay }, symbols);
+        CollectionAssert.AreEquivalent(new[] { Firebase, UnityIap, AppLovin, LevelPlay, Adjust }, symbols);
     }
 
     [Test]
@@ -139,6 +140,17 @@ public class SdkDefineSynchronizerTest
     }
 
     [Test]
+    public void Adjust_심볼은_AdjustSdk_Scripts_어셈블리로_판정한다()
+    {
+        // 어댑터 asmdef가 참조하는 어셈블리 이름과 같아야 한다
+        // (com.adjust.sdk의 Scripts/AdjustSdk.Scripts.asmdef).
+        var present = SdkDefineSynchronizer.DetectPresent(new[] { "AdjustSdk.Scripts" });
+
+        Assert.IsTrue(present[Adjust]);
+        Assert.IsFalse(present[Firebase]);
+    }
+
+    [Test]
     public void 어셈블리가_있으면_present이고_없으면_아니다()
     {
         var available = new[] { "Unity.Purchasing", "UnityEngine.UI" };
@@ -149,6 +161,7 @@ public class SdkDefineSynchronizerTest
         Assert.IsFalse(present[Firebase]);
         Assert.IsFalse(present[AppLovin]);
         Assert.IsFalse(present[LevelPlay]);
+        Assert.IsFalse(present[Adjust]);
     }
 
     [Test]

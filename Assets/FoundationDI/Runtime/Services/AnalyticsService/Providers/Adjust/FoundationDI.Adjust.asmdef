@@ -1,0 +1,19 @@
+{
+    "name": "FoundationDI.Adjust",
+    "rootNamespace": "",
+    "references": [
+        "FoundationDI",
+        "AdjustSdk.Scripts"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "FOUNDATIONDI_ADJUST"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
