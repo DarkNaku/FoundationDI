@@ -6,6 +6,24 @@
 
 ---
 
+## 완료: AnalyticsService — Adjust 어댑터
+
+Firebase 어댑터와 같은 모양으로 Adjust(MMP) 어댑터를 붙인다. Adjust는 이벤트 "이름"이 아니라
+대시보드 발급 토큰을 요구하므로(README 2.3), 이름→토큰 매핑표는 **어댑터 자기 설정**이 든다.
+그래서 코어에 "어댑터 고유 설정"을 실어 나르는 seam 하나가 먼저 필요하다.
+
+- [x] provider 설정 목록에서 요청한 타입을 찾아 준다
+- [x] provider 설정 목록에 없는 타입을 요청하면 null을 준다
+- [x] 기본 생성한 컨텍스트에 설정을 요청해도 예외가 나지 않는다
+- [x] 팩토리가 provider 설정을 creator에게 그대로 넘긴다
+- [x] 설정에 담긴 provider 설정 목록이 등록 경로를 타고 creator까지 간다
+- [x] 관리 대상 표가 Adjust를 AdjustSdk.Scripts 어셈블리로 판정한다
+
+이후는 `FoundationDI.Adjust` 어셈블리(FOUNDATIONDI_ADJUST 게이트) 안이라 EditMode에서
+테스트할 수 없다 — Firebase 어댑터와 같은 이유다. 컴파일과 실기 검증으로 대신한다.
+
+---
+
 ## 완료: TutorialManager — 조건 기반 튜토리얼 진행 엔진
 
 게임 조건(레벨 시작, 아이템 등장 등)에 따라 발동하는 튜토리얼 시퀀스를 `ITutorialManager` 하나로

@@ -7,8 +7,8 @@ Singular / Airbridge 같은 MMP를 몇 개 붙이든, 게임 코드는 `IAnalyti
 버퍼링·예외 격리·수집 게이트 같은 정책은 provider(SDK 어댑터)가 아니라 서비스 자신이 갖고 있어서,
 SDK 어댑터마다 같은 로직을 복붙하지 않습니다.
 
-현재 실제로 구현된 provider는 **Debug**와 **Firebase** 둘입니다. MMP 4사 어댑터는 각각 별도
-계획으로 붙습니다.
+현재 실제로 구현된 provider는 **Debug** / **Firebase** / **Adjust** 셋입니다. AppsFlyer /
+Singular / Airbridge 어댑터는 각각 별도 계획으로 붙습니다.
 
 ---
 
@@ -22,6 +22,7 @@ SDK 어댑터마다 같은 로직을 복붙하지 않습니다.
 | --- | --- |
 | `Providers` | 동시에 사용할 provider(다중 선택). 켜진 것 전부로 브로드캐스트된다 |
 | `Force Debug Only In Editor` | 켜면 에디터에서는 `Debug` provider만 생성한다. 개발 중 이벤트가 실제 대시보드를 오염시키는 것을 막는다 |
+| `Provider Settings` | 어댑터 고유 설정 에셋 목록(6.1절). 설정이 필요 없는 어댑터는 비워 둔다 |
 | `Collection Enabled By Default` | `CollectionEnabled`의 초기값. 동의를 먼저 받아야 하는 앱은 꺼진 채로 출시한다 |
 
 ### 1.2 DI 등록
@@ -285,6 +286,38 @@ _analytics.CollectionEnabled = false;   // 게임이 판단해서 밀어 넣는�
 
 `AnalyticsService`를 수정해야만 어댑터가 붙는다면 seam 설계가 잘못됐다는 신호입니다 — 멈추고 재검토합니다.
 
+### 6.1 어댑터가 자기 설정을 갖는 방법
+
+Firebase는 `google-services.json`이 설정을 대신하지만, Adjust는 **앱 토큰**과 **이름→토큰 매핑표**를
+프로젝트가 들고 있어야 합니다. 그 값들을 `AnalyticsServiceSettings`에 직접 넣지 않습니다 — 정책
+계층이 토큰의 존재를 알게 되고(2.3절), 코어 설정이 SDK가 늘 때마다 필드로 부풀어 오릅니다.
+
+대신 어댑터가 **`AnalyticsProviderSettings`를 상속한 자기 `ScriptableObject`** 를 정의합니다.
+
+```csharp
+[CreateAssetMenu(menuName = "FoundationDI/AppsFlyer Analytics Settings")]
+public sealed class AppsFlyerAnalyticsSettings : AnalyticsProviderSettings
+{
+    [SerializeField] private string _devKey;
+    public string DevKey => _devKey;
+}
+```
+
+그 에셋을 `AnalyticsServiceSettings`의 **Provider Settings** 목록에 끌어다 놓으면, 코어는 내용을
+모른 채 목록째 들고 있다가 생성 시점에 그대로 넘깁니다. 자기 것을 고르는 일은 어댑터가 타입으로 합니다.
+
+```csharp
+AnalyticsProviderRegistry.Register(AnalyticsProviderType.AppsFlyer,
+    ctx => new AppsFlyerAnalyticsProvider(ctx.GetSettings<AppsFlyerAnalyticsSettings>()));
+```
+
+`GetSettings<T>()`는 없으면 **예외가 아니라 `null`** 을 돌려줍니다. 설정이 없을 때 무엇을 할지가
+어댑터마다 다르기 때문입니다 — Adjust는 앱 토큰이 없으면 초기화를 실패시켜야 하지만, 설정이 전부
+선택값인 어댑터는 기본값으로 그냥 돌아도 됩니다. 여기서 던지면 그 판단을 뺏습니다.
+
+> `AnalyticsProviderSettings`에는 멤버가 하나도 없습니다. 코어가 읽을 수 있는 공통 필드를 하나라도
+> 두는 순간 "코어는 내용을 모른다"는 규칙에 예외가 생기고, 그 예외가 곧 두 번째 예외의 근거가 됩니다.
+
 ---
 
 ## 7. Firebase 어댑터
@@ -310,7 +343,65 @@ SDK에게 맡기고 개발자에게만 알립니다. Firebase가 규칙 위반 �
 
 ---
 
-## 8. 구조
+## 8. Adjust 어댑터
+
+`FoundationDI.Adjust` asmdef(`FOUNDATIONDI_ADJUST` 게이트)에 들어 있습니다. SDK를 임포트하면
+심볼이 자동으로 켜지고 SDK를 지우면 꺼집니다(`Editor/SdkDefines/`, 마커 어셈블리 `AdjustSdk.Scripts`).
+
+### 8.1 설정
+
+우클릭 → `Create > FoundationDI > Adjust Analytics Settings` 로 에셋을 만들고,
+`AnalyticsServiceSettings`의 **Provider Settings** 목록에 넣습니다(6.1절).
+
+| 필드 | 의미 |
+| --- | --- |
+| `Android App Token` / `iOS App Token` | 대시보드의 앱 토큰. **Adjust에서 Android와 iOS는 서로 다른 앱**이라 토큰도 다르다. 현재 빌드 타깃의 것이 쓰인다 |
+| `Environment` | `Sandbox`는 테스트 콘솔로만 흘러가고 어트리뷰션에 집계되지 않는다. 출시 빌드는 `Production` |
+| `Force Sandbox In Development Build` | 켜면 Development Build에서 위 설정과 무관하게 `Sandbox`로 강제한다. `Production`인 채로 테스트해 실데이터를 오염시키는 사고를 막는다 |
+| `Log Level` / `Send In Background` | SDK 로그 레벨, 백그라운드 전송 여부 |
+| `Event Tokens` | **이름 → 토큰** 매핑표. 게임 코드는 Firebase에 보내던 이름 그대로 `LogEvent`를 부른다 |
+| `Purchase Event Token` | `LogPurchase`가 쓸 토큰. 비우면 구매를 Adjust로 보내지 않는다 |
+| `Treat Unmapped Names As Tokens` | 표에 없는 이름을 토큰으로 그대로 간주해 보낸다. 이벤트 상수를 아예 토큰 문자열로 쓰는 프로젝트용 |
+| `User Id Callback Key` | `SetUserId`가 실릴 전역 콜백 파라미터의 키(기본 `user_id`) |
+
+### 8.2 매핑
+
+| 서비스 호출 | Adjust |
+| --- | --- |
+| `InitializeAsync` | `Adjust.InitSdk(new AdjustConfig(appToken, environment))`. 앱 토큰이 비면 **에러 로그 후 `false`** — 팬아웃에서 제외된다 |
+| `LogEvent(name, params)` | 표에서 토큰을 찾아 `Adjust.TrackEvent(new AdjustEvent(token))`. 파라미터는 **콜백 파라미터**로 붙는다 |
+| `LogPurchase` | `Purchase Event Token` + `SetRevenue(Revenue, Currency)` + `ProductId` + `DeduplicationId`(=`TransactionId`) |
+| `LogAdImpression` | `Adjust.TrackAdRevenue`. 토큰이 필요 없는 전용 API다 |
+| `SetUserId` / `SetUserProperty` | `Adjust.AddGlobalCallbackParameter` (빈 값이면 `Remove~`) |
+| `SetCollectionEnabled` | `Adjust.Enable()` / `Adjust.Disable()` |
+
+**이름이 아니라 토큰인 것이 이 어댑터의 전부입니다.** `Adjust.TrackEvent`는 대시보드가 발급한
+토큰만 받으므로 "이름을 그냥 보낸다"는 선택지가 없습니다. 표에 없는 이름은 **전송하지 않고
+이름당 한 번만 경고**합니다 — 매 프레임 도는 이벤트에서 로그가 터지면 콘솔이 못 쓰게 됩니다.
+
+**`DeduplicationId`를 반드시 채웁니다.** Adjust는 이 값이 같은 매출 이벤트를 한 번만 집계합니다.
+`IAPService`는 스토어 재전달·복원에서 같은 거래를 다시 지급 경로에 태우므로(IAPService README의
+`IIapFulfillment`), 이게 없으면 매출이 부풀어 오릅니다.
+
+**광고 수익 소스**는 `AdImpression.AdPlatform`에서 옮깁니다 — `AppLovin` → `applovin_max_sdk`,
+`LevelPlay`/`IronSource` → `ironsource_sdk`, `AdMob` → `admob_sdk` 등. 모르는 값은 경고 후
+`publisher_sdk`(Adjust가 "그 외" 용도로 지정한 값)로 보냅니다. 이 표를 인스펙터로 빼지 않은 이유는
+양쪽 다 닫힌 집합이라 오타로 집계를 깨뜨릴 자리만 생기기 때문입니다.
+
+### 8.3 Adjust에는 런타임 `SetUserId`가 없다
+
+`AdjustConfig.ExternalDeviceId`는 **초기화 시점 전용**인데 `AnalyticsService`는 유저 상태를
+초기화 **이후**에 flush합니다(4절) — 늘 늦습니다. 그래서 전역 콜백 파라미터로 이후 모든 이벤트에
+실어 보냅니다. 콜백 URL을 쓰지 않는다면 이 값은 Adjust 대시보드에 보이지 않습니다.
+
+> **⚠️ 실전송은 미검증입니다.** Adjust SDK는 **에디터에서 아무것도 하지 않습니다**
+> (`Adjust.InitSdk`가 `IsEditor()`에서 즉시 반환합니다). 실기 빌드에서 대시보드 테스트 콘솔로
+> 확인해야 합니다. 또 `Force Debug Only In Editor`가 켜져 있으면 에디터에서는 Adjust provider가
+> 아예 생성되지 않습니다.
+
+---
+
+## 9. 구조
 
 ```
 AnalyticsService/
@@ -323,9 +414,11 @@ AnalyticsService/
 │   ├── IAnalyticsProviderFactory.cs / AnalyticsProviderFactory.cs
 │   ├── AnalyticsProviderRegistry.cs   옵셔널 어셈블리가 자신을 등록하는 진입점
 │   ├── Debug/                         콘솔에 찍는 provider (SDK 없이 흐름 확인용)
-│   └── Firebase/                      ← FoundationDI.Firebase asmdef 가 이 폴더를 도려낸다
+│   ├── Firebase/                      ← FoundationDI.Firebase asmdef 가 이 폴더를 도려낸다
+│   └── Adjust/                        ← FoundationDI.Adjust asmdef 가 이 폴더를 도려낸다
 └── Settings/
     ├── AnalyticsProviderType.cs       [Flags] enum
+    ├── AnalyticsProviderSettings.cs   어댑터 고유 설정의 기반(멤버 없는 마커)
     └── AnalyticsServiceSettings.cs    ScriptableObject + ToOptions()
 ```
 
@@ -338,9 +431,9 @@ AnalyticsService/
 
 ---
 
-## 9. 알려진 범위 밖
+## 10. 알려진 범위 밖
 
-- **AppsFlyer / Adjust / Singular / Airbridge 어댑터** — seam과 매핑표만 준비돼 있습니다.
+- **AppsFlyer / Singular / Airbridge 어댑터** — seam과 매핑표만 준비돼 있습니다.
 - **동의(GDPR/ATT) UI·판단·영속화** — `CollectionEnabled` 세터만 제공합니다(5절).
 - **`google-services.json` 없이의 Firebase 실전송 검증** — 설정 파일이 있어야 합니다(7절).
 - **라우팅 규칙** — 이벤트별로 provider를 골라 보내는 기능은 없습니다. 전체 브로드캐스트만 합니다.

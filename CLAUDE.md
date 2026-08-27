@@ -85,7 +85,10 @@ NuGet 의존성은 **NuGetForUnity**(`Assets/NuGet/`)가 `Assets/packages.config
   - **`AnalyticsProviderType`은 `[Flags]`** — AdService와 달리 provider가 동시에 여럿이다. creator가 없는 provider만 건너뛰고 Dummy로 폴백하지 않는다.
   - **광고 수익 연동은 수동 배선** `_ads.Paid += _analytics.LogAdImpression;` — 두 서비스가 서로를 모르는 상태로 남긴다. 이 때문에 구조체 파라미터에 `in`을 쓰지 않는다(`in`이 붙으면 `Action<T>`에 대입 불가).
   - **동의 판단은 범위 밖** — `CollectionEnabled` 세터만 제공하고 영속화하지 않는다. ATT는 OS가 강제하지만 GDPR형 동의는 앱이 직접 막아야 한다.
-  - **현재 Debug/Firebase provider만 구현됨.** Firebase는 `FOUNDATIONDI_FIREBASE` 심볼이 걸린 `FoundationDI.Firebase` asmdef(precompiled DLL 참조)에 있다. **`google-services.json`이 없어 실전송은 미검증.**
+  - **어댑터 고유 설정은 `AnalyticsProviderSettings`(멤버 없는 마커 SO)를 상속해 어댑터가 직접 정의한다.** `AnalyticsServiceSettings`의 `Provider Settings` 목록에 넣으면 코어가 내용을 모른 채 실어 나르고, 어댑터가 `ctx.GetSettings<T>()`로 타입으로 골라 간다. 토큰 같은 SDK 고유 개념을 정책 계층이 알게 하지 않기 위한 seam이다.
+  - **현재 Debug/Firebase/Adjust provider가 구현됨.** Firebase는 `FOUNDATIONDI_FIREBASE` 심볼이 걸린 `FoundationDI.Firebase` asmdef(precompiled DLL 참조), Adjust는 `FOUNDATIONDI_ADJUST` 심볼이 걸린 `FoundationDI.Adjust` asmdef(`AdjustSdk.Scripts` 참조)에 있다.
+  - **Adjust는 이벤트를 이름이 아니라 대시보드 발급 토큰으로 받는다.** `AdjustAnalyticsSettings`가 이름→토큰 매핑표를 들고, 표에 없는 이름은 전송하지 않고 이름당 한 번만 경고한다. 런타임 `SetUserId`가 없어(`ExternalDeviceId`는 초기화 시점 전용) 전역 콜백 파라미터로 대신하며, 매출 중복 집계를 막으려면 `DeduplicationId`(=`TransactionId`)가 필수다.
+  - **`google-services.json`이 없어 Firebase 실전송은 미검증이고, Adjust SDK는 에디터에서 아무것도 하지 않아(`InitSdk`가 즉시 반환) 실기 빌드로만 검증된다.**
   - 상세: `Assets/FoundationDI/Runtime/Services/AnalyticsService/README.md`.
 
 - **IAPService** (`Services/IAPService/`): 모바일 인앱 구매 서비스. Google Play / App Store의 소모성·비소모성 상품을 `IIapService` 하나로 다룬다.
@@ -112,9 +115,9 @@ NuGet 의존성은 **NuGetForUnity**(`Assets/NuGet/`)가 `Assets/packages.config
 
 ### SDK 스크립팅 심볼 자동 관리
 
-3사 SDK 어댑터를 게이트하는 `FOUNDATIONDI_*` 심볼은 **손으로 정의하지 않는다.** `Assets/FoundationDI/Editor/SdkDefines/`의 `SdkDefineSynchronizer`가 도메인 리로드마다 SDK 대표 타입의 존재 여부를 보고 Android/iOS/Standalone 심볼을 켜거나 끈다.
+3사 SDK 어댑터를 게이트하는 `FOUNDATIONDI_*` 심볼은 **손으로 정의하지 않는다.** `Assets/FoundationDI/Editor/SdkDefines/`의 `SdkDefineSynchronizer`가 도메인 리로드마다 SDK 대표 어셈블리의 존재 여부를 보고 Android/iOS/Standalone 심볼을 켜거나 끈다.
 
-- 관리 대상은 `SdkDefineTable.Entries` 한 곳에 있다. 어댑터를 추가하면 여기에 한 줄 넣는다(심볼·마커 타입·표시 이름).
+- 관리 대상은 `SdkDefineTable.Entries` 한 곳에 있다. 어댑터를 추가하면 여기에 한 줄 넣는다(심볼·마커 어셈블리·표시 이름).
 - **관리 대상 심볼만 건드린다** — `LEVELPLAY_DEPENDENCIES_INSTALLED` 같은 남의 심볼은 순서까지 보존한다.
 - `FOUNDATIONDI_ADMOB`는 어댑터 어셈블리가 없어 표에서 일부러 빠져 있다. 켜면 `AdProviderFactory`가 "creator 없음" 에러를 낸다.
 - 계산은 순수 함수 `SdkDefineSynchronizer.Resolve(current, present)`로 분리돼 EditMode에서 검증된다. 쓰기는 값이 실제로 달라질 때만 일어난다(안 그러면 재컴파일 무한 루프).
