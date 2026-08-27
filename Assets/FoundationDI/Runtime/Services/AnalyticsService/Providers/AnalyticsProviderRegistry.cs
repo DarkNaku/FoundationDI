@@ -3,16 +3,43 @@ using System.Collections.Generic;
 
 namespace DarkNaku.FoundationDI
 {
-    // provider 생성에 필요한 것들을 담는다. 오늘은 옵션 하나뿐이지만, 나중에 두 번째 의존성이
-    // 생겨도 이 struct에 프로퍼티만 추가하면 되고 이미 등록된 creator 델리게이트의 시그니처는
-    // 그대로 유지된다 — 파라미터 목록이었다면 이 변경이 모든 호출부를 깨뜨렸을 것이다.
+    // provider 생성에 필요한 것들을 담는다. 나중에 또 하나가 늘어도 이 struct에 프로퍼티만
+    // 추가하면 되고 이미 등록된 creator 델리게이트의 시그니처는 그대로 유지된다 —
+    // 파라미터 목록이었다면 이 변경이 모든 호출부를 깨뜨렸을 것이다.
     public readonly struct AnalyticsProviderCreationContext
     {
+        private static readonly AnalyticsProviderSettings[] _none = new AnalyticsProviderSettings[0];
+
         public AnalyticsServiceOptions Options { get; }
 
-        public AnalyticsProviderCreationContext(AnalyticsServiceOptions options)
+        // 어댑터 고유 설정들. 코어는 내용을 모르고 목록째 들고만 있다가 여기로 넘긴다.
+        public IReadOnlyList<AnalyticsProviderSettings> ProviderSettings { get; }
+
+        public AnalyticsProviderCreationContext(AnalyticsServiceOptions options,
+                                                IReadOnlyList<AnalyticsProviderSettings> providerSettings = null)
         {
             Options = options;
+            ProviderSettings = providerSettings ?? _none;
+        }
+
+        // 어댑터가 자기 설정을 타입으로 골라 간다.
+        //
+        // 없으면 예외가 아니라 null이다. 설정이 없다는 사실을 "어떻게 대응할 것인가"는 어댑터마다
+        // 다르기 때문이다 — Adjust는 앱 토큰이 없으면 초기화를 실패시켜야 하지만, 설정이 전부
+        // 선택값인 어댑터라면 기본값으로 그냥 돌아도 된다. 여기서 던지면 그 판단을 뺏는다.
+        public T GetSettings<T>() where T : AnalyticsProviderSettings
+        {
+            // default(T)로 만든 컨텍스트는 생성자를 타지 않아 null이다.
+            var settings = ProviderSettings;
+
+            if (settings == null) return null;
+
+            for (var i = 0; i < settings.Count; i++)
+            {
+                if (settings[i] is T match) return match;
+            }
+
+            return null;
         }
     }
 

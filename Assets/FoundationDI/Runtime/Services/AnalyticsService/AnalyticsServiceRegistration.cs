@@ -24,7 +24,7 @@ namespace DarkNaku.FoundationDI
                 var factory = container.Resolve<IAnalyticsProviderFactory>();
                 var options = settings.ToOptions();
                 var types = settings.ResolveProviders(Application.isEditor);
-                var providers = factory.CreateAll(types, options);
+                var providers = factory.CreateAll(types, options, settings.ProviderSettings);
 
                 return new AnalyticsService(providers, options);
             }, Lifetime.Singleton);

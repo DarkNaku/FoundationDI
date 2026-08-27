@@ -113,3 +113,14 @@ public class FakeAnalyticsProvider : IAnalyticsProvider
         Calls.Add("Dispose");
     }
 }
+
+// 어댑터 고유 설정 seam 검증용. 실제 어댑터 설정(AdjustAnalyticsSettings 등)은 게이트된
+// 옵셔널 어셈블리 안에 있어 테스트에서 참조할 수 없으므로, 같은 모양의 가짜를 둘 세운다.
+public class FakeAnalyticsProviderSettings : AnalyticsProviderSettings
+{
+    public string Token;
+}
+
+public class OtherAnalyticsProviderSettings : AnalyticsProviderSettings
+{
+}
