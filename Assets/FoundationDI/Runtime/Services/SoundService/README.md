@@ -286,7 +286,7 @@ SoundService/
 │   ├── SoundDataCollection.cs    SFX 데이터베이스 (SO)
 │   ├── MusicDataCollection.cs    음악 데이터베이스 (SO)
 │   ├── OutputDataCollection.cs   Output 데이터베이스 (SO)
-│   └── SoundServiceSettings.cs   데이터 참조 + 오클루전 설정 (SO)
+│   └── SoundServiceSettings.cs   데이터 참조 + 기본 Output + 오클루전 설정 (SO)
 ├── Tags/                         SFX / Track / Output 유사 enum(partial struct)
 ├── Components/                   MusicZone / OutputVolumeSlider / VolumeSlider
 ├── ISoundService.cs              공개 API

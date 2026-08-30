@@ -125,3 +125,4 @@ public PoolManager(IResourceService resourceService, Transform parent = null);
 - **스레드 안전성 없음** — Unity 메인 스레드 사용을 전제로 합니다.
 - **동기 로드** — 첫 `Get`은 `IResourceService.Load`(`WaitForCompletion`) 기반이라 큰 에셋은 프레임이 멈출 수 있습니다. 비동기 선로딩이 필요하면 미리 `IResourceService.LoadAsync`로 데워두는 방식을 고려하세요.
 - **Addressables 키 예외** — 잘못된 Addressables 키는 `IResourceService`에서 예외가 전파될 수 있습니다(에러 처리는 ResourceService의 후속 과제).
+- **주입 실패는 인스턴스 단위로 격리됩니다** — 풀은 인스턴스를 처음 만들 때 계층 전체 MonoBehaviour에 DI를 주입하는데, 여기서 예외가 나면 `Debug.LogException`으로 남기고 생성은 계속합니다. 격리가 없으면 생성 콜백이 반환하지 못해 방금 `Instantiate`한 GameObject가 풀에 추적되지 않은 채 씬에 남고, `Get`을 시도할 때마다 하나씩 쌓입니다. 주입받지 못한 컴포넌트는 의존성이 `null`이므로 콘솔 로그를 무시하면 안 됩니다.
