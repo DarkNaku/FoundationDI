@@ -47,6 +47,8 @@ public class SceneLifetimeScope : LifetimeScope
 }
 ```
 
+> `IResourceService`가 부모(`RootLifetimeScope`)에서 해결되려면 `SceneLifetimeScope`가 실제로 그 부모를 갖고 있어야 합니다. VContainer가 부모를 찾는 경로는 셋뿐입니다: (1) `VContainerSettings.RootLifetimeScope`에 `RootLifetimeScope`가 지정되어 있거나, (2) 씬의 `LifetimeScope` 인스펙터에서 `parentReference`에 직접 연결하거나, (3) `SceneLifetimeScope`의 GameObject를 `RootLifetimeScope` 계층 아래에 중첩합니다. `parentReference`를 비워둔 채 아무 설정도 하지 않으면 부모 없는 자식 스코프가 되어 `IResourceService` 해석이 실패합니다 — 조용히가 아니라 즉시 예외로 실패하므로, 셋 중 하나를 반드시 갖추는 것을 등록 절차의 일부로 여기세요(이 리포지토리의 호스트 프로젝트는 `Assets/Settings/VContainerSettings.asset`이 (1)을 담당합니다).
+
 > 백엔드는 `IResourceProvider` 구현체 선택으로 결정됩니다. 호스트 샘플은 `ResourcesProvider`(Resources)를 쓰며, Addressables는 선택입니다.
 
 > 캔버스 렌더 모드/기준 해상도를 커스터마이즈하려면 `settings.RootPrefab`에 루트 프리팹을 연결하세요(만드는 법은 아래 [에디터 워크플로](#에디터-워크플로-디자이너용) 1번 참고). 비워두면 코드 기본값으로 동작합니다.
@@ -167,7 +169,7 @@ Page와 Overlay는 전면 배경이 없으므로 빈 영역의 입력이 자연�
 
 - 루트 Canvas는 **최초 표시 시 지연 생성**됩니다. `UINavigatorSettings`의 **Root Prefab**을 인스턴스화하며(렌더 모드·`CanvasScaler`·레이어 구성은 그 프리팹이 결정), 미지정 시 코드 기본값(`UIRoot.CreateDefault()` — ScreenSpaceOverlay / ScaleWithScreenSize / Expand / 1920x1080)으로 폴백합니다. 어느 경로든 상주화는 하지 않습니다 — 루트는 부모 없이 인스턴스화되어 **활성 씬에 붙고, 그 씬과 함께 파괴**됩니다. 레이어 렌더 순서(아래→위)는 `Page → BelowOverlay → Popup → AboveOverlay`.
 - **정리 경로는 `UINavigator.Dispose()`(= 소유 스코프 dispose) 하나뿐입니다.** 진행 중인 큐를 취소하고, 활성 Presenter를 전부 teardown(`OnBeforeHide`/`OnAfterHide` 발화)하고, View 풀을 dispose한 뒤 캔버스 GameObject를 파괴합니다. 씬 전환 자체는 이 정리를 촉발하지 않습니다 — 보통 씬이 언로드되면 UINavigator를 소유한 씬 `LifetimeScope`도 함께 dispose되므로 결과적으로 같은 타이밍에 정리됩니다.
-- 캔버스 GameObject가 (씬 언로드 등으로) **`Dispose()`보다 먼저 외부에서 파괴되면**(fake-null), 그 뒤의 `Page/Popup/Overlay<T>()` 호출은 죽은 참조를 버리고 **그 시점의 활성 씬에 새 캔버스를 재구성**합니다. `Dispose()`가 이미 끝난 뒤라면 대신 `ObjectDisposedException`을 던져 재구성을 막습니다(자세한 내용은 아래 [알려진 한계](#알려진-한계) 참고).
+- 캔버스 GameObject가 (씬 언로드 등으로) **`Dispose()`보다 먼저 외부에서 파괴되면**(fake-null), 그 뒤의 `Page/Popup/Overlay<T>()` 호출은 **재구성되지 않습니다.** 이미 한 번이라도 표시가 있었다면 View 풀이 캔버스보다 오래 살아남아 `Root` getter의 fake-null 복구 분기가 실행되기 전에 실패합니다(예외가 로그로 남고 화면에는 아무것도 나타나지 않습니다). `Dispose()`가 이미 끝난 뒤라면 대신 `ObjectDisposedException`을 던집니다(자세한 내용은 아래 [알려진 한계](#알려진-한계) 참고).
 
 ### additive 씬
 
@@ -175,7 +177,7 @@ Page와 Overlay는 전면 배경이 없으므로 빈 영역의 입력이 자연�
 
 ### 알려진 한계
 
-캔버스가 이미 파괴됐지만 아직 `Dispose()`가 오지 않은 창(씬 언로드 도중 게임 코드가 UI를 새로 여는 경우)에서 `Page<T>()`를 부르면, 캔버스가 **다음 씬에** 만들어져 고아로 남습니다. 캔버스가 예기치 않게 파괴됐을 때 UI가 영구히 죽지 않도록 재구성 동작을 유지한 결과입니다. 씬 전환 중에는 UI를 새로 열지 마세요.
+캔버스가 이미 파괴됐지만 아직 `Dispose()`가 오지 않은 창(씬 언로드 도중 게임 코드가 UI를 새로 여는 경우)에서 `Page<T>()`를 부르면 **실패합니다** — 예외가 로그로 남고 UI는 표시되지 않습니다. `Root` getter 자체에는 죽은 참조를 버리고 재구성하는 분기가 남아 있지만, 한 번이라도 표시가 있었던 뒤에는 View 풀(`Pool`)이 캔버스보다 먼저 만들어져 있어 그 분기에 도달하기 전에 실패합니다(자세한 메커니즘은 `UINavigator.cs`의 `Root`/`Pool` 주석 참고). 캔버스를 되살리는 것은 **현재 동작이 아니라 후속 과제**입니다. 씬 전환 중에는 UI를 새로 열지 마세요.
 
 ---
 
@@ -359,7 +361,7 @@ _ui.Page<StagePage>()
 
 **동작이 바뀝니다**: 씬이 언로드되면 캔버스·풀·프리젠터가 모두 파괴됩니다. 씬을 가로질러 살아남아야 하는 UI(로딩 화면·페이드)는 이 컴포넌트 밖에서 별도 캔버스로 만드세요.
 
-**`InjectorService`로 주입되는 씬 배치 컴포넌트는 `IUINavigator`를 해결하지 못합니다.** `InjectorService`는 정적 리졸버 하나를 들고 있어, `RegisterInjector`가 루트에 있으면 씬 배치 MonoBehaviour가 루트 컨테이너로 주입됩니다. `IUINavigator`가 필요하면 `RegisterInjector`도 같은 씬 스코프에 두거나(권장하지 않음), UI를 `UIPresenter`/`View` 계층에서만 다루세요 — 이 경로는 `UIInstanceFactory`가 씬 스코프 리졸버를 쓰므로 정상 동작합니다.
+**`InjectorService`로 주입되는 씬 배치 컴포넌트는 `IUINavigator`를 해결하지 못합니다.** `InjectorService`는 정적 리졸버 하나를 들고 있어, `RegisterInjector`가 루트에 있으면 씬 배치 MonoBehaviour가 루트 컨테이너로 주입됩니다. `IUINavigator`가 필요하면 `RegisterInjector`도 같은 씬 스코프에 두거나(권장하지 않음 — `InjectorService`는 정적 필드 하나(`_resolver`)를 공유하므로, 씬 스코프에 두면 그 씬이 언로드될 때 `InjectorService.Dispose()`가 이 정적 참조를 null로 만듭니다. 상주 씬(DontDestroyOnLoad)에서 더 먼저 주입받은 컴포넌트는 이미 죽은 컨테이너를 가리키는 참조를 들고 있다가, 이후 재주입·재해석 시도에서 조용히 실패합니다), UI를 `UIPresenter`/`View` 계층에서만 다루세요 — 이 경로는 `UIInstanceFactory`가 씬 스코프 리졸버를 쓰므로 정상 동작합니다.
 
 `UIPresenter`/`UIView`/`UIRoot`/`[UIPrefab]`은 이름이 그대로이므로 **프리젠터·뷰 선언부는 손댈 필요가 없습니다.**
 

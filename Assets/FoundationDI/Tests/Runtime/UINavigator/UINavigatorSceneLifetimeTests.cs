@@ -75,16 +75,26 @@ public class UINavigatorSceneLifetimeTests
         var previous = SceneManager.GetActiveScene();
         var temp = SceneManager.CreateScene("uinavigator_scene_switch");
         SceneManager.SetActiveScene(temp);
-        await AwaitableTest.NextFrame();
 
-        // 정리 경로는 Dispose 하나뿐이다. 씬 이벤트는 더 이상 teardown을 촉발하지 않는다.
-        Assert.IsFalse(p.AfterHideCalled, "씬 전환이 presenter를 teardown하면 안 된다");
-        Assert.IsTrue(p.ViewBase != null, "표시 중인 View가 파괴되면 안 된다");
-        Assert.IsTrue(p.ViewBase.gameObject.activeSelf, "표시 중인 View가 비활성화되면 안 된다");
+        try
+        {
+            await AwaitableTest.NextFrame();
 
-        SceneManager.SetActiveScene(previous);
-        nav.Dispose();
-        await Awaitable.FromAsyncOperation(SceneManager.UnloadSceneAsync(temp));
+            // 정리 경로는 Dispose 하나뿐이다. 씬 이벤트는 더 이상 teardown을 촉발하지 않는다.
+            Assert.IsFalse(p.AfterHideCalled, "씬 전환이 presenter를 teardown하면 안 된다");
+            Assert.IsTrue(p.ViewBase != null, "표시 중인 View가 파괴되면 안 된다");
+            Assert.IsTrue(p.ViewBase.gameObject.activeSelf, "표시 중인 View가 비활성화되면 안 된다");
+        }
+        finally
+        {
+            // 위 assert 중 하나라도 던지면 활성 씬 복원과 임시 씬 언로드가 건너뛰어져
+            // uinavigator_scene_switch가 이후 테스트 실행 내내 남는다 — 남은 캔버스가
+            // UINavigatorRootPrefabTests의 GetActiveScene().handle 단언과 충돌해
+            // 무관한 실패가 연쇄된다(finding: 활성 씬 드리프트).
+            SceneManager.SetActiveScene(previous);
+            nav.Dispose();
+            await Awaitable.FromAsyncOperation(SceneManager.UnloadSceneAsync(temp));
+        }
     });
 
     [UnityTest]

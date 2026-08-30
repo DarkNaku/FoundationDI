@@ -39,7 +39,11 @@ namespace DarkNaku.FoundationDI
                 if (_disposed) throw new ObjectDisposedException(nameof(UINavigator));
 
                 // 캔버스는 씬 수명이다. 씬 언로드와 Dispose의 순서는 보장되지 않으므로
-                // 파괴된 뒤(fake-null) 접근이 올 수 있다 — 참조를 버리고 재구성한다.
+                // 파괴된 뒤(fake-null) 접근이 올 수 있다 — 그 경우를 위한 안전망으로
+                // 참조를 버리고 재구성하는 분기를 남겨 두지만, 현재는 실질적으로 도달하지
+                // 않는다: 한 번이라도 표시가 있었다면 아래 Pool getter가 이미 _pool을
+                // 채워 놓았고 그 이후로는 이 getter가 Pool 쪽에서 평가되지 않기 때문이다
+                // (자세한 내용은 Pool getter 주석과 README "알려진 한계" 참고).
                 // UIRoot는 MonoBehaviour다 → ??= 는 fake-null을 못 걸러내므로 쓰지 않는다.
                 if (_root == null) DiscardRoot();
                 if (_root == null) _root = CreateRoot();
@@ -86,8 +90,12 @@ namespace DarkNaku.FoundationDI
             return root;
         }
 
-        // 전용 풀: 캔버스(씬 수명) 아래에 위치한다. Dispose 또는 캔버스 파괴 감지(DiscardRoot) 시 정리되고 다음 표시에서 재구성된다.
+        // 전용 풀: 캔버스(씬 수명) 아래에 위치한다. Dispose 시 정리되고 다음 표시에서 재구성된다.
         // resolver를 넘겨 View 프리팹 계층의 MonoBehaviour도 인스턴스 생성 시 1회 주입되게 한다.
+        // ??= 는 _pool이 한 번 채워지면 다시는 이 식(따라서 Root 평가)을 거치지 않는다는 뜻이다.
+        // 캔버스가 Dispose보다 먼저 파괴돼도 이미 채워진 _pool은 그대로 남으므로, 위 Root
+        // getter의 fake-null 복구 분기는 이 경로로는 재실행되지 않는다 — 캔버스 파괴 이후 첫
+        // 표시 호출은 죽은 풀 아이템을 건드리다 실패한다(README "알려진 한계" 참고).
         private PoolManager Pool => _pool ??= new PoolManager(_resource, _factory.Resolver, Root.GO.transform);
 
         public bool IsPopupVisible => _popups.All.Count > 0;
@@ -338,6 +346,12 @@ namespace DarkNaku.FoundationDI
                 p.OnAfterHide(); p.Fire(UIPresenter.LifecycleEvent.AfterHide);
             }
 
+            // 이 Clear는 겉보기보다 하는 일이 많다: HandleHideAsync는 `_active.Contains(presenter)`가
+            // false면 곧장 return한다. Dispose 이후 큐에 남아 있던(또는 뒤늦게 들어오는) Hide
+            // 요청이 이 return으로 걸러지지 않으면, HandleHideAsync 본문이 이어서 Root getter에
+            // 닿아 ObjectDisposedException을 던지게 된다 — 그 예외는 OperationQueue가 로그로
+            // 삼키므로 겉으로는 "그냥 씹힌 Hide 요청"처럼 보인다. 이 Clear를 지우는 리팩터링은
+            // 이 가드를 조용히 무력화하니 주의.
             _active.Clear();
             _pages.Clear();
             _popups.Clear();
