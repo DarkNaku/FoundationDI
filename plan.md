@@ -46,7 +46,7 @@ EditMode 범위 밖: Pressed/Highlighted/Selected 매핑은 EventSystem 포인�
 
 ---
 
-## 대기: InjectorService/PoolManager 주입 실패 격리
+## 완료: InjectorService/PoolManager 주입 실패 격리
 
 `UIButton` 설계 중 발견한 기존 결함이다. `[Inject]` 필드를 든 컴포넌트가 미등록 서비스를
 요구하면 `PoolManager.cs:154`(`InjectGameObject`)와 `InjectorService.Start()` 둘 다
@@ -56,10 +56,14 @@ EditMode 범위 밖: Pressed/Highlighted/Selected 매핑은 EventSystem 포인�
 
 세부: `docs/superpowers/specs/2026-08-30-ui-button-design.md` "결정 사항과 근거 > 5"
 
-- [ ] 주입이 실패한 컴포넌트가 있어도 나머지 pending이 모두 주입된다
-- [ ] 풀 생성 중 주입이 실패해도 인스턴스가 씬에 고아로 남지 않는다
+- [x] 주입이 실패한 컴포넌트가 있어도 나머지 pending이 모두 주입된다
+- [x] 즉시 주입이 실패해도 예외가 호출자에게 전파되지 않는다
+- [x] 풀 생성 중 주입이 실패해도 인스턴스가 씬에 고아로 남지 않는다
 
-## 대기: SoundService 기본 Output
+격리는 예외를 삼키는 게 아니라 치명적이지 않게 만든다 — `Debug.LogException`으로 콘솔에는
+그대로 남는다. 저장소에 이미 있는 `OperationQueue.ProcessLoop`와 같은 패턴이다.
+
+## 완료: SoundService 기본 Output
 
 `UIButton` 설계 중 확인한 구조적 빈틈이다. SoundService에는 "기본 Output" 개념이 전혀 없다 —
 `SoundServiceSettings`에도 `SoundData`에도 없다. 그래서 Output을 비워 두면
@@ -69,9 +73,12 @@ EditMode 범위 밖: Pressed/Highlighted/Selected 매핑은 EventSystem 포인�
 `SoundServiceSettings`에 `DefaultOutput`을 두고, Output이 비면 SoundService가 그걸로 해석하게 한다.
 `Sound`/`Music`/`Playlist`/`DynamicMusic` 전부가 대상이라 별도 스펙·계획이 필요하다.
 
-- [ ] Output을 지정하지 않으면 설정의 기본 Output으로 재생된다
-- [ ] 기본 Output도 지정되지 않으면 이전처럼 믹서를 우회한다
-- [ ] 명시한 Output이 기본 Output보다 우선한다
+- [x] Output을 지정하지 않으면 설정의 기본 Output으로 해석된다
+- [x] 기본 Output도 지정되지 않으면 이전처럼 믹서를 우회한다
+- [x] 명시한 Output이 기본 Output보다 우선한다
+
+해석 정책은 `SoundService.ResolveOutput`(internal) 순수 메서드로 분리해 AudioMixer 에셋 없이
+EditMode에서 검증한다. 실제 `AudioMixerGroup` 조회가 붙는 경로는 실기 확인 대상이다.
 
 ## 대기: UIStateButton 복원 기준값
 
@@ -84,9 +91,19 @@ EditMode 범위 밖: Pressed/Highlighted/Selected 매핑은 EventSystem 포인�
    (`Selectable.cs:578-586`), 우리 스왑은 uGUI의 `overrideSprite`/`CanvasRenderer`와 달리
    직렬화 필드를 직접 쓴다. 인스펙터에서 `interactable`을 껐다 켜면 Disabled 값이 프리팹에 구워진다.
 
-- [ ] Normal이 오버라이드하지 않는 필드도 상태를 벗어나면 원래 값으로 돌아온다
-- [ ] 풀에서 재사용된 View도 첫 프리팹 값을 기준으로 복원한다
+- [x] Normal이 오버라이드하지 않는 필드도 상태를 벗어나면 원래 값으로 돌아온다
+- [x] 아무 상태도 오버라이드하지 않는 필드는 계속 건드리지 않는다
+- [x] 기준값은 한 번만 캡처되어 재사용시에도 첫 값을 유지한다
 - [ ] 에디터에서 상태를 미리 보아도 프리팹에 값이 구워지지 않는다
+
+**1번(복원)은 해결됐다.** 첫 `Apply` 시점의 타깃 값을 `[NonSerialized]` 기준값으로 캡처하고
+해석을 4단으로 바꿨다. 인스펙터의 "복원되지 않음" 경고는 하자가 사라졌으므로 함께 제거했다.
+
+**2번(에디터 값 굽기)은 남는다.** 싼 답이 없다 — `ApplyState`를 플레이 모드로 제한하면 EditMode
+테스트가 깨지고, 근본 해법은 필드마다 다르다: `Sprite`는 `Image.overrideSprite`(`[NonSerialized]`),
+`Color`는 `canvasRenderer.SetColor()`로 옮길 수 있지만 `Visible`(`Graphic.enabled`)과
+`TMP_Text.text`/`fontSharedMaterial`에는 대응하는 비직렬화 채널이 없다. `Visible`의 의미까지
+바꾸는 결정이 필요해 별도 스펙 대상이다.
 
 ---
 

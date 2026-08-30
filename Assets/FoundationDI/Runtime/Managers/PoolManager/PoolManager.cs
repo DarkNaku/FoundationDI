@@ -151,7 +151,17 @@ namespace DarkNaku.FoundationDI
 
                     // 생성 시 1회 계층 전체 MonoBehaviour에 DI 주입.
                     // resolver가 없으면(테스트/컨테이너 미사용) 조용히 건너뛴다.
-                    _resolver?.InjectGameObject(go);
+                    // 주입 실패는 이 인스턴스에 가둔다 — 여기서 예외가 빠져나가면 create func이
+                    // 반환하지 못해 방금 Instantiate한 GameObject가 풀에 추적되지 않은 채
+                    // 씬에 고아로 남고, Get을 시도할 때마다 하나씩 쌓인다.
+                    try
+                    {
+                        _resolver?.InjectGameObject(go);
+                    }
+                    catch (Exception e)
+                    {
+                        Debug.LogException(e, go);
+                    }
 
                     item.OnCreateItem();
 

@@ -28,6 +28,14 @@ namespace DarkNaku.FoundationDI
         [field: SerializeField]
         public AudioMixer MasterAudioMixer { get; set; }
 
+        /// <summary>
+        /// Output을 지정하지 않은 재생이 사용할 기본 Output.
+        /// 비워 두면 AudioMixerGroup을 붙이지 않아 믹서를 통째로 우회한다 —
+        /// 그러면 유저가 볼륨을 내려도 그 소리는 그대로 난다.
+        /// </summary>
+        [field: SerializeField]
+        public Output DefaultOutput { get; set; }
+
         [field: Tooltip("에디터 도구가 생성한 데이터/코드를 저장할 프로젝트 상대 경로. 예: 'Assets/FoundationDI.Data/SoundService/'")]
         [field: SerializeField]
         public string DataRootPath { get; set; } = "Assets/FoundationDI.Data/SoundService/";

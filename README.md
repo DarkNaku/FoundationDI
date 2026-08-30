@@ -1,11 +1,11 @@
 # FoundationDI
 
 ![Unity](https://img.shields.io/badge/Unity-6000.3%2B-black?logo=unity)
-![Version](https://img.shields.io/badge/version-0.7.2-blue)
+![Version](https://img.shields.io/badge/version-0.8.2-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Author](https://img.shields.io/badge/author-DarkNaku-orange)
 
-DI(의존성 주입) 기반 Unity 게임 개발 파운데이션 패키지입니다. [VContainer](https://github.com/hadashiA/VContainer)를 코어로 Addressables와 Unity `Awaitable`을 조합한 공통 서비스 계층(메시징·리소스·UI·풀·사운드·햅틱·초기화·광고·분석·인앱결제)을 제공합니다. 각 서비스는 인터페이스(`IXxxService`)로 등록되어 생성자 주입으로 소비되며, 외부 의존(Addressables 등)은 seam으로 분리되어 EditMode 단위 테스트가 가능합니다.
+DI(의존성 주입) 기반 Unity 게임 개발 파운데이션 패키지입니다. [VContainer](https://github.com/hadashiA/VContainer)를 코어로 Addressables와 Unity `Awaitable`을 조합한 공통 서비스 계층(메시징·리소스·UI·풀·사운드·햅틱·초기화·광고·분석·인앱결제·튜토리얼)을 제공합니다. 각 서비스는 인터페이스(`IXxxService`)로 등록되어 생성자 주입으로 소비되며, 외부 의존(Addressables 등)은 seam으로 분리되어 EditMode 단위 테스트가 가능합니다.
 
 > 패키지 본체는 [`Assets/FoundationDI`](Assets/FoundationDI)에 있습니다.
 
@@ -19,7 +19,9 @@ DI(의존성 주입) 기반 Unity 게임 개발 파운데이션 패키지입니�
 - **햅틱** — iOS/Android 촉각 피드백. 시맨틱 프리셋(`Impact`/`Notification`/`Selection`, 옵트인 쿨다운) + `AnimationCurve` 커브·커스텀 패턴 재생(`Awaitable`, 단일 활성)과 플랫폼 케이퍼빌리티 폴백. 에디터/데스크톱은 Noop
 - **부트스트랩 초기화** — 초기화 단위를 SO(`InitializeItem`)로 정의하고 카탈로그 순서대로 순차 실행. 세션 내 중복 실행 방지, 실패 지점부터 재개
 - **수익화 3종** — 광고(`IAdService`)·분석(`IAnalyticsService`)·인앱결제(`IIapService`). 세 서비스 모두 SDK를 옵셔널 어셈블리로 격리해 **코어는 어떤 3사 SDK도 참조하지 않으며**, SDK가 없으면 Dummy/Debug provider로 에디터에서 전체 플로우가 돌아갑니다
-- **씬 컴포넌트 DI** — 씬에 배치된 MonoBehaviour에 의존성을 주입하는 인프라(`InjectableBehaviour` + `InjectorService`). `UIButton`/`UIStateButton`/`MusicZone`/`OutputVolumeSlider` 등이 이를 사용
+- **튜토리얼** — 게임 조건에 따라 나뉘어 발동하는 튜토리얼 진행 엔진(`ITutorialManager`). 시퀀스는 각자 `StartTrigger`로 발동하는 조건부 집합이고, 진행도는 시퀀스 ID로 영속화. 진행 규칙은 순수 C#이라 EditMode에서 전부 테스트됨
+- **UI 컴포넌트** — uGUI `Button`을 상속한 `UIButton`(클릭 SFX + 햅틱)과 상태별 이미지/텍스트 스왑 `UIStateButton`. 사운드·햅틱 서비스는 선택적이라 등록하지 않으면 그 기능만 조용히 꺼진다
+- **씬 컴포넌트 DI** — 씬에 배치된 MonoBehaviour에 의존성을 주입하는 인프라(`InjectableBehaviour` + `InjectorService`). `UIButton`/`UIStateButton`/`MusicZone`/`OutputVolumeSlider` 등이 이를 사용. **주입 실패는 대상 하나에 격리**되어 미등록 서비스 하나가 나머지 컴포넌트나 컨테이너 시작을 깨뜨리지 않는다
 
 ## 설치 방법
 
@@ -111,9 +113,10 @@ public class TitleFlow
 | 구성 요소 | 설명 | 상세 문서 |
 | --- | --- | --- |
 | **UIService** | uGUI 기반 UI 표시/전환 시스템. Presenter 타입으로 Page(단일 교체)/Popup(LIFO·모달)/Overlay(상주 Above/Below) 모드를 고정. **게임 전역 단일 상주 Canvas**(`DontDestroyOnLoad`, 렌더 모드/CanvasScaler는 `UIServiceSettings.RootPrefab`이 결정·미지정 시 ScreenSpaceOverlay/1920x1080 폴백, 씬 전환 시 자식만 clear), Presenter 매 표시 재생성 + **View 풀링**, `Awaitable` 트랜지션, 모달 입력 차단(`CanvasGroup.interactable`). Page/Popup에 `WithOverlay`(오버레이 동시 노출·`persistent` 연속 유지)와 자동-show 빌더 API 제공. 프리팹 로딩은 `IResourceService`(Resources/Addressables)에 위임. | [README](Assets/FoundationDI/Runtime/Services/UIService/README.md) |
+| **Components** | 씬 저작용 uGUI 위젯. `UIButton`(클릭 시 SFX 재생 + 햅틱 `Impact`, 두 서비스 모두 **선택적** 주입)과, 상태(Normal/Highlighted/Pressed/Selected/Disabled)별로 여러 `Image`/텍스트를 동시에 스왑하는 `UIStateButton`. 스왑은 `그 상태 → Normal → 기준값 → 안 씀` 4단으로 해석되어 상태를 벗어나면 원래 값으로 돌아온다. | [README](Assets/FoundationDI/Runtime/Components/README.md) |
 | **ResourceService** | Addressables 추상화. `LoadAsync`/`Load`/`Release`/`Dispose` API로 키 단위 캐싱 + 참조 카운팅. 에셋 로딩이 필요한 모든 서비스의 위임 대상. | [README](Assets/FoundationDI/Runtime/Services/ResourceService/README.md) |
 | **MessageService** | 외부 라이브러리 없는 인-메모리 pub-sub. 타입을 채널로 삼아 `Publish<T>`/`Subscribe<T>`만 제공하며, 구독 토큰은 `IDisposable`(R3를 쓴다면 `AddTo`로 MonoBehaviour 수명에 바인딩 가능). 발행은 스냅샷으로 완주하고 핸들러 예외는 격리한다. 메인 스레드 전제. | [README](Assets/FoundationDI/Runtime/Services/MessageService/README.md) |
-| **PoolService** | 키 기반 GameObject 오브젝트 풀. Resources→Addressables fallback으로 프리팹을 로드하며, 풀 항목 생명주기 콜백과 지연 반환(`Release(delay)`)을 지원. | — |
+| **PoolManager** | 키 기반 GameObject 오브젝트 풀. 프리팹 로드는 `IResourceService`에 위임하고, 풀 루트를 씬 스코프에 귀속시켜 씬 언로드 시 함께 정리된다. 풀 항목 생명주기 콜백과 지연 반환(`Release(delay)`)을 지원하며, 생성 시 계층 전체에 DI를 주입한다(주입 실패는 인스턴스 단위로 격리되어 다른 컴포넌트와 풀 자체에 번지지 않는다). | [README](Assets/FoundationDI/Runtime/Managers/PoolManager/README.md) |
 | **SoundService** | 태그 기반 오디오 시스템. `Sound`/`Music`/`Playlist`/`DynamicMusic` 빌더, AudioSource 풀링, 페이드 인·아웃, 루프/트랙 콜백, id 기반 일괄 제어, AudioMixer Output 볼륨(`PlayerPrefs` 영속, `ISoundVolumeStorage`로 교체 가능), 레이캐스트 3D 오클루전. Audio Creator/Collection/Output Manager/Settings 에디터 창과 `MusicZone`/`OutputVolumeSlider` 컴포넌트 포함(버튼 클릭음은 `SoundService` 소속이 아니라 `Runtime/Components/`의 `UIButton`/`UIStateButton` 참고). | [README](Assets/FoundationDI/Runtime/Services/SoundService/README.md) |
 | **HapticService** | iOS/Android 통합 햅틱. 시맨틱 프리셋(`Impact`/`Notification`/`Selection`, 옵트인 쿨다운) + `AnimationCurve` 커브·커스텀 패턴 재생(`Play`, `Awaitable`, 단일 활성)·케이퍼빌리티 폴백. 에디터/데스크톱은 Noop, `Enabled`는 `PlayerPrefs`에 영속. | [README](Assets/FoundationDI/Runtime/Services/HapticService/README.md) |
 | **InitializeService** | 게임 부트스트랩 순차 초기화. 초기화 단위를 `InitializeItem`(SO)로 정의하고 `InitializeCatalog`에 묶어 리스트 순서대로 직렬 실행. 세션 내 중복 실행 방지, 예외는 즉시 전파하고 실패 지점부터 재개. | [README](Assets/FoundationDI/Runtime/Services/InitializeService/README.md) |
@@ -121,6 +124,7 @@ public class TitleFlow
 | **AnalyticsService** | 다중 분석/MMP 팬아웃. 게임이 `IAnalyticsService` API를 한 번 호출하면 등록된 모든 provider로 브로드캐스트된다. 라우팅 규칙 없음(무엇을 무시할지는 어댑터가 결정), 초기화 전 이벤트는 순서 보존 버퍼링·유저 상태는 latest-wins, provider 예외는 격리. | [README](Assets/FoundationDI/Runtime/Services/AnalyticsService/README.md) |
 | **IAPService** | 모바일 인앱 구매(Google Play/App Store). 소모성·비소모성을 `IIapService` 하나로 구매·복원. **지급을 저장한 뒤에만 확정**하는 규율을 `IIapFulfillment` seam 하나로 접어, 신규 구매·재전달·복원이 전부 같은 메서드로 들어온다. 로컬 영수증 검증(Google Play)·상품 상수 생성기 포함. | [README](Assets/FoundationDI/Runtime/Services/IAPService/README.md) |
 | **InjectorService** | 씬에 배치된 MonoBehaviour에 의존성을 주입하는 인프라. 정적 요청 큐 + EntryPoint로 위치·계층·순서에 무관하게 주입. `InjectableBehaviour` 베이스 상속으로 사용. | [README](Assets/FoundationDI/Runtime/Services/InjectorService/README.md) |
+| **TutorialManager** | 조건 기반 튜토리얼 진행 엔진. 시퀀스는 순차 리스트가 아니라 각자 `StartTrigger`(Auto/Manual/ButtonClick/`MessageTrigger<T>`)로 발동하는 **조건부 후보 집합**이고, 진행도는 인덱스가 아닌 **시퀀스 ID**로 영속화해 시퀀스를 추가·삭제해도 기존 유저 진행도가 어긋나지 않는다. 진행 규칙은 순수 C#(EditMode 테스트 가능) + 얇은 씬 오써링 어댑터로 분리. 연출은 `ITutorialModule` seam + 기본 2종. | [README](Assets/FoundationDI/Runtime/Managers/TutorialManager/README.md) |
 
 > 상세 문서가 아직 없는 구성 요소는 소스(`Assets/FoundationDI/Runtime/Services/<이름>/`)와 인터페이스(`IXxxService`)를 참고하세요.
 

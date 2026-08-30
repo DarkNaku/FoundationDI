@@ -62,12 +62,13 @@ public class RootLifetimeScope : LifetimeScope
 API에서 쓸 수 없어 별도로 둔 것이므로, 캐스팅이 아니라 명시적 매핑으로 번역된다.
 
 각 스왑 필드(이미지의 Sprite/Color/Visible, 텍스트의 Text/Color/Material)는 필드마다 독립적으로
-3단 폴백을 따른다.
+4단 폴백을 따른다.
 
 ```
 그 상태에서 오버라이드했다 → 그 값을 쓴다
 그 상태에서 오버라이드하지 않았다 → Normal에서 오버라이드했다면 Normal 값을 쓴다
-Normal도 오버라이드하지 않았다 → 그 필드를 건드리지 않는다(원래 값 유지)
+Normal도 오버라이드하지 않았다 → 다른 상태가 오버라이드한다면 기준값으로 되돌린다
+아무 상태도 오버라이드하지 않았다 → 그 필드를 건드리지 않는다(원래 값 유지)
 ```
 
 폴백 대상이 **"가장 가까운 상태"가 아니라 항상 `Normal`이라는 점이 핵심**이다. 예를 들어 `Selected`를
@@ -75,16 +76,27 @@ Normal도 오버라이드하지 않았다 → 그 필드를 건드리지 않는�
 uGUI가 클릭한 버튼을 선택 상태로 계속 유지하는 성질과 겹쳐, 모바일에서 탭한 버튼이 계속 하이라이트된
 채로 남는 결과가 된다.
 
-**⚠️ 위 3단 규칙은 `Normal`이 오버라이드하지 않는 필드를 `Highlighted`/`Pressed`/`Selected`/`Disabled`
-중 하나가 오버라이드할 때 깨진다.** 세 번째 분기("아무것도 쓰지 않는다")는 *어느 상태도* 그 필드를
-오버라이드하지 않을 때만 안전하다. 예를 들어 `Highlighted.Override`에 `Color`를 켜고 노란색을 지정하되
-`Normal.Override`는 `Color`를 켜지 않았다면, 호버 시 노란색이 적용된 뒤 호버를 벗어나 `Normal`로
-돌아가도 그 값을 복원할 근거가 없어 **버튼이 노란색인 채로 계속 남는다**. `Visible`도 마찬가지다 —
-`Disabled`만 `Visible`을 꺼서 아이콘을 숨기면, 다시 활성화해도 아이콘이 돌아오지 않는다. 해법은
-간단하다: 다른 상태가 오버라이드하는 필드는 **`Normal`에서도 같은 필드를 오버라이드**해 복원 기준값을
-명시한다. 인스펙터가 이 조합을 감지하면 경고를 띄운다(`UIStateButtonEditor`). 근본적으로 스왑 세트가
-직렬화 필드를 복원 기준 없이 직접 쓰는 구조적 문제이며, 런타임에서 자동 복원하는 개선은 `plan.md`의
-"대기: UIStateButton 복원 기준값"으로 남아 있다.
+**기준값 복원.** `Normal`이 오버라이드하지 않는 필드를 다른 상태가 오버라이드하는 경우도 안전하다.
+예를 들어 `Highlighted`에만 `Color`를 켜 노란색을 지정하면, 호버를 벗어날 때 **첫 `Apply` 시점에
+캡처해 둔 기준값**으로 돌아온다. 그래서 실제 해석은 4단이다:
+
+```
+그 상태가 오버라이드하면            → 그 상태의 값
+아니면 Normal이 오버라이드하면       → Normal의 값
+아니면 다른 상태가 오버라이드하면     → 기준값(첫 Apply 시점의 타깃 값)
+아무 상태도 오버라이드하지 않으면     → 아무것도 쓰지 않는다
+```
+
+마지막 줄이 중요하다. 아무 상태도 관리하지 않는 필드는 기준값으로도 되돌리지 않는다 — 게임 코드가
+런타임에 바꾼 스프라이트를 버튼이 멋대로 되돌리면 안 되기 때문이다.
+
+기준값은 `[NonSerialized]`라 프리팹 인스턴스마다 새로 잡히고, View가 풀에서 재사용돼도 다시 잡지
+않는다. 즉 두 번째 표시에서도 첫 프리팹 값이 기준이다.
+
+> **에디터에서는 아직 값이 구워진다.** `Selectable`이 `[ExecuteAlways]`라 에디터에서도 `OnValidate`
+> → `DoStateTransition`이 돌고, 이 스왑은 uGUI의 `overrideSprite`/`CanvasRenderer`와 달리 직렬화
+> 필드를 직접 쓴다. 인스펙터에서 `interactable`을 껐다 켜면 `Disabled` 값이 프리팹에 남을 수 있다.
+> `plan.md`의 "대기: UIStateButton 복원 기준값"에 남아 있는 항목이다.
 
 ---
 
@@ -109,12 +121,12 @@ uGUI가 클릭한 버튼을 선택 상태로 계속 유지하는 성질과 겹�
 바꾸지 않는다. 상태에 따라 굵기나 외곽선처럼 폰트를 바꿔야 표현되는 효과가 필요하면, TMP 표준 방식대로
 Material Preset을 만들어 `Material` 필드로 교체한다.
 
-**주의 4 — `Output`을 비우면 믹서를 우회한다.**
+**주의 4 — `Output`을 비우면 설정의 기본 Output을 탄다.**
 `Output`은 이 클릭음을 어느 `AudioMixerGroup`으로 보낼지 고르는 항목이다. 비워 두면
-`Sound.SetOutput`이 `null`을 그대로 넘기고 `SoundSource`가 `outputAudioMixerGroup`을 `null`로
-세팅해 버려 믹서를 통째로 지나친다. 그 결과 유저가 효과음 볼륨을 0으로 내려도 버튼 클릭음은 그대로
-난다. SoundService에는 아직 "기본 Output" 개념이 없으므로 지금은 반드시 채워야 한다(기본 Output
-지원은 `plan.md`의 대기 항목으로 남아 있다).
+`SoundServiceSettings.DefaultOutput`으로 해석된다. **그 기본값도 비어 있으면** `SoundSource`가
+`outputAudioMixerGroup`을 `null`로 세팅해 믹서를 통째로 지나치고, 그러면 유저가 효과음 볼륨을 0으로
+내려도 버튼 클릭음은 그대로 난다. UI 클릭음이 볼륨 설정을 따르게 하려면 버튼의 `Output`을 채우거나
+`SoundServiceSettings`의 `Default Output`을 지정한다.
 
 **주의 5 — `_sfx`/`_volume`/`_output`은 첫 클릭 이후 런타임 변경이 반영되지 않는다.**
 `UIButton`은 첫 클릭 시 `Sound`를 한 번 빌드해 `_sound` 필드에 캐싱하고, 이후 클릭은 그 인스턴스의
@@ -249,6 +261,5 @@ EditMode 범위 밖: `Pressed`/`Highlighted`/`Selected`로의 실제 전이는 `
 
 ## 한계 / 후속 과제
 
-- SoundService에 "기본 Output" 개념이 없어 `Output`을 비우면 믹서를 우회한다(위 주의 4). 별도 계획
-  대상(`plan.md`).
+- `Output`과 `SoundServiceSettings.DefaultOutput`이 둘 다 비면 믹서를 우회한다(위 주의 4).
 - 폰트 에셋 자체는 스왑 대상이 아니다(위 주의 3).

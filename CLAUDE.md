@@ -61,11 +61,12 @@ NuGet 의존성은 **NuGetForUnity**(`Assets/NuGet/`)가 `Assets/packages.config
   - **DI 등록**: `builder.RegisterUIService(settings)` 확장 메서드(루트 `LifetimeScope`에서, `IResourceService` 등록 이후에 호출). Presenter/View는 VContainer가 주입.
   - **에디터 도구**(`Assets/FoundationDI/Editor/UIService/`): `Tools/FoundationDI/UI/Create UI Root Prefab`(루트 프리팹 생성) · `Setup/Clear Prefab Editing Environment`(프리팹을 실제 캔버스 안에서 편집) · `Create UI Element...`(View/Presenter 스크립트 + 프리팹 생성 마법사).
   - 상세: `Assets/FoundationDI/Runtime/Services/UIService/README.md`.
-- **PoolService** (`Services/PoolService/`): 키 기반 GameObject 오브젝트 풀. `Resources.Load` 우선, 실패 시 Addressables fallback으로 프리팹을 로드(`Load()`). `ObjectPool<IPoolItem>` 기반이며 `PoolData`가 풀+Addressables 핸들을, `PoolItem`(MonoBehaviour)이 풀 항목 생명주기 콜백(`OnGetItem`/`OnReleaseItem` 등)과 지연 반환(`Release(delay)`)을 담당. **현재 `plan.md`의 활성 개선 대상**(crash/thread-safety/null-safety).
+- **PoolManager** (`Managers/PoolManager/`): 키 기반 GameObject 오브젝트 풀. **프리팹 로드는 `IResourceService`에 위임한다.** `ObjectPool<IPoolItem>` 기반이며 `PoolData`가 풀을, `PoolItem`(MonoBehaviour)이 풀 항목 생명주기 콜백(`OnGetItem`/`OnReleaseItem` 등)과 지연 반환(`Release(delay)`)을 담당. 풀 루트는 `DontDestroyOnLoad`가 아니라 씬 스코프에 귀속시켜 씬 언로드 시 함께 정리된다. 생성 시 계층 전체에 DI를 주입하며, **주입 실패는 인스턴스 단위로 격리**된다(격리가 없으면 생성 콜백이 반환하지 못해 인스턴스가 씬에 고아로 남는다).
 - **SoundService** (`Services/SoundService/`): 태그 기반 오디오 시스템.
   - 공개 API는 `ISoundService` 하나. `CreateSound/CreateMusic/CreatePlaylist/CreateDynamicMusic` 팩토리로 빌더를 만들고 체이닝 후 `Play()`. 빌더가 쓰는 내부 seam은 `ISoundEngine`(internal).
   - `SoundSource`(MonoBehaviour)를 `[SoundService] Sources Pool` 아래에 풀링. 페이드·루프·플레이리스트 진행·오클루전을 담당.
-  - 데이터는 `SoundServiceSettings`(SO) 하나가 `SoundDataCollection`/`MusicDataCollection`/`OutputDataCollection`/`AudioMixer`를 들고 있고 DI로 주입된다. **런타임 Resources 의존 없음** — 에디터 도구만 `AssetDatabase`로 이 에셋을 찾는다.
+  - 데이터는 `SoundServiceSettings`(SO) 하나가 `SoundDataCollection`/`MusicDataCollection`/`OutputDataCollection`/`AudioMixer`/`DefaultOutput`을 들고 있고 DI로 주입된다.
+  - **`Output`을 지정하지 않으면 `DefaultOutput`으로 해석된다**(`SoundService.ResolveOutput`). 둘 다 비면 `outputAudioMixerGroup`이 `null`로 남아 믹서를 통째로 우회하므로 볼륨 설정이 안 먹는다 — 조용히 잘못되기 쉬운 조합이다. **런타임 Resources 의존 없음** — 에디터 도구만 `AssetDatabase`로 이 에셋을 찾는다.
   - `SFX`/`Track`/`Output`은 `[SerializeField] string`을 감싼 `partial struct`. 에디터가 `<DataRoot>/Generated/`에 상수를 생성하고 같은 폴더의 `.asmref`로 `FoundationDI` 어셈블리에 합류시킨다.
   - Output 볼륨 영속화는 `ISoundVolumeStorage` seam(기본 `PlayerPrefsVolumeStorage`).
   - 에디터 도구는 `Assets/FoundationDI/Editor/SoundService/`(IMGUI): Audio Creator / Audio Collection / Output Manager / Settings 창 + 유사 enum PropertyDrawer + MusicZone 인스펙터.
@@ -122,7 +123,7 @@ NuGet 의존성은 **NuGetForUnity**(`Assets/NuGet/`)가 `Assets/packages.config
   - 발동 지점은 `onClick` 리스너다. `Button.Press()`가 `OnPointerClick`/`OnSubmit` 양쪽을 지나므로 리스너 하나로 전부 커버된다.
 - **UIStateButton** (`Components/UIStateButton.cs`): `UIButton` 상속 + 상태별 이미지/텍스트 스왑.
   - **자체 `UIButtonState` enum을 쓴다** — uGUI의 `Selectable.SelectionState`는 `protected` 중첩 enum이라 공개 API·테스트에서 쓸 수 없다. 순서가 같아도 캐스팅하지 않고 명시적 `switch`로 번역한다.
-  - **폴백 규칙**: `그 상태가 오버라이드 → Normal이 오버라이드 → 아무것도 안 씀`. 폴백 대상이 **`Normal`이라는 게 핵심**이다. `Selected`를 `Highlighted`로 떨어뜨리면 uGUI가 클릭한 버튼을 선택 상태로 남기기 때문에 모바일에서 탭한 버튼이 계속 하이라이트된 채 남는다.
+  - **폴백 규칙**: `그 상태가 오버라이드 → Normal이 오버라이드 → 기준값 → 아무것도 안 씀`. 폴백 대상이 **`Normal`이라는 게 핵심**이다. `Selected`를 `Highlighted`로 떨어뜨리면 uGUI가 클릭한 버튼을 선택 상태로 남기기 때문에 모바일에서 탭한 버튼이 계속 하이라이트된 채 남는다.
   - 스왑 세트는 `Selectable`을 전혀 모르는 순수 타입이라 EditMode에서 단독 테스트된다.
   - 상세: `Assets/FoundationDI/Runtime/Components/README.md`.
 
@@ -136,7 +137,7 @@ NuGet 의존성은 **NuGetForUnity**(`Assets/NuGet/`)가 `Assets/packages.config
 - 계산은 순수 함수 `SdkDefineSynchronizer.Resolve(current, present)`로 분리돼 EditMode에서 검증된다. 쓰기는 값이 실제로 달라질 때만 일어난다(안 그러면 재컴파일 무한 루프).
 - 옵트아웃은 `Tools/FoundationDI/SDK Defines/Auto Manage` 토글(EditorPrefs).
 
-공통 패턴: 런타임에 리소스를 로드하는 서비스(PoolService, ResourceService 등)는 `Resources.Load<T>()`를 먼저 시도하고 실패 시 `Addressables.LoadAssetAsync<T>().WaitForCompletion()`으로 폴백한 뒤 핸들을 보관해 두었다가 dispose 시 해제한다. SoundService는 `SoundData`가 `AudioClip`을 컴파일 타임 직접 참조로 보유하므로 이 패턴에 해당하지 않는다.
+공통 패턴: 에셋 로딩은 `IResourceService`에 위임한다(`UIService`, `PoolManager`). `ResourceService`가 등록된 `IResourceProvider`(Resources/Addressables)로 실제 로드를 수행하고 키 단위 캐싱·참조 카운팅으로 핸들 생명주기를 한 곳에서 관리한다. SoundService는 `SoundData`가 `AudioClip`을 컴파일 타임 직접 참조로 보유하므로 이 패턴에 해당하지 않는다.
 
 ### 네임스페이스
 런타임 코드는 `DarkNaku.FoundationDI` 단일 네임스페이스로 통일한다(UIManager 리뉴얼로 구 `FoundationDI` 네임스페이스는 제거됨). 새 코드를 추가할 때 같은 디렉터리의 기존 파일이 쓰는 네임스페이스를 따른다.
@@ -166,4 +167,4 @@ PrimeTween(트위닝, tgz로 로컬 설치), Director(DarkNaku의 씬/플로우 
 - 상세 사용법·API·매뉴얼: `Assets/FoundationDI/Runtime/Services/ResourceService/README.md`.
 - 알려진 범위 외 항목(설계 시 참고): 에러 처리 미구현(로드 중 예외 시 대기 호출자 미완료 가능), 스레드 안전성 없음(메인 스레드 전제).
 
-> 향후 `PoolService`의 중복 로딩 로직도 `IResourceService` 위임으로 전환 예정(별도 계획). `SoundService`는 `SoundData`가 `AudioClip`을 컴파일 타임 직접 참조로 보유하므로 위임 대상이 아니다.
+> `PoolManager`는 이미 `IResourceService` 위임으로 전환됐다. `SoundService`는 `SoundData`가 `AudioClip`을 컴파일 타임 직접 참조로 보유하므로 위임 대상이 아니다.

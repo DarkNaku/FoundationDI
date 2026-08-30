@@ -120,4 +120,51 @@ public class UIImageStateSetTest
         Assert.IsFalse(_target.enabled);
         Assert.IsTrue(_go.activeSelf, "SetActive가 아니라 enabled만 꺼야 레이아웃이 흔들리지 않는다");
     }
+
+    [Test]
+    public void Normal이_오버라이드하지_않는_필드도_상태를_벗어나면_원래_값으로_돌아온다()
+    {
+        _target.color = Color.white;                       // 프리팹 값
+        var set = NewSet();
+        set.Normal = new UIImageStateValue { Override = UIImageSwap.None };
+        set.Highlighted = new UIImageStateValue { Override = UIImageSwap.Color, Color = Color.yellow };
+
+        set.Apply(UIButtonState.Normal);                   // 첫 Apply에서 기준값 캡처
+        set.Apply(UIButtonState.Highlighted);
+        Assert.AreEqual(Color.yellow, _target.color);
+
+        set.Apply(UIButtonState.Normal);
+
+        Assert.AreEqual(Color.white, _target.color, "Normal이 오버라이드하지 않아도 기준값으로 돌아와야 한다");
+    }
+
+    [Test]
+    public void 아무_상태도_오버라이드하지_않는_필드는_계속_건드리지_않는다()
+    {
+        _target.sprite = _a;
+        var set = NewSet();
+        set.Normal = new UIImageStateValue { Override = UIImageSwap.Color, Color = Color.white };
+        set.Pressed = new UIImageStateValue { Override = UIImageSwap.Color, Color = Color.gray };
+
+        set.Apply(UIButtonState.Pressed);
+        _target.sprite = _b;                               // 외부 코드가 바꾼 상황
+        set.Apply(UIButtonState.Normal);
+
+        Assert.AreSame(_b, _target.sprite, "아무도 Sprite를 관리하지 않으므로 기준값으로도 되돌리면 안 된다");
+    }
+
+    [Test]
+    public void 기준값은_한_번만_캡처되어_재사용시에도_첫_값을_유지한다()
+    {
+        _target.color = Color.white;
+        var set = NewSet();
+        set.Normal = new UIImageStateValue { Override = UIImageSwap.None };
+        set.Highlighted = new UIImageStateValue { Override = UIImageSwap.Color, Color = Color.yellow };
+
+        set.Apply(UIButtonState.Highlighted);              // 첫 Apply가 곧 캡처 시점
+        set.Apply(UIButtonState.Highlighted);              // 재캡처되면 기준값이 yellow로 오염된다
+        set.Apply(UIButtonState.Normal);
+
+        Assert.AreEqual(Color.white, _target.color);
+    }
 }

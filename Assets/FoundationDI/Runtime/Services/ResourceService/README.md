@@ -162,5 +162,5 @@ public ResourceService(IResourceProvider provider); // 백엔드 provider 주입
 
 - **에러 처리 미구현(범위 외)** — `LoadAsync` 진행 중 provider가 예외를 던지면 대기 중인 호출자가 완료되지 않을 수 있습니다. 에러 전파는 후속 과제입니다.
 - **스레드 안전성 없음** — Unity 메인 스레드 사용을 전제로 합니다.
-- **기존 서비스 위임** — PoolService/SoundService가 이 로더를 사용하도록 전환하는 작업은 별도 계획으로 진행됩니다.
+- **위임 현황** — `UIService`와 `PoolManager`는 프리팹 로드를 이 서비스에 위임합니다. `SoundService`는 `SoundData`가 `AudioClip`을 컴파일 타임 직접 참조로 보유하므로 위임 대상이 아닙니다.
 - `ResourcesProvider`(Resources)는 Addressables 같은 핸들 해제가 없어 메모리 반환이 제한적이다(`GameObject` 등 개별 언로드 불가, 확실한 회수는 `Resources.UnloadUnusedAssets()`).

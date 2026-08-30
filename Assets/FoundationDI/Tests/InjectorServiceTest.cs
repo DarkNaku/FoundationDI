@@ -1,8 +1,12 @@
+using System;
+using System.Text.RegularExpressions;
 using DarkNaku.FoundationDI;
 using NSubstitute;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.TestTools;
 using VContainer;
+using Object = UnityEngine.Object;
 
 public class InjectorServiceTest
 {
@@ -78,5 +82,36 @@ public class InjectorServiceTest
     public void Request_null은_예외없이_무시한다()
     {
         Assert.DoesNotThrow(() => InjectorService.Request(null));
+    }
+
+    [Test]
+    public void 주입이_실패한_컴포넌트가_있어도_나머지_pending이_모두_주입된다()
+    {
+        var resolver = Substitute.For<IObjectResolver>();
+        var bad = _go.AddComponent<DummyBehaviour>();
+        var good = _go.AddComponent<DummyBehaviour>();
+        resolver.When(r => r.Inject(bad)).Do(_ => throw new Exception("boom"));
+
+        InjectorService.Request(bad);          // 먼저 보류된 것이 터진다
+        InjectorService.Request(good);
+
+        LogAssert.Expect(LogType.Exception, new Regex(".*boom.*"));
+
+        new InjectorService(resolver).Start();
+
+        resolver.Received(1).Inject(good);
+    }
+
+    [Test]
+    public void 즉시_주입이_실패해도_예외가_호출자에게_전파되지_않는다()
+    {
+        var resolver = Substitute.For<IObjectResolver>();
+        new InjectorService(resolver).Start();  // 먼저 바인딩 → 즉시 주입 경로
+        var mb = _go.AddComponent<DummyBehaviour>();
+        resolver.When(r => r.Inject(mb)).Do(_ => throw new Exception("boom"));
+
+        LogAssert.Expect(LogType.Exception, new Regex(".*boom.*"));
+
+        Assert.DoesNotThrow(() => InjectorService.Request(mb));
     }
 }

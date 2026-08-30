@@ -93,9 +93,29 @@ public class UIButton : Button
 ```
 
 `[Inject]` 필드 대신 `IObjectResolver`를 받아 `TryResolve`하는 이유는 별개의 설계 결정입니다 —
-미등록 서비스를 `[Inject]` 필드로 요구하면 VContainer가 예외를 던지는데, 이 프로젝트에는 그 예외를
-받아낼 곳이 마땅치 않기 때문입니다. 자세한 내용은 [Components README](../../Components/README.md)를
-참고하세요.
+미등록 서비스를 `[Inject]` 필드로 요구하면 VContainer가 예외를 던지고, 그 컴포넌트는 결국 의존성
+없이 남기 때문입니다. 자세한 내용은 [Components README](../../Components/README.md)를 참고하세요.
+
+---
+
+## 주입 실패 격리
+
+주입 중 예외가 나도 **그 대상 하나에만 가둡니다.** `Start()`의 일괄 주입과 `Request()`의 즉시 주입
+양쪽 모두 대상마다 `try/catch`로 감싸고 `Debug.LogException`으로 남긴 뒤 계속 진행합니다.
+
+예외를 삼키는 것이 아니라 **치명적이지 않게** 만드는 것입니다 — 콘솔에는 그대로 에러로 뜹니다.
+`MessageService`의 핸들러 예외 격리, `UIService`의 `OperationQueue`와 같은 방침입니다.
+
+격리가 없으면 피해가 번집니다.
+
+- `Start()`에서 예외가 빠져나가면 **뒤 순번의 모든 보류분이 주입을 못 받고** 보류 큐도 비워지지
+  않습니다. VContainer는 `EntryPointExceptionHandler`가 등록되어 있지 않으면 EntryPoint 예외를
+  그대로 다시 던지므로, 컨테이너 시작 자체가 깨질 수 있습니다.
+- `Request()`의 즉시 주입은 보통 컴포넌트의 `Awake` 안에서 호출됩니다. 여기서 예외가 나가면
+  `Instantiate` 호출자에게까지 전파됩니다.
+
+> 격리는 "조용한 실패"와 다릅니다. 주입받지 못한 컴포넌트는 의존성이 `null`인 채로 남으므로,
+> 콘솔의 예외 로그를 무시하면 안 됩니다.
 
 ---
 

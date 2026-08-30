@@ -215,7 +215,25 @@ namespace DarkNaku.FoundationDI
             return soundSource;
         }
 
-        AudioMixerGroup ISoundEngine.GetOutput(Output output) => GetOutputGroupWithSavedVolume(output.ToString());
+        /// <summary>
+        /// 요청한 Output이 비어 있으면 설정의 기본 Output으로 대체한다.
+        /// 둘 다 비어 있으면 Null 그대로 두어 이전처럼 믹서를 우회한다.
+        /// 믹서 조회와 분리해 두어 에셋 없이 단위 테스트된다.
+        /// </summary>
+        internal Output ResolveOutput(Output requested)
+        {
+            if (!requested.IsNull) return requested;
+
+            return Settings != null ? Settings.DefaultOutput : Output.Null;
+        }
+
+        AudioMixerGroup ISoundEngine.GetOutput(Output output)
+        {
+            var resolved = ResolveOutput(output);
+
+            // Null을 그대로 넘기면 OutputDataCollection이 "__NULL__ 없음" 경고를 낸다.
+            return resolved.IsNull ? null : GetOutputGroupWithSavedVolume(resolved.ToString());
+        }
 
         AudioMixerGroup ISoundEngine.GetOutput(string outputName) => GetOutputGroupWithSavedVolume(outputName);
 

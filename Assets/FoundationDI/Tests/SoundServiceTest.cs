@@ -119,4 +119,27 @@ public class SoundServiceTest
             _service.Dispose();
         });
     }
+
+    [Test]
+    public void Output을_지정하지_않으면_설정의_기본_Output으로_해석된다()
+    {
+        _settings.DefaultOutput = Output.FromTag("SFX");
+
+        Assert.AreEqual(Output.FromTag("SFX"), _service.ResolveOutput(Output.Null));
+    }
+
+    [Test]
+    public void 기본_Output도_지정되지_않으면_이전처럼_믹서를_우회한다()
+    {
+        // DefaultOutput 미지정 → Null 그대로 → 호출부가 AudioMixerGroup을 붙이지 않는다
+        Assert.IsTrue(_service.ResolveOutput(Output.Null).IsNull);
+    }
+
+    [Test]
+    public void 명시한_Output이_기본_Output보다_우선한다()
+    {
+        _settings.DefaultOutput = Output.FromTag("SFX");
+
+        Assert.AreEqual(Output.FromTag("BGM"), _service.ResolveOutput(Output.FromTag("BGM")));
+    }
 }
