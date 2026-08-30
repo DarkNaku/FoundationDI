@@ -4,7 +4,7 @@ namespace FoundationDI.Host
 {
     /// 여러 패널을 가로로 나란히 두고 인덱스 사이를 coordinated 슬라이드로 이동하는 pager.
     /// 두 패널이 붙어서 함께 미끄러지며, 방향은 현재 인덱스 대비 목표 인덱스로 자동 결정된다.
-    /// (탭 전환은 이 컴포넌트가 처리하므로 UIService 페이지 전환과 무관하다.)
+    /// (탭 전환은 이 컴포넌트가 처리하므로 UINavigator 페이지 전환과 무관하다.)
     public sealed class TabPager : MonoBehaviour
     {
         [SerializeField] private RectTransform _content; // 패널들을 자식으로 갖는 컨테이너

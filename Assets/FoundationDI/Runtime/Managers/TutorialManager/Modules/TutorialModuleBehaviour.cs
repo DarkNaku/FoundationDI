@@ -8,7 +8,7 @@ namespace DarkNaku.FoundationDI
     /// 진행 엔진에는 프레임 펌프가 들어가지 않는다.
     ///
     /// 타깃을 자식으로 삼거나 리페어런팅하지 않고 스크린 rect만 읽는다.
-    /// 그래서 타깃이 UIRoot(DontDestroyOnLoad) 안에 있든 씬 캔버스에 있든 3D 월드에 있든
+    /// 그래서 타깃이 UIRoot(씬 수명 캔버스) 안에 있든 씬 캔버스에 있든 3D 월드에 있든
     /// 동일하게 동작한다.
     /// </summary>
     public abstract class TutorialModuleBehaviour : MonoBehaviour, ITutorialModule

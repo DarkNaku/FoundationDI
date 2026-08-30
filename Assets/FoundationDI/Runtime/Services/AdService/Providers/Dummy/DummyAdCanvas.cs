@@ -4,7 +4,7 @@ using UnityEngine.UI;
 
 namespace DarkNaku.FoundationDI
 {
-    // 자립형 가짜 광고 화면. UIService에 의존하지 않는다 —
+    // 자립형 가짜 광고 화면. UINavigator에 의존하지 않는다 —
     // ADService가 UI 시스템에 묶이면 "어떤 네트워크든 동일"이라는 목표와 무관한 결합이 생긴다.
     public class DummyAdCanvas : IDummyAdScreen
     {

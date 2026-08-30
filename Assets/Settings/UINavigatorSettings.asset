@@ -10,5 +10,6 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: acd0e9c8147914e10b02045a2015d024, type: 3}
-  m_Name: SampleSettings
+  m_Name: UINavigatorSettings
   m_EditorClassIdentifier: FoundationDI::DarkNaku.FoundationDI.UINavigatorSettings
+  _rootPrefab: {fileID: 7624536058343521225, guid: 5383c1b2ab964455c9023cf936ecc4d7, type: 3}

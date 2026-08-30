@@ -5,7 +5,7 @@ using UnityEngine.UI;
 
 /// <summary>
 /// 연출 모듈의 캔버스·레이캐스트 배선을 고정한다.
-/// UIService의 UIRoot는 sortingOrder 0짜리 캔버스 하나에 모든 UI를 담으므로
+/// UINavigator의 UIRoot는 sortingOrder 0짜리 캔버스 하나에 모든 UI를 담으므로
 /// (레이어들은 자기 Canvas가 없는 RectTransform이다) 튜토리얼은 자기 캔버스를
 /// 더 높은 sortingOrder로 띄워야 팝업 위에 그려진다.
 ///

@@ -6,6 +6,23 @@
 
 ---
 
+## 완료: UINavigator 씬 수명 전환
+
+UIService를 씬 LifetimeScope가 소유하는 UINavigator로 바꿨다. 캔버스가 활성 씬에
+귀속되고, 정리 경로가 Dispose 하나로 줄었다.
+
+세부: `docs/superpowers/specs/2026-08-30-ui-navigator-scene-lifetime-design.md`
+계획: `docs/superpowers/plans/2026-08-30-ui-navigator-scene-lifetime.md`
+
+- [x] 캔버스는 상주씬이 아니라 활성씬에 속한다
+- [x] 활성씬이 바뀌어도 표시중인 UI를 스스로 리셋하지 않는다
+- [x] Dispose 이후 Hide요청이 캔버스를 되살리지 않는다
+- [x] Dispose하면 캔버스GO가 파괴된다
+- [x] Dispose하면 활성presenter가 OnAfterHide까지 teardown된다
+- [x] 캔버스가 먼저 파괴된 뒤 Dispose해도 예외가 없다
+
+---
+
 ## 완료: UIButton / UIStateButton
 
 uGUI Button을 상속한 피드백 버튼(사운드+햅틱)과, 상태별로 여러 Image/Text를 스왑하는 버튼.

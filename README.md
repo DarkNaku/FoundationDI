@@ -1,7 +1,7 @@
 # FoundationDI
 
 ![Unity](https://img.shields.io/badge/Unity-6000.3%2B-black?logo=unity)
-![Version](https://img.shields.io/badge/version-0.8.2-blue)
+![Version](https://img.shields.io/badge/version-0.9.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Author](https://img.shields.io/badge/author-DarkNaku-orange)
 
@@ -14,7 +14,7 @@ DI(의존성 주입) 기반 Unity 게임 개발 파운데이션 패키지입니�
 - **DI 컴포지션** — VContainer `LifetimeScope`에서 서비스를 인터페이스로 등록하고 생성자 주입으로 소비
 - **메시징** — 외부 라이브러리 없는 타입 기반 pub-sub. `IDisposable` 구독 토큰(R3를 쓴다면 `AddTo`와도 호환), 발행 스냅샷, 핸들러 예외 격리
 - **리소스 로딩** — Addressables 추상화. 키 단위 캐싱 + 참조 카운팅으로 핸들 생명주기를 한 곳에서 관리
-- **UI 시스템** — 게임 전역 단일 상주 Canvas(`DontDestroyOnLoad`, 렌더 모드/CanvasScaler는 루트 프리팹이 결정·미지정 시 ScreenSpaceOverlay 폴백) 위에 Page/Popup/Overlay 표시·전환, 모달 입력 차단, `Awaitable` 트랜지션 추상화. Page/Popup에 오버레이를 함께 노출하는 `WithOverlay`(동시 전환·`persistent` 연속 유지 옵션) 제공
+- **UI 시스템** — 씬 수명 Canvas(자신을 만든 씬에 속하며 씬 언로드 시 캔버스·풀·프리젠터가 함께 파괴, 렌더 모드/CanvasScaler는 루트 프리팹이 결정·미지정 시 ScreenSpaceOverlay 폴백) 위에 Page/Popup/Overlay 표시·전환, 모달 입력 차단, `Awaitable` 트랜지션 추상화. Page/Popup에 오버레이를 함께 노출하는 `WithOverlay`(동시 전환·`persistent` 연속 유지 옵션) 제공
 - **오브젝트 풀 / 사운드** — 키 기반 GameObject 풀링과 태그 기반 오디오. 사운드는 SFX/음악/플레이리스트/다이내믹 뮤직 빌더, AudioSource 풀링, 페이드·루프·콜백, AudioMixer Output 볼륨 영속화, 3D 오클루전, 전용 에디터 창(Audio Creator/Collection/Output Manager)을 제공
 - **햅틱** — iOS/Android 촉각 피드백. 시맨틱 프리셋(`Impact`/`Notification`/`Selection`, 옵트인 쿨다운) + `AnimationCurve` 커브·커스텀 패턴 재생(`Awaitable`, 단일 활성)과 플랫폼 케이퍼빌리티 폴백. 에디터/데스크톱은 Noop
 - **부트스트랩 초기화** — 초기화 단위를 SO(`InitializeItem`)로 정의하고 카탈로그 순서대로 순차 실행. 세션 내 중복 실행 방지, 실패 지점부터 재개
@@ -63,7 +63,7 @@ FoundationDI는 다음 패키지를 전제로 합니다. 먼저 설치되어 있
 
 ## 빠른 시작
 
-VContainer의 루트 `LifetimeScope`에서 서비스를 등록합니다. 등록 순서에 주의합니다 — UIService는 프리팹 로드를 `IResourceService`에 위임하므로 `RegisterUIService` **전에** `IResourceService`가 등록되어야 합니다.
+앱 수명 서비스는 프로젝트 루트 `LifetimeScope`에서 등록합니다. **UINavigator는 씬 수명이므로 씬 `LifetimeScope`에 따로 등록합니다** — 등록한 스코프가 그대로 캔버스·풀·프리젠터의 수명이 되기 때문입니다(씬이 언로드되면 함께 파괴). 등록 순서에도 주의합니다 — UINavigator는 프리팹 로드를 `IResourceService`에 위임하므로, `RegisterUINavigator`가 호출되는 시점에는 `IResourceService`가 (부모 스코프에서라도) 이미 등록되어 있어야 합니다.
 
 ```csharp
 using UnityEngine;
@@ -73,13 +73,10 @@ using DarkNaku.FoundationDI;
 
 public class RootLifetimeScope : LifetimeScope
 {
-    [SerializeField] private UIServiceSettings _uiSettings;
-
     protected override void Configure(IContainerBuilder builder)
     {
         builder.Register<IResourceProvider, ResourcesProvider>(Lifetime.Singleton);
         builder.Register<IResourceService, ResourceService>(Lifetime.Singleton);
-        builder.RegisterUIService(_uiSettings);
         builder.RegisterInjector();   // 씬 배치 컴포넌트 주입(UIButton 등)
         builder.RegisterInitializeService();
 
@@ -92,6 +89,18 @@ public class RootLifetimeScope : LifetimeScope
         // builder.RegisterIapService(_iapSettings);
     }
 }
+
+// 씬에 배치되는 스코프. UINavigator는 여기서 등록해 씬 수명을 갖게 한다.
+public class SceneLifetimeScope : LifetimeScope
+{
+    [SerializeField] private UINavigatorSettings _uiSettings;
+
+    protected override void Configure(IContainerBuilder builder)
+    {
+        // IResourceService는 부모(RootLifetimeScope)에서 해결된다.
+        builder.RegisterUINavigator(_uiSettings);
+    }
+}
 ```
 
 소비 측은 인터페이스를 생성자로 주입받습니다.
@@ -99,8 +108,8 @@ public class RootLifetimeScope : LifetimeScope
 ```csharp
 public class TitleFlow
 {
-    private readonly IUIService _ui;
-    public TitleFlow(IUIService ui) => _ui = ui;
+    private readonly IUINavigator _ui;
+    public TitleFlow(IUINavigator ui) => _ui = ui;
 
     public void Open() => _ui.Page<TitlePresenter>();
 }
@@ -112,7 +121,7 @@ public class TitleFlow
 
 | 구성 요소 | 설명 | 상세 문서 |
 | --- | --- | --- |
-| **UIService** | uGUI 기반 UI 표시/전환 시스템. Presenter 타입으로 Page(단일 교체)/Popup(LIFO·모달)/Overlay(상주 Above/Below) 모드를 고정. **게임 전역 단일 상주 Canvas**(`DontDestroyOnLoad`, 렌더 모드/CanvasScaler는 `UIServiceSettings.RootPrefab`이 결정·미지정 시 ScreenSpaceOverlay/1920x1080 폴백, 씬 전환 시 자식만 clear), Presenter 매 표시 재생성 + **View 풀링**, `Awaitable` 트랜지션, 모달 입력 차단(`CanvasGroup.interactable`). Page/Popup에 `WithOverlay`(오버레이 동시 노출·`persistent` 연속 유지)와 자동-show 빌더 API 제공. 프리팹 로딩은 `IResourceService`(Resources/Addressables)에 위임. | [README](Assets/FoundationDI/Runtime/Services/UIService/README.md) |
+| **UINavigator** | uGUI 기반 UI 표시/전환 시스템. Presenter 타입으로 Page(단일 교체)/Popup(LIFO·모달)/Overlay(상주 Above/Below) 모드를 고정. **씬 수명 Canvas**(씬 `LifetimeScope`가 소유, 렌더 모드/CanvasScaler는 `UINavigatorSettings.RootPrefab`이 결정·미지정 시 ScreenSpaceOverlay/1920x1080 폴백, 씬 언로드 시 캔버스·풀·프리젠터가 함께 파괴), Presenter 매 표시 재생성 + **View 풀링**, `Awaitable` 트랜지션, 모달 입력 차단(`CanvasGroup.interactable`). Page/Popup에 `WithOverlay`(오버레이 동시 노출·`persistent` 연속 유지)와 자동-show 빌더 API 제공. 프리팹 로딩은 `IResourceService`(Resources/Addressables)에 위임. | [README](Assets/FoundationDI/Runtime/Managers/UINavigator/README.md) |
 | **Components** | 씬 저작용 uGUI 위젯. `UIButton`(클릭 시 SFX 재생 + 햅틱 `Impact`, 두 서비스 모두 **선택적** 주입)과, 상태(Normal/Highlighted/Pressed/Selected/Disabled)별로 여러 `Image`/텍스트를 동시에 스왑하는 `UIStateButton`. 스왑은 `그 상태 → Normal → 기준값 → 안 씀` 4단으로 해석되어 상태를 벗어나면 원래 값으로 돌아온다. | [README](Assets/FoundationDI/Runtime/Components/README.md) |
 | **ResourceService** | Addressables 추상화. `LoadAsync`/`Load`/`Release`/`Dispose` API로 키 단위 캐싱 + 참조 카운팅. 에셋 로딩이 필요한 모든 서비스의 위임 대상. | [README](Assets/FoundationDI/Runtime/Services/ResourceService/README.md) |
 | **MessageService** | 외부 라이브러리 없는 인-메모리 pub-sub. 타입을 채널로 삼아 `Publish<T>`/`Subscribe<T>`만 제공하며, 구독 토큰은 `IDisposable`(R3를 쓴다면 `AddTo`로 MonoBehaviour 수명에 바인딩 가능). 발행은 스냅샷으로 완주하고 핸들러 예외는 격리한다. 메인 스레드 전제. | [README](Assets/FoundationDI/Runtime/Services/MessageService/README.md) |

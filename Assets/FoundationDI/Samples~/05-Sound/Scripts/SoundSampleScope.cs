@@ -6,7 +6,7 @@ namespace DarkNaku.FoundationDI.Samples
 {
     /// <summary>
     /// 사운드 샘플 컴포지션 루트.
-    /// SoundService와 씬 컴포넌트 주입 인프라만 등록한다(UIService는 쓰지 않는다).
+    /// SoundService와 씬 컴포넌트 주입 인프라만 등록한다(UINavigator는 쓰지 않는다).
     /// </summary>
     public class SoundSampleScope : LifetimeScope
     {

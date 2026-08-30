@@ -133,9 +133,9 @@ public sealed class MyTrigger : ITutorialTrigger
 `TutorialTargetRef`는 둘 중 하나로 채웁니다.
 
 - **씬에 상주하는 오브젝트**: 인스펙터에서 `Direct`에 드래그.
-- **런타임에 생성되는 UI**(UIService가 띄우는 View 내부 요소): `Key`에 문자열을 적고, 그 UI 프리팹의 오브젝트에 **`TutorialTarget` 컴포넌트**를 붙여 같은 키를 지정.
+- **런타임에 생성되는 UI**(UINavigator가 띄우는 View 내부 요소): `Key`에 문자열을 적고, 그 UI 프리팹의 오브젝트에 **`TutorialTarget` 컴포넌트**를 붙여 같은 키를 지정.
 
-`TutorialTarget`은 `OnEnable`에 등록하고 `OnDisable`에 해제합니다. UIService는 이 컴포넌트의 존재를 모르고, 튜토리얼도 UIService에 의존하지 않습니다.
+`TutorialTarget`은 `OnEnable`에 등록하고 `OnDisable`에 해제합니다. UINavigator는 이 컴포넌트의 존재를 모르고, 튜토리얼도 UINavigator에 의존하지 않습니다.
 
 여기서 두 가지가 공짜로 따라옵니다.
 
@@ -162,13 +162,13 @@ public sealed class MyArrowModule : TutorialModuleBehaviour
 }
 ```
 
-**모듈은 타깃을 자식으로 삼지 않습니다.** 스크린 rect만 읽으므로 타깃이 `UIRoot`(DontDestroyOnLoad) 안에 있든, 씬 캔버스에 있든, 3D 월드에 있든 똑같이 동작합니다. `TutorialScreenRect`가 `RectTransform`이면 코너 4점을, 일반 `Transform`이면 `Renderer`/`Collider` 바운즈를 스크린으로 투영합니다.
+**모듈은 타깃을 자식으로 삼지 않습니다.** 스크린 rect만 읽으므로 타깃이 `UIRoot`(씬 수명 캔버스) 안에 있든, 씬 캔버스에 있든, 3D 월드에 있든 똑같이 동작합니다. `TutorialScreenRect`가 `RectTransform`이면 코너 4점을, 일반 `Transform`이면 `Renderer`/`Collider` 바운즈를 스크린으로 투영합니다.
 
 ### 정렬 — 기존 UI를 가리거나 가려지지 않나?
 
-**가려지지 않습니다.** UIService의 `UIRoot`는 `sortingOrder = 0`짜리 캔버스 **하나**이고, Page/Popup/Overlay 레이어들은 자기 `Canvas` 없이 그 안에서 하이어라키 순서로만 정렬됩니다. 튜토리얼 모듈은 자기 root `Canvas`를 `ScreenSpaceOverlay` + 높은 `sortingOrder`로 들고 있어서 팝업이든 오버레이든 전부 위에 그려집니다(`HighlightModule` 32000, `HandPointerModule` 32001). `ScreenSpaceOverlay` 캔버스는 하이어라키가 아니라 `sortingOrder`로 전역 정렬되기 때문입니다.
+**가려지지 않습니다.** UINavigator의 `UIRoot`는 `sortingOrder = 0`짜리 캔버스 **하나**이고, Page/Popup/Overlay 레이어들은 자기 `Canvas` 없이 그 안에서 하이어라키 순서로만 정렬됩니다. 튜토리얼 모듈은 자기 root `Canvas`를 `ScreenSpaceOverlay` + 높은 `sortingOrder`로 들고 있어서 팝업이든 오버레이든 전부 위에 그려집니다(`HighlightModule` 32000, `HandPointerModule` 32001). `ScreenSpaceOverlay` 캔버스는 하이어라키가 아니라 `sortingOrder`로 전역 정렬되기 때문입니다.
 
-`UIServiceSettings.RootPrefab`으로 `UIRoot`를 `ScreenSpaceCamera`로 바꿔도 안전합니다 — Overlay 캔버스는 Camera 캔버스보다 항상 위에 그려집니다.
+`UINavigatorSettings.RootPrefab`으로 `UIRoot`를 `ScreenSpaceCamera`로 바꿔도 안전합니다 — Overlay 캔버스는 Camera 캔버스보다 항상 위에 그려집니다.
 
 > `overrideSorting`은 **중첩 캔버스에서만** 의미가 있습니다. 모듈 프리팹을 루트에 두면 Unity가 이 값을 무시하고 `sortingOrder` 하나로 정렬합니다. 모듈이 코드에서 켜두는 건 프리팹을 다른 `Canvas` 밑에 넣었을 때를 대비한 것입니다.
 

@@ -11,7 +11,7 @@ namespace DarkNaku.FoundationDI.Samples
     [UIPrefab("Title")]
     public class TitlePage : UIPagePresenter<TitleView>
     {
-        [Inject] private IUIService _ui;
+        [Inject] private IUINavigator _ui;
 
         protected override void OnBeforeShow()
             => View.nextButton.onClick.AddListener(() => _ui.Page<CharacterListPage>());
@@ -23,7 +23,7 @@ namespace DarkNaku.FoundationDI.Samples
     [UIPrefab("CharacterList")]
     public class CharacterListPage : UIPagePresenter<CharacterListView>
     {
-        [Inject] private IUIService _ui;
+        [Inject] private IUINavigator _ui;
 
         protected override void OnBeforeShow()
         {
@@ -52,7 +52,7 @@ namespace DarkNaku.FoundationDI.Samples
     [UIPrefab("CharacterDetail")]
     public class CharacterDetailPage : UIPagePresenter<CharacterDetailView>, IConfigurable<CharacterDetailParams>
     {
-        [Inject] private IUIService _ui;
+        [Inject] private IUINavigator _ui;
         private CharacterDetailParams _params;
 
         // Configure는 View 바인딩 전에 실행되므로 params만 저장하고, View 접근은 OnBeforeShow에서.
@@ -70,8 +70,8 @@ namespace DarkNaku.FoundationDI.Samples
 
     public class PageNavigationDemo : IStartable
     {
-        private readonly IUIService _ui;
-        public PageNavigationDemo(IUIService ui) => _ui = ui;
+        private readonly IUINavigator _ui;
+        public PageNavigationDemo(IUINavigator ui) => _ui = ui;
         public void Start() => _ui.Page<TitlePage>();
     }
 }

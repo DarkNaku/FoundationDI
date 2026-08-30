@@ -34,7 +34,7 @@ namespace DarkNaku.FoundationDI.Samples
     [UIPrefab("ModalHost")]
     public class ModalHostPage : UIPagePresenter<ModalHostView>
     {
-        [Inject] private IUIService _ui;
+        [Inject] private IUINavigator _ui;
 
         protected override void OnInitialize()
         {
@@ -50,8 +50,8 @@ namespace DarkNaku.FoundationDI.Samples
 
     public class PopupModalDemo : IStartable
     {
-        private readonly IUIService _ui;
-        public PopupModalDemo(IUIService ui) => _ui = ui;
+        private readonly IUINavigator _ui;
+        public PopupModalDemo(IUINavigator ui) => _ui = ui;
         public void Start() => _ui.Page<ModalHostPage>();
     }
 }

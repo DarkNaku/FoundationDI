@@ -6,7 +6,7 @@ namespace DarkNaku.FoundationDI
 {
     /// <summary>
     /// 타깃 버튼 클릭으로 발동한다. Button 직접 참조가 아니라 TutorialTargetRef를 받으므로
-    /// UIService가 런타임에 만든 팝업의 버튼도 트리거가 된다.
+    /// UINavigator가 런타임에 만든 팝업의 버튼도 트리거가 된다.
     /// </summary>
     [Serializable]
     public sealed class ButtonClickTrigger : ITutorialTrigger

@@ -5,8 +5,8 @@ namespace DarkNaku.FoundationDI
 {
     /// <summary>
     /// 런타임에 생성되는 UI 요소를 튜토리얼이 키로 가리킬 수 있게 한다.
-    /// UI 프리팹의 버튼 등에 붙여두면 UIService가 그 View를 띄울 때마다 자동으로 등록된다.
-    /// UIService는 이 컴포넌트의 존재를 모르고, 튜토리얼도 UIService에 의존하지 않는다.
+    /// UI 프리팹의 버튼 등에 붙여두면 UINavigator가 그 View를 띄울 때마다 자동으로 등록된다.
+    /// UINavigator는 이 컴포넌트의 존재를 모르고, 튜토리얼도 UINavigator에 의존하지 않는다.
     /// </summary>
     public sealed class TutorialTarget : InjectableBehaviour
     {
