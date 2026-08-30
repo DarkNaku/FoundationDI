@@ -3,6 +3,7 @@ using System.Text.RegularExpressions;
 using NSubstitute;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 using UnityEngine.UI;
 using VContainer;
@@ -68,8 +69,8 @@ public class UINavigatorRootPrefabTests
         Assert.AreNotSame(_rootTemplate, clone, "원본이 아니라 클론이어야 한다");
         Assert.AreEqual(Marker, clone.GO.GetComponent<CanvasScaler>().referenceResolution,
             "캔버스 설정은 프리팹에서 와야 한다(코드가 덮어쓰지 않는다)");
-        Assert.AreEqual("DontDestroyOnLoad", clone.GO.scene.name,
-            "상주화는 프리팹 경로에서도 적용되어야 한다");
+        Assert.AreEqual(SceneManager.GetActiveScene().handle, clone.GO.scene.handle,
+            "씬 귀속은 프리팹 경로에서도 동일하게 적용되어야 한다");
 
         service.Dispose();
     });
@@ -92,7 +93,7 @@ public class UINavigatorRootPrefabTests
         Assert.IsNotNull(root);
         Assert.AreEqual(UIRoot.DefaultReferenceResolution,
             root.GO.GetComponent<CanvasScaler>().referenceResolution);
-        Assert.AreEqual("DontDestroyOnLoad", root.GO.scene.name);
+        Assert.AreEqual(SceneManager.GetActiveScene().handle, root.GO.scene.handle);
 
         service.Dispose();
     });

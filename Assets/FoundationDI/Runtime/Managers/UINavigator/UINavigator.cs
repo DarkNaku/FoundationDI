@@ -35,16 +35,17 @@ namespace DarkNaku.FoundationDI
         {
             get
             {
-                // 캔버스는 DontDestroyOnLoad라 정상적으로는 파괴되지 않는다.
-                // 예외적으로 파괴되면(fake-null) 참조를 버리고 재구성한다.
-                // UIRoot는 이제 MonoBehaviour다 → ??= 는 fake-null을 못 걸러내므로 쓰지 않는다.
+                // 캔버스는 씬 수명이다. 씬 언로드와 Dispose의 순서는 보장되지 않으므로
+                // 파괴된 뒤(fake-null) 접근이 올 수 있다 — 참조를 버리고 재구성한다.
+                // UIRoot는 MonoBehaviour다 → ??= 는 fake-null을 못 걸러내므로 쓰지 않는다.
                 if (_root == null) DiscardRoot();
                 if (_root == null) _root = CreateRoot();
                 return _root;
             }
         }
 
-        // 상주화 책임은 서비스가 진다. 루트를 어디서 얻었든(프리팹/폴백) 동일하게 적용한다.
+        // 루트는 부모 없이 인스턴스화되므로 활성 씬에 붙는다 = 씬과 함께 파괴된다.
+        // 상주화(DontDestroyOnLoad)는 하지 않는다 — 이 내비게이터의 수명이 씬 수명이기 때문이다.
         private UIRoot CreateRoot()
         {
             var prefab = _settings != null ? _settings.RootPrefab : null;
@@ -66,8 +67,6 @@ namespace DarkNaku.FoundationDI
                     "UINavigatorSettings.RootPrefab에 연결하세요.");
                 root = UIRoot.CreateDefault();
             }
-
-            UnityEngine.Object.DontDestroyOnLoad(root.GO);
 
             // 레이어 미연결은 예외 없이 조용히 UI가 사라지는 원인이 된다(SetParent(null,false)는 합법).
             // 던지지 않고 로그만 남긴다 — 게임 런타임을 크래시시키는 것보다 저하된 채로라도 동작하는 편이 낫다.
