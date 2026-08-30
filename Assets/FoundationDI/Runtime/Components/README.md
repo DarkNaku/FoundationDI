@@ -39,9 +39,9 @@ public class RootLifetimeScope : LifetimeScope
 
 ### 2) 씬에 배치
 
-`GameObject > FoundationDI > UI > Button` / `State Button` 메뉴로 배치하거나, 기존 `Button`에
-`UIButton`/`UIStateButton`을 붙인다(`Button`을 대체하는 컴포넌트이므로 같은 오브젝트에 `Button`과
-`UIButton`을 함께 두지 않는다).
+전용 GameObject 생성 메뉴는 없다 — 기존 GameObject의 **Add Component**에서 `FoundationDI/UI Button`
+또는 `FoundationDI/UI State Button`을 검색해 붙인다(`[AddComponentMenu]`로 노출된다). `Button`을
+대체하는 컴포넌트이므로 같은 오브젝트에 `Button`과 `UIButton`을 함께 두지 않는다.
 
 인스펙터에서 SFX/Output/Volume/RandomPitch(Sound)와 UseHaptic/HapticImpact(Haptic)를 설정한다.
 `UIStateButton`은 그 아래에 이미지 세트/텍스트 세트 목록과 `Deselect On Click`이 추가로 나온다.
@@ -202,8 +202,9 @@ public class UITextStateSet
 - `UIButtonEditor` — 기본 `ButtonEditor` 위에 Sound/Haptic 섹션을 추가로 그린다.
 - `UIStateButtonEditor` — 위 에디터를 상속해 State Swap 섹션을 추가하고, 스왑 세트가 있는데
   `Transition`이 `None`이 아니면 경고, 세트의 `Target`이 비어 있으면 경고를 띄운다.
-- `UIStateValueDrawers` — `UIImageStateValue`/`UITextStateValue`의 `PropertyDrawer`. `Override`
-  플래그로 켠 필드만 인스펙터에 노출한다.
+- `UIImageStateValueDrawer`/`UITextStateValueDrawer`(`UIStateValueDrawers.cs`) — 각각
+  `UIImageStateValue`/`UITextStateValue`의 `PropertyDrawer`. `Override` 플래그로 켠 필드만
+  인스펙터에 노출한다.
 
 ---
 
