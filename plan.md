@@ -46,7 +46,7 @@ EditMode 범위 밖: Pressed/Highlighted/Selected 매핑은 EventSystem 포인�
 
 ---
 
-## 대기: InjectorService/PoolManager 주입 실패 격리
+## 완료: InjectorService/PoolManager 주입 실패 격리
 
 `UIButton` 설계 중 발견한 기존 결함이다. `[Inject]` 필드를 든 컴포넌트가 미등록 서비스를
 요구하면 `PoolManager.cs:154`(`InjectGameObject`)와 `InjectorService.Start()` 둘 다
@@ -56,8 +56,12 @@ EditMode 범위 밖: Pressed/Highlighted/Selected 매핑은 EventSystem 포인�
 
 세부: `docs/superpowers/specs/2026-08-30-ui-button-design.md` "결정 사항과 근거 > 5"
 
-- [ ] 주입이 실패한 컴포넌트가 있어도 나머지 pending이 모두 주입된다
-- [ ] 풀 생성 중 주입이 실패해도 인스턴스가 씬에 고아로 남지 않는다
+- [x] 주입이 실패한 컴포넌트가 있어도 나머지 pending이 모두 주입된다
+- [x] 즉시 주입이 실패해도 예외가 호출자에게 전파되지 않는다
+- [x] 풀 생성 중 주입이 실패해도 인스턴스가 씬에 고아로 남지 않는다
+
+격리는 예외를 삼키는 게 아니라 치명적이지 않게 만든다 — `Debug.LogException`으로 콘솔에는
+그대로 남는다. 저장소에 이미 있는 `OperationQueue.ProcessLoop`와 같은 패턴이다.
 
 ## 대기: SoundService 기본 Output
 
