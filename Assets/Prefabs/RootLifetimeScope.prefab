@@ -48,7 +48,6 @@ MonoBehaviour:
     TypeName: 
   autoRun: 1
   autoInjectGameObjects: []
-  settings: {fileID: 11400000, guid: d055982776c8c43039cccbed24fdc6bb, type: 2}
   _adServiceSettings: {fileID: 11400000, guid: e4264ee9117e840d8b674b447c2d4e10, type: 2}
   _analyticsServiceSettings: {fileID: 11400000, guid: 3dd21fc1e2f2543d9a2165388f6098e7, type: 2}
   _iapServiceSettings: {fileID: 11400000, guid: f4dbadd63e58245038dab390b964e660, type: 2}
