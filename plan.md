@@ -6,6 +6,21 @@
 
 ---
 
+## 대기: InjectorService/PoolManager 주입 실패 격리
+
+`UIButton` 설계 중 발견한 기존 결함이다. `[Inject]` 필드를 든 컴포넌트가 미등록 서비스를
+요구하면 `PoolManager.cs:154`(`InjectGameObject`)와 `InjectorService.Start()` 둘 다
+`try/catch`가 없어 피해가 번진다. 전자는 풀 생성 중 예외로 인스턴스가 씬에 고아로 남고,
+후자는 VContainer가 `EntryPointExceptionHandler` 미등록 시 그대로 rethrow하므로
+나머지 pending 컴포넌트가 영영 주입을 못 받는다.
+
+세부: `docs/superpowers/specs/2026-08-30-ui-button-design.md` "결정 사항과 근거 > 5"
+
+- [ ] 주입이 실패한 컴포넌트가 있어도 나머지 pending이 모두 주입된다
+- [ ] 풀 생성 중 주입이 실패해도 인스턴스가 씬에 고아로 남지 않는다
+
+---
+
 ## 완료: AnalyticsService — Adjust 어댑터
 
 Firebase 어댑터와 같은 모양으로 Adjust(MMP) 어댑터를 붙인다. Adjust는 이벤트 "이름"이 아니라
