@@ -94,8 +94,12 @@ public class UINavigatorSceneLifetimeTests
         var p = nav.Page<P>();
         await AwaitableTest.WaitUntil(() => p.Shown);
 
+        var rootGO = p.ViewBase.transform.root.gameObject;
         nav.Dispose();
-        await AwaitableTest.NextFrame();   // Object.Destroy 반영
+        // 파괴가 반영된 뒤에 스냅샷을 찍는다 — 한 프레임으로는 보장되지 않는다(아래
+        // Dispose하면_캔버스GO가_파괴된다 테스트에서 실측한 바와 같다). before/after 사이에
+        // 파괴가 끼면 개수가 줄어 재생성과 무관하게 실패한다.
+        await AwaitableTest.WaitUntil(() => rootGO == null, timeoutSeconds: 5f);
 
         // 이름으로 GameObject.Find하지 않는 이유: 이 호스트 프로젝트는 VContainerSettings.asset이
         // RootLifetimeScope.prefab을 모든 Play 세션(PlayMode 테스트 포함)에 자동 부트스트랩하므로,
