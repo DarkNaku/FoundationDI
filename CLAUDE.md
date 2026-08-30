@@ -122,7 +122,7 @@ NuGet 의존성은 **NuGetForUnity**(`Assets/NuGet/`)가 `Assets/packages.config
   - 발동 지점은 `onClick` 리스너다. `Button.Press()`가 `OnPointerClick`/`OnSubmit` 양쪽을 지나므로 리스너 하나로 전부 커버된다.
 - **UIStateButton** (`Components/UIStateButton.cs`): `UIButton` 상속 + 상태별 이미지/텍스트 스왑.
   - **자체 `UIButtonState` enum을 쓴다** — uGUI의 `Selectable.SelectionState`는 `protected` 중첩 enum이라 공개 API·테스트에서 쓸 수 없다. 순서가 같아도 캐스팅하지 않고 명시적 `switch`로 번역한다.
-  - **폴백 규칙**: `그 상태가 오버라이드 → Normal이 오버라이드 → 아무것도 안 씀`. 폴백 대상이 **`Normal`이라는 게 핵심**이다. `Selected`를 `Highlighted`로 떨어뜨리면 uGUI가 클릭한 버튼을 선택 상태로 남기기 때문에 모바일에서 탭한 버튼이 계속 하이라이트된 채 남는다.
+  - **폴백 규칙**: `그 상태가 오버라이드 → Normal이 오버라이드 → 기준값 → 아무것도 안 씀`. 폴백 대상이 **`Normal`이라는 게 핵심**이다. `Selected`를 `Highlighted`로 떨어뜨리면 uGUI가 클릭한 버튼을 선택 상태로 남기기 때문에 모바일에서 탭한 버튼이 계속 하이라이트된 채 남는다.
   - 스왑 세트는 `Selectable`을 전혀 모르는 순수 타입이라 EditMode에서 단독 테스트된다.
   - 상세: `Assets/FoundationDI/Runtime/Components/README.md`.
 

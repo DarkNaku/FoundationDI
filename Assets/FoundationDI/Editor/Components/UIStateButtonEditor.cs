@@ -35,7 +35,6 @@ namespace DarkNaku.FoundationDI.Editor
 
             DrawTransitionWarning();
             DrawEmptyTargetWarning();
-            DrawUnrestoredOverrideWarning();
 
             EditorGUILayout.PropertyField(_imageSets, true);
             EditorGUILayout.PropertyField(_textSets, true);
@@ -80,42 +79,5 @@ namespace DarkNaku.FoundationDI.Editor
         }
 
         // Normal이 오버라이드하지 않는 필드를 다른 상태가 오버라이드하면, 그 상태를 벗어나
-        // Normal로 되돌아갈 때 TryResolve의 세 번째 분기("아무것도 쓰지 않는다")를 타서
-        // 값이 원래대로 복원되지 않는다. 런타임 폴백 로직 자체는 바꾸지 않고(별도 스펙 대기),
-        // 인스펙터에서 이 조합을 미리 경고만 한다.
-        private void DrawUnrestoredOverrideWarning()
-        {
-            if (HasUnrestoredOverride(_imageSets) || HasUnrestoredOverride(_textSets))
-            {
-                EditorGUILayout.HelpBox(
-                    "Normal이 오버라이드하지 않는 필드를 다른 상태가 오버라이드하고 있습니다. " +
-                    "그 상태를 벗어나도 원래 값으로 돌아오지 않습니다. " +
-                    "Normal에서도 같은 필드를 오버라이드하세요.",
-                    MessageType.Warning);
-            }
-        }
-
-        private static bool HasUnrestoredOverride(SerializedProperty list)
-        {
-            for (int i = 0; i < list.arraySize; i++)
-            {
-                var element = list.GetArrayElementAtIndex(i);
-
-                var normalMask = GetOverrideMask(element, "Normal");
-                var otherMask = GetOverrideMask(element, "Highlighted")
-                    | GetOverrideMask(element, "Pressed")
-                    | GetOverrideMask(element, "Selected")
-                    | GetOverrideMask(element, "Disabled");
-
-                if ((otherMask & ~normalMask) != 0) return true;
-            }
-            return false;
-        }
-
-        private static int GetOverrideMask(SerializedProperty element, string stateName)
-        {
-            var overrideProp = element.FindPropertyRelative(stateName)?.FindPropertyRelative("Override");
-            return overrideProp != null ? overrideProp.intValue : 0;
-        }
     }
 }

@@ -91,9 +91,19 @@ EditMode에서 검증한다. 실제 `AudioMixerGroup` 조회가 붙는 경로는
    (`Selectable.cs:578-586`), 우리 스왑은 uGUI의 `overrideSprite`/`CanvasRenderer`와 달리
    직렬화 필드를 직접 쓴다. 인스펙터에서 `interactable`을 껐다 켜면 Disabled 값이 프리팹에 구워진다.
 
-- [ ] Normal이 오버라이드하지 않는 필드도 상태를 벗어나면 원래 값으로 돌아온다
-- [ ] 풀에서 재사용된 View도 첫 프리팹 값을 기준으로 복원한다
+- [x] Normal이 오버라이드하지 않는 필드도 상태를 벗어나면 원래 값으로 돌아온다
+- [x] 아무 상태도 오버라이드하지 않는 필드는 계속 건드리지 않는다
+- [x] 기준값은 한 번만 캡처되어 재사용시에도 첫 값을 유지한다
 - [ ] 에디터에서 상태를 미리 보아도 프리팹에 값이 구워지지 않는다
+
+**1번(복원)은 해결됐다.** 첫 `Apply` 시점의 타깃 값을 `[NonSerialized]` 기준값으로 캡처하고
+해석을 4단으로 바꿨다. 인스펙터의 "복원되지 않음" 경고는 하자가 사라졌으므로 함께 제거했다.
+
+**2번(에디터 값 굽기)은 남는다.** 싼 답이 없다 — `ApplyState`를 플레이 모드로 제한하면 EditMode
+테스트가 깨지고, 근본 해법은 필드마다 다르다: `Sprite`는 `Image.overrideSprite`(`[NonSerialized]`),
+`Color`는 `canvasRenderer.SetColor()`로 옮길 수 있지만 `Visible`(`Graphic.enabled`)과
+`TMP_Text.text`/`fontSharedMaterial`에는 대응하는 비직렬화 채널이 없다. `Visible`의 의미까지
+바꾸는 결정이 필요해 별도 스펙 대상이다.
 
 ---
 
