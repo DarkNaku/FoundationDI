@@ -31,7 +31,7 @@ namespace DarkNaku.FoundationDI
             {
                 if (target != null)
                 {
-                    _resolver.Inject(target);
+                    TryInject(target);
                 }
             }
 
@@ -44,11 +44,28 @@ namespace DarkNaku.FoundationDI
 
             if (_resolver != null)
             {
-                _resolver.Inject(target);
+                TryInject(target);
                 return;
             }
 
             _pending.Add(target);
+        }
+
+        /// <summary>
+        /// 주입 실패를 대상 하나에 가둔다. 예외를 삼키는 게 아니라 치명적이지 않게 만든다 —
+        /// 콘솔에는 그대로 남고, 나머지 보류분과 호출자(컴포넌트의 Awake 등)는 계속 진행한다.
+        /// 격리가 없으면 미등록 서비스를 요구하는 컴포넌트 하나가 뒤 순번 전체의 주입을 막는다.
+        /// </summary>
+        private static void TryInject(MonoBehaviour target)
+        {
+            try
+            {
+                _resolver.Inject(target);
+            }
+            catch (Exception e)
+            {
+                Debug.LogException(e, target);
+            }
         }
 
         public void Dispose()

@@ -1,3 +1,4 @@
+using System;
 using System.Text.RegularExpressions;
 using DarkNaku.FoundationDI;
 using NSubstitute;
@@ -195,6 +196,30 @@ public class PoolManagerTest
         resolver.Received(1).Inject(Arg.Any<object>());
 
         sut.Dispose();
+        Object.DestroyImmediate(prefab);
+    }
+
+    [Test]
+    public void 풀_생성_중_주입이_실패해도_인스턴스가_씬에_고아로_남지_않는다()
+    {
+        var prefab = new GameObject("prefab");
+        var resource = Substitute.For<IResourceService>();
+        resource.Load<GameObject>("enemy").Returns(prefab);
+        var resolver = Substitute.For<IObjectResolver>();
+        resolver.When(r => r.Inject(Arg.Any<object>())).Do(_ => throw new Exception("boom"));
+        var sut = new PoolManager(resource, resolver);
+
+        LogAssert.Expect(LogType.Exception, new Regex(".*boom.*"));
+
+        var go = sut.Get("enemy");
+
+        Assert.IsNotNull(go, "주입이 실패해도 인스턴스는 반환되어야 한다");
+        Assert.IsNotNull(go.transform.parent, "풀 루트에 붙어 있어야 고아가 아니다");
+        Assert.AreEqual("[PoolManager]", go.transform.parent.name);
+
+        sut.Dispose();
+
+        Assert.IsTrue(go == null, "풀 루트와 함께 파괴되어야 한다");
         Object.DestroyImmediate(prefab);
     }
 }
