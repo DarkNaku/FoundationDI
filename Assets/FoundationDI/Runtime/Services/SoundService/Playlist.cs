@@ -46,6 +46,7 @@ namespace DarkNaku.FoundationDI
         internal Playlist(ISoundEngine engine, string[] tags)
         {
             _engine = engine;
+            _output = engine.GetOutput(Output.Null);   // SetOutput을 부르지 않아도 기본 Output을 탄다
 
             if (tags == null) return;
 
@@ -304,7 +305,7 @@ namespace DarkNaku.FoundationDI
         /// <summary>AudioMixer Output을 지정해 볼륨 그룹을 관리한다.</summary>
         public Playlist SetOutput(Output output)
         {
-            _output = output.IsNull ? null : _engine.GetOutput(output);
+            _output = _engine.GetOutput(output);   // 비어 있으면 엔진이 기본 Output으로 해석한다
             return this;
         }
 

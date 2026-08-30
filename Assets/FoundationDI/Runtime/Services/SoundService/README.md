@@ -211,6 +211,16 @@ _sound.StopAll();        // 씬 전환
 
 볼륨은 `PlayerPrefs`에 Output 이름을 키로 저장되고, 다음 실행에서 자동 복원된다.
 
+### 기본 Output
+
+`SoundServiceSettings`의 **Default Output**을 지정하면, `SetOutput`을 부르지 않았거나 빈 `Output`을
+넘긴 재생이 모두 그 Output으로 간다. `Sound`/`Music`/`Playlist`/`DynamicMusic` 전부에 적용된다.
+
+기본 Output도 비어 있으면 `outputAudioMixerGroup`이 `null`로 남아 **믹서를 통째로 우회한다.**
+그 소리는 어떤 Output 볼륨 설정에도 영향을 받지 않는다 — 조용히 잘못되기 쉬운 조합이라,
+UI 클릭음처럼 볼륨 설정을 따라야 하는 소리가 있다면 기본 Output을 지정해 두는 편이 안전하다.
+명시적으로 지정한 `Output`은 언제나 기본값보다 우선한다.
+
 ```csharp
 _sound.ChangeOutputVolume(Output.BGM, 0.5f);
 float saved = _sound.GetSavedOutputVolume("BGM");
