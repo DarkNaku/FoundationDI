@@ -207,7 +207,9 @@ ls Assets/FoundationDI/Runtime/Managers/UINavigator
 FILES=$(grep -rl "UIService" Assets \
   --include='*.cs' --include='*.md' --include='*.asset' --include='*.unity' --include='*.prefab')
 
-for f in $FILES; do
+# zsh는 $FILES를 단어 분리하지 않는다 — while read로 줄 단위 순회한다.
+echo "$FILES" | while read -r f; do
+  [ -n "$f" ] || continue
   sed -i '' \
     -e 's/UIServiceVContainerExtensions/UINavigatorVContainerExtensions/g' \
     -e 's/UIServiceSettings/UINavigatorSettings/g' \
@@ -228,6 +230,15 @@ grep -rn "UIService" Assets | grep -v '\.meta:'
 
 기대: **0건.** 남아 있으면 그 파일이 위 `--include` 목록에서 빠진 확장자다 — 확인 후 같은 sed를 적용한다.
 
+**폴더가 `Services/`에서 `Managers/`로 옮겨졌으므로 마크다운 상대 링크도 깨진다.** sed는 식별자만 바꾸지 경로 세그먼트를 모른다. 다음 둘을 함께 고친다:
+
+```bash
+grep -rn "Runtime/Services/UINavigator" Assets           # 기대 0건
+grep -n '](\.\./' Assets/FoundationDI/Runtime/Managers/UINavigator/README.md
+```
+
+`Managers/` 아래에서 `Services/`를 가리키는 상대 링크는 두 단계를 올라가야 한다 — 관행은 `Assets/FoundationDI/Runtime/Managers/PoolManager/README.md:6`의 `../../Services/ResourceService/README.md` 형태다.
+
 - [ ] **Step 6: 컴파일 확인**
 
 UnityMCP `refresh_unity` → `read_console` (`types: ["error"]`). 기대: 에러 0건.
@@ -236,7 +247,7 @@ UnityMCP `refresh_unity` → `read_console` (`types: ["error"]`). 기대: 에러
 
 - [ ] **Step 7: 프리팹 참조 육안 확인**
 
-Unity에서 `Assets/Scripts/LifetimeScopes/RootLifetimeScope.prefab`을 선택해 인스펙터의 `Settings` 슬롯이 `UINavigatorSettings`를 여전히 가리키는지 본다. 비어 있으면 `Assets/Settings/UINavigatorSettings.asset`을 다시 끌어다 놓고 저장한다.
+Unity에서 `Assets/Prefabs/RootLifetimeScope.prefab`(경로 주의 — `Scripts/LifetimeScopes/` 아래가 아니다)을 선택해 인스펙터의 `Settings` 슬롯이 `UINavigatorSettings`를 여전히 가리키는지 본다. 비어 있으면 `Assets/Settings/UINavigatorSettings.asset`을 다시 끌어다 놓고 저장한다.
 
 - [ ] **Step 8: 전체 테스트 실행**
 
