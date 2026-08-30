@@ -46,7 +46,7 @@ public class RootLifetimeScope : LifetimeScope
     protected override void Configure(IContainerBuilder builder)
     {
         builder.RegisterSoundService(soundSettings);
-        builder.RegisterInjector();   // 씬 배치 컴포넌트(SoundButton, MusicZone 등) 주입용
+        builder.RegisterInjector();   // 씬 배치 컴포넌트(MusicZone 등) 주입용
     }
 }
 ```
@@ -256,10 +256,12 @@ builder.Register<SoundService>(Lifetime.Singleton).As<ISoundService>();
 
 | 컴포넌트 | 하는 일 |
 | --- | --- |
-| `SoundButton` | `Button` 클릭 시 지정한 SFX 재생 |
 | `MusicZone` | 구/박스 영역 안에서만 들리는 음악. 영역 밖 페이드 구간에서 거리 비례로 감쇠. Music / Playlist / DynamicMusic 모드 |
 | `OutputVolumeSlider` | `Slider`로 Output 볼륨 조절 + 저장값 복원 + 백분율 라벨 |
 | `VolumeSlider` | 백분율 라벨이 붙은 범용 슬라이더. `UnityEvent<float>`로 값을 흘려보낸다 |
+
+버튼 클릭음은 이 목록에 없다 — `Runtime/Components/`의 `UIButton`을 쓴다(사운드+햅틱 통합
+버튼, 자세한 내용은 [Components README](../../Components/README.md)).
 
 ---
 
@@ -276,7 +278,7 @@ SoundService/
 │   ├── OutputDataCollection.cs   Output 데이터베이스 (SO)
 │   └── SoundServiceSettings.cs   데이터 참조 + 오클루전 설정 (SO)
 ├── Tags/                         SFX / Track / Output 유사 enum(partial struct)
-├── Components/                   SoundButton / MusicZone / OutputVolumeSlider / VolumeSlider
+├── Components/                   MusicZone / OutputVolumeSlider / VolumeSlider
 ├── ISoundService.cs              공개 API
 ├── ISoundEngine.cs               빌더·소스가 쓰는 내부 seam
 ├── SoundService.cs               소스 풀 + Output 볼륨 + 오클루전 계산

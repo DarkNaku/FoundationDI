@@ -6,6 +6,46 @@
 
 ---
 
+## 완료: UIButton / UIStateButton
+
+uGUI Button을 상속한 피드백 버튼(사운드+햅틱)과, 상태별로 여러 Image/Text를 스왑하는 버튼.
+스왑 세트는 Selectable을 모르는 순수 타입이라 EditMode에서 단독으로 테스트된다.
+
+세부: `docs/superpowers/specs/2026-08-30-ui-button-design.md`
+계획: `docs/superpowers/plans/2026-08-30-ui-button.md`
+
+- [x] 상태가 필드를 오버라이드하면 그 상태의 값을 쓴다
+- [x] 상태가 오버라이드하지 않으면 Normal 값으로 떨어진다
+- [x] Normal도 오버라이드하지 않으면 그 필드를 건드리지 않는다
+- [x] Selected를 지정하지 않으면 Normal로 떨어진다
+- [x] 색만 오버라이드하면 스프라이트는 원본 그대로다
+- [x] 타깃이 null이면 예외 없이 아무 일도 하지 않는다
+- [x] Visible 오버라이드는 타깃의 enabled를 바꾼다
+- [x] TMP 타깃의 문자열이 바뀐다
+- [x] 레거시 Text 타깃의 문자열이 바뀐다
+- [x] 색은 타깃 종류와 무관하게 Graphic.color에 들어간다
+- [x] TMP 머티리얼은 fontSharedMaterial에 들어간다
+- [x] 레거시 Text 머티리얼은 material에 들어간다
+- [x] 텍스트 세트도 Selected 미지정이면 Normal로 떨어진다
+- [x] 텍스트 타깃이 null이면 예외 없이 아무 일도 하지 않는다
+- [x] 서비스가 하나도 등록되지 않아도 클릭이 예외를 내지 않는다
+- [x] 햅틱서비스가 등록되지 않아도 주입이 예외를 내지 않는다
+- [x] 사운드서비스가 등록되면 클릭시 지정한 SFX로 사운드를 만든다
+- [x] SFX를 지정하지 않으면 사운드를 만들지 않는다
+- [x] 햅틱을 켜면 클릭시 지정한 강도로 Impact를 부른다
+- [x] 햅틱을 끄면 클릭해도 Impact를 부르지 않는다
+- [x] SFX가 지정됐는데 사운드서비스가 없으면 한 번만 경고한다
+- [x] ApplyState에 각 상태를 넣으면 세트가 그 상태로 적용된다
+- [x] interactable을 끄면 Disabled 세트가 적용된다
+- [x] interactable을 다시 켜면 Normal 세트가 적용된다
+- [x] 세트가 비어도 상태 전이가 예외를 내지 않는다
+- [x] 텍스트 세트도 함께 적용된다
+
+EditMode 범위 밖: Pressed/Highlighted/Selected 매핑은 EventSystem 포인터 시뮬레이션이
+필요하다. Disabled 경로로 switch 배선은 확인되고, 나머지는 플레이 모드 확인으로 대신한다.
+
+---
+
 ## 대기: InjectorService/PoolManager 주입 실패 격리
 
 `UIButton` 설계 중 발견한 기존 결함이다. `[Inject]` 필드를 든 컴포넌트가 미등록 서비스를
@@ -18,6 +58,20 @@
 
 - [ ] 주입이 실패한 컴포넌트가 있어도 나머지 pending이 모두 주입된다
 - [ ] 풀 생성 중 주입이 실패해도 인스턴스가 씬에 고아로 남지 않는다
+
+## 대기: SoundService 기본 Output
+
+`UIButton` 설계 중 확인한 구조적 빈틈이다. SoundService에는 "기본 Output" 개념이 전혀 없다 —
+`SoundServiceSettings`에도 `SoundData`에도 없다. 그래서 Output을 비워 두면
+`Sound.SetOutput`이 `null`을 넘기고 `SoundSource.cs:308`이 `outputAudioMixerGroup = null`로
+세팅해 **믹서를 통째로 우회한다**. 결과적으로 유저가 효과음 볼륨을 0으로 내려도 소리가 그대로 난다.
+
+`SoundServiceSettings`에 `DefaultOutput`을 두고, Output이 비면 SoundService가 그걸로 해석하게 한다.
+`Sound`/`Music`/`Playlist`/`DynamicMusic` 전부가 대상이라 별도 스펙·계획이 필요하다.
+
+- [ ] Output을 지정하지 않으면 설정의 기본 Output으로 재생된다
+- [ ] 기본 Output도 지정되지 않으면 이전처럼 믹서를 우회한다
+- [ ] 명시한 Output이 기본 Output보다 우선한다
 
 ---
 

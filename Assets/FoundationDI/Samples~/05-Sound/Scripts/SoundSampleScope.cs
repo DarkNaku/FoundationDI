@@ -17,7 +17,7 @@ namespace DarkNaku.FoundationDI.Samples
         {
             builder.RegisterSoundService(_soundSettings);
 
-            // SoundSampleDemo, SoundButton, MusicZone 같은 씬 배치 컴포넌트에 주입하려면 필요하다.
+            // SoundSampleDemo, UIButton, MusicZone 같은 씬 배치 컴포넌트에 주입하려면 필요하다.
             builder.RegisterInjector();
         }
     }

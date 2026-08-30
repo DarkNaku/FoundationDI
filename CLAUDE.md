@@ -113,6 +113,19 @@ NuGet 의존성은 **NuGetForUnity**(`Assets/NuGet/`)가 `Assets/packages.config
   - ⚠️ **`RegisterTutorialManager`는 `RegisterInjector`와 같은 스코프에 등록한다.** `InjectorService`가 정적 컨테이너 참조 하나를 공유하는 단일 컨테이너 모델이라, 씬(자식) 스코프에 두면 루트 리졸버가 `ITutorialManager`를 해결하지 못해 주입이 **조용히 실패**한다. 씬 스코프에 두려면 그 스코프에서 `RegisterComponentInHierarchy<TutorialSequenceBehaviour>()`를 함께 부른다.
   - 상세: `Assets/FoundationDI/Runtime/Managers/TutorialManager/README.md`.
 
+### 씬 저작 컴포넌트 (`Assets/FoundationDI/Runtime/Components/`)
+서비스를 소비하는 씬 저작용 위젯이 사는 자리다(서비스도 매니저도 아니다).
+
+- **UIButton** (`Components/UIButton.cs`): uGUI `Button` 상속. 클릭 시 SFX + 햅틱 `Impact`.
+  - **서비스는 선택적 주입**이다 — `[Inject]` 필드가 아니라 `IObjectResolver`를 받아 `TryResolve`한다. `[Inject]` 필드로 받으면 미등록 서비스 하나가 `PoolManager.cs:154`(`InjectGameObject`)나 `InjectorService.Start()`를 터뜨리는데 **둘 다 try/catch가 없어** View가 안 뜨거나 컨테이너 시작이 깨진다.
+  - `Button` 상속이라 `InjectableBehaviour`를 못 쓴다. `InjectorService.Request(this)`를 `Awake`에서 직접 부른다.
+  - 발동 지점은 `onClick` 리스너다. `Button.Press()`가 `OnPointerClick`/`OnSubmit` 양쪽을 지나므로 리스너 하나로 전부 커버된다.
+- **UIStateButton** (`Components/UIStateButton.cs`): `UIButton` 상속 + 상태별 이미지/텍스트 스왑.
+  - **자체 `UIButtonState` enum을 쓴다** — uGUI의 `Selectable.SelectionState`는 `protected` 중첩 enum이라 공개 API·테스트에서 쓸 수 없다. 순서가 같아도 캐스팅하지 않고 명시적 `switch`로 번역한다.
+  - **폴백 규칙**: `그 상태가 오버라이드 → Normal이 오버라이드 → 아무것도 안 씀`. 폴백 대상이 **`Normal`이라는 게 핵심**이다. `Selected`를 `Highlighted`로 떨어뜨리면 uGUI가 클릭한 버튼을 선택 상태로 남기기 때문에 모바일에서 탭한 버튼이 계속 하이라이트된 채 남는다.
+  - 스왑 세트는 `Selectable`을 전혀 모르는 순수 타입이라 EditMode에서 단독 테스트된다.
+  - 상세: `Assets/FoundationDI/Runtime/Components/README.md`.
+
 ### SDK 스크립팅 심볼 자동 관리
 
 3사 SDK 어댑터를 게이트하는 `FOUNDATIONDI_*` 심볼은 **손으로 정의하지 않는다.** `Assets/FoundationDI/Editor/SdkDefines/`의 `SdkDefineSynchronizer`가 도메인 리로드마다 SDK 대표 어셈블리의 존재 여부를 보고 Android/iOS/Standalone 심볼을 켜거나 끈다.

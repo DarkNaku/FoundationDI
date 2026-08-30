@@ -1,6 +1,6 @@
 # InjectorService
 
-씬에 디자이너가 직접 배치한(=`LifetimeScope`가 생성하지 않은) MonoBehaviour에 VContainer 의존성을 주입하는 **인프라**입니다. 컴포넌트는 정적 진입점에 자신을 등록하고, 컨테이너가 준비되면 주입받습니다. `SoundButton`이 첫 사용처입니다.
+씬에 디자이너가 직접 배치한(=`LifetimeScope`가 생성하지 않은) MonoBehaviour에 VContainer 의존성을 주입하는 **인프라**입니다. 컴포넌트는 정적 진입점에 자신을 등록하고, 컨테이너가 준비되면 주입받습니다. `UIButton`이 첫 사용처입니다.
 
 - **위치·계층·순서 무관** — 컴포넌트는 정적 `InjectorService.Request(this)`만 호출. 컨테이너 준비 전 요청은 보류했다가 일괄 주입
 - **이벤트 드리븐** — 폴링 없음. 컨테이너 준비 시 1회 flush, 준비 후 요청은 즉시 주입
@@ -57,6 +57,45 @@ public sealed class HudWidget : InjectableBehaviour
 ```
 
 주입 완료 시점은 컨테이너 준비 시점에 달려 있으므로, 주입된 필드는 클릭/입력 등 **런타임 이벤트 시점**에 사용합니다(생성자/`Awake` 즉시 사용 금지).
+
+### 3) `InjectableBehaviour`를 못 쓸 때
+
+`InjectableBehaviour`는 `MonoBehaviour`를 직접 상속하므로, 이미 다른 클래스를 상속하고 있는
+컴포넌트는 쓸 수 없습니다. `UIButton`이 그 예입니다 — uGUI `Button`을 상속해야 하므로
+`InjectableBehaviour`에 올라탈 수 없고, `Awake`에서 `InjectorService.Request(this)`를 직접
+호출합니다.
+
+```csharp
+public class UIButton : Button
+{
+    private bool _requested;
+
+    [Inject]
+    public void Construct(IObjectResolver resolver)
+    {
+        resolver.TryResolve(out _soundService);
+        resolver.TryResolve(out _hapticService);
+    }
+
+    protected override void Awake()
+    {
+        base.Awake();
+        EnsureInjected();
+    }
+
+    private void EnsureInjected()
+    {
+        if (_requested) return;
+        _requested = true;
+        InjectorService.Request(this);
+    }
+}
+```
+
+`[Inject]` 필드 대신 `IObjectResolver`를 받아 `TryResolve`하는 이유는 별개의 설계 결정입니다 —
+미등록 서비스를 `[Inject]` 필드로 요구하면 VContainer가 예외를 던지는데, 이 프로젝트에는 그 예외를
+받아낼 곳이 마땅치 않기 때문입니다. 자세한 내용은 [Components README](../../Components/README.md)를
+참고하세요.
 
 ---
 
