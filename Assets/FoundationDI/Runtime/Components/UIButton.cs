@@ -27,7 +27,11 @@ namespace DarkNaku.FoundationDI
         private Sound _sound;
         private bool _requested;
         private bool _warnedSound;
-        private bool _warnedHaptic;
+
+        // 인스턴스가 아니라 세션당 한 번만 경고한다: 이 경고는 전역 IHapticService 미등록을
+        // 보고하는 것이라 어떤 버튼이 눌렀는지는 의미가 없다. 풀링된 View가 많은 화면에서
+        // 인스턴스별로 두면 같은 문구가 수십 번 찍힌다.
+        private static bool _warnedHaptic;
 
         /// <summary>
         /// 개별 서비스가 아니라 리졸버를 받는다. [Inject] 필드로 서비스를 직접 받으면
@@ -57,6 +61,10 @@ namespace DarkNaku.FoundationDI
 
         private void EnsureInjected()
         {
+            // Selectable이 [ExecuteAlways]라 에디터에서도 Awake가 돈다. 에디터에서는 컨테이너가 없어
+            // InjectorService의 정적 _pending 목록에만 쌓이고 비워지지 않는다.
+            if (!Application.isPlaying) return;
+
             if (_requested) return;
             _requested = true;
             InjectorService.Request(this);
