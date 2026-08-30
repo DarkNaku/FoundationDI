@@ -1,5 +1,4 @@
 using DarkNaku.FoundationDI;
-using FoundationDI.Host;
 using UnityEngine;
 using VContainer;
 using VContainer.Unity;
@@ -33,7 +32,7 @@ public class RootLifetimeScope : LifetimeScope
         builder.RegisterIapService(_iapServiceSettings);
 
         // TutorialManager는 원래 씬 LifetimeScope에 등록하는 게 기본이다.
-        // 이 호스트 프로젝트는 루트 스코프 하나뿐이라 여기에 붙인다(전역 수명이 된다).
+        // 여기 남기는 이유: InjectorService는 정적 리졸버 하나를 공유해 씬 배치 컴포넌트를 항상 루트로 주입하므로, RegisterInjector와 다른 스코프로 갈리면 그 주입이 조용히 실패한다.
         builder.RegisterTutorialManager();
     }
 }
