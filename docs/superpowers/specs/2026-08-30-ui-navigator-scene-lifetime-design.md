@@ -71,6 +71,8 @@ public static void RegisterUINavigator(this IContainerBuilder builder, UINavigat
 
 **(b) 이미 파괴된 캔버스에 대한 dispose 허용** — 캔버스가 씬과 함께 먼저 파괴된 뒤 `Dispose()`가 오는 경우 예외 없이 통과해야 한다. 현재 `if (_root != null && _root.GO != null)` 검사가 이 역할을 하고, `_pool?.Dispose()` 경로도 같은 가정 위에서 이미 방어되어 있다(`PoolManager.cs:111` 주석). 테스트로 이 계약을 고정한다.
 
+**(c) 수용하는 한계** — 캔버스가 파괴됐지만 아직 `Dispose()`가 오지 않은 창(window)에서 `Page<T>()`가 호출되면, `Root` getter의 기존 fake-null 재구성 경로가 **다음 씬에 캔버스를 만든다.** `_disposed`가 아직 false라 가드가 걸리지 않는다. 이 창은 좁고(씬 언로드 도중 게임 코드가 UI를 새로 여는 경우) 막으려면 "파괴됐으면 재구성하지 않는다"로 바꿔야 하는데, 그러면 캔버스가 예기치 않게 파괴됐을 때 UI가 영구히 죽는 현재의 복구 동작을 잃는다. 재구성 동작을 유지하고 이 창은 문서화된 한계로 남긴다.
+
 ### 5. 씬을 가로지르는 UI는 범위 밖이다
 
 캔버스가 씬과 함께 죽으므로, **씬 A 언로드 ~ 씬 B 스코프 기동 사이에는 이 컴포넌트가 그리는 UI가 하나도 없다.** 지금까지는 `DontDestroyOnLoad` 캔버스가 이 구간을 덮고 있었다.
@@ -98,6 +100,17 @@ public static void RegisterUINavigator(this IContainerBuilder builder, UINavigat
 유지: `Create UI Root Prefab`, `Create UI Element...` — 확인용이 아니라 생성용이다.
 
 이 제거는 수명 변경과 무관하므로 **별도의 첫 커밋**으로 분리한다.
+
+### 9. `InjectorService`로 주입되는 씬 컴포넌트는 `IUINavigator`를 못 본다
+
+`InjectorService`는 **정적 리졸버 하나**를 들고 있다(`InjectorService.cs:16`). `RegisterInjector`를 부른 스코프의 컨테이너가 그 정적 참조가 된다. 따라서 `RegisterInjector`가 루트에 있고 `RegisterUINavigator`가 씬에 있으면, `InjectorService.Request(this)`로 주입받는 **씬 배치 MonoBehaviour**(`TutorialTarget`, `UIButton` 등)는 루트 컨테이너로 해결되어 `IUINavigator`를 찾지 못한다 — `TryInject`가 예외를 로그하고 넘어간다(조용히 실패하지는 않지만 컴파일 타임에도 안 잡힌다).
+
+이는 CLAUDE.md가 이미 `RegisterTutorialManager`에 대해 경고한 것과 **같은 제약**이다. 해결책도 같다:
+
+- 씬 배치 컴포넌트가 `IUINavigator`를 주입받아야 하면 `RegisterInjector`도 **같은 씬 스코프**에 둔다.
+- 그럴 필요가 없으면(권장) UI는 컨테이너가 만드는 객체 — `UIPresenter`와 프리팹 `View` 계층 — 에서만 주입받는다. 이 경로는 `UIInstanceFactory`가 **씬 스코프 리졸버**를 쓰므로 정상 동작한다.
+
+코어 코드는 바꾸지 않는다. README 마이그레이션 항목으로만 싣는다.
 
 ---
 
