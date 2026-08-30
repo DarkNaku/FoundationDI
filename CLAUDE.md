@@ -59,7 +59,7 @@ NuGet 의존성은 **NuGetForUnity**(`Assets/NuGet/`)가 `Assets/packages.config
   - **상주 캔버스**: 루트는 `UIServiceSettings.RootPrefab`으로 지정한 프리팹을 인스턴스화하며(렌더 모드/`CanvasScaler`/레이어 구성은 프리팹이 결정), 미지정 시 `UIRoot.CreateDefault()`(ScreenSpaceOverlay/1920x1080)로 폴백한다. `DontDestroyOnLoad`로 앱 전체에 1개만 상주하며 씬 전환 시 자식 UI만 clear.
   - **트랜지션**: `IUITransition` 추상화 + 기본 3종 MonoBehaviour 컴포넌트(`FadeTransition`/`ScaleTransition`/`SlideTransition`, 공통 기반 `UITransitionBehaviour`). 트윈 라이브러리 비의존 — `Awaitable` 자체 보간(`AnimationCurve` 인스펙터 커스터마이즈). 폴백 `NoopTransition`(즉시). 해석 우선순위: 빌더 오버라이드 > View의 트랜지션 컴포넌트 > Noop.
   - **DI 등록**: `builder.RegisterUIService(settings)` 확장 메서드(루트 `LifetimeScope`에서, `IResourceService` 등록 이후에 호출). Presenter/View는 VContainer가 주입.
-  - **에디터 도구**(`Assets/FoundationDI/Editor/UIService/`): `Tools/FoundationDI/UI/Create UI Root Prefab`(루트 프리팹 생성) · `Setup/Clear Prefab Editing Environment`(프리팹을 실제 캔버스 안에서 편집) · `Create UI Element...`(View/Presenter 스크립트 + 프리팹 생성 마법사).
+  - **에디터 도구**(`Assets/FoundationDI/Editor/UIService/`): `Tools/FoundationDI/UI/Create UI Root Prefab`(루트 프리팹 생성) · `Create UI Element...`(View/Presenter 스크립트 + 프리팹 생성 마법사).
   - 상세: `Assets/FoundationDI/Runtime/Services/UIService/README.md`.
 - **PoolManager** (`Managers/PoolManager/`): 키 기반 GameObject 오브젝트 풀. **프리팹 로드는 `IResourceService`에 위임한다.** `ObjectPool<IPoolItem>` 기반이며 `PoolData`가 풀을, `PoolItem`(MonoBehaviour)이 풀 항목 생명주기 콜백(`OnGetItem`/`OnReleaseItem` 등)과 지연 반환(`Release(delay)`)을 담당. 풀 루트는 `DontDestroyOnLoad`가 아니라 씬 스코프에 귀속시켜 씬 언로드 시 함께 정리된다. 생성 시 계층 전체에 DI를 주입하며, **주입 실패는 인스턴스 단위로 격리**된다(격리가 없으면 생성 콜백이 반환하지 못해 인스턴스가 씬에 고아로 남는다).
 - **SoundService** (`Services/SoundService/`): 태그 기반 오디오 시스템.

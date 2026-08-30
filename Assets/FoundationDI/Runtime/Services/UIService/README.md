@@ -119,24 +119,7 @@ public class ConfirmPresenter : UIPopupPresenter<ConfirmView>, IConfigurable<Con
 기준 해상도, 레이어 구성은 전부 이 프리팹이 결정합니다. 비워두면 코드 기본값
 (ScreenSpaceOverlay / ScaleWithScreenSize / Expand / 1920x1080)으로 폴백합니다.
 
-### 2) 프리팹 편집 환경 지정하기 (프로젝트당 1회)
-
-`Tools/FoundationDI/UI/Setup Prefab Editing Environment` → 씬 저장 위치 선택.
-이후 **UI 프리팹을 프로젝트 창에서 더블클릭**하면 런타임과 동일한 캔버스 안에서
-올바른 크기/스케일로 열립니다. 씬에 임시 캔버스를 만들 필요도, 작업 후 지울 필요도 없습니다.
-
-> **전제조건 — 저장된 씬이 열려 있어야 합니다.** Unity는 저장된 적 없는 씬이 열려 있으면
-> 씬을 추가로 만들지 못합니다("Cannot create a new scene additively with an untitled scene
-> unsaved"). 이 경우 메뉴가 안내 다이얼로그를 띄우고 중단하므로, 열린 씬을 저장하거나
-> 이미 저장된 씬을 연 뒤 다시 실행하세요. **PlayMode 테스트를 돌린 직후에도 이 상태가 됩니다.**
-
-> 이 설정(`EditorSettings.prefabUIEnvironment`)은 프리팹을 **격리 모드**로 열 때만
-> 적용됩니다. 씬의 프리팹 인스턴스에서 "Open"으로 들어가는 "in context" 모드에는
-> 적용되지 않습니다.
-
-해제는 `Tools/FoundationDI/UI/Clear Prefab Editing Environment`.
-
-### 3) 새 UI 요소 만들기
+### 2) 새 UI 요소 만들기
 
 `Tools/FoundationDI/UI/Create UI Element...` → 이름과 모드(Page/Popup/Overlay) 입력 → Create.
 
@@ -336,7 +319,7 @@ _ui.Page<StagePage>()
 
 ### 테스트
 
-- **EditMode** (`Tests/Editor/UIService`): `DIRegistrationTests` · `ModeControllerTests` · `NoopTransitionTests` · `OperationQueueTests` · `PresenterLifecycleTests` · `UIInstanceFactoryTests` · `UIPrefabKeyResolverTests` · `UIServiceSettingsTests` · `UIViewPoolLifecycleTests`, 그리고 에디터 도구용 `UIEditingEnvironmentTests` · `UIElementCreationRequestTests` · `UIElementCreationSettingsTests` · `UIElementNamingTests` · `UIElementPrefabBuilderTests` · `UIElementTemplatesTests` · `UIRootPrefabCreatorTests`.
+- **EditMode** (`Tests/Editor/UIService`): `DIRegistrationTests` · `ModeControllerTests` · `NoopTransitionTests` · `OperationQueueTests` · `PresenterLifecycleTests` · `UIInstanceFactoryTests` · `UIPrefabKeyResolverTests` · `UIServiceSettingsTests` · `UIViewPoolLifecycleTests`, 그리고 에디터 도구용 `UIElementCreationRequestTests` · `UIElementCreationSettingsTests` · `UIElementNamingTests` · `UIElementPrefabBuilderTests` · `UIElementTemplatesTests` · `UIRootPrefabCreatorTests`.
 - **PlayMode** (`Tests/Runtime/UIService`): `FadeTransitionTests` · `ScaleTransitionTests` · `SlideTransitionTests` · `UIRootTests` · `UIServiceFlowTests` · `UIServiceRootPrefabTests` · `UIServiceSceneResetTests` · `UIServiceViewInjectionTests` · `UIServiceWithOverlayTests` · `UIViewTests` · `UIViewTransitionResolveTests` (공용 헬퍼 `TransitionTestHelpers`).
 - 프리팹 로드는 `IResourceService`를 NSubstitute로 대체해 가짜 프리팹을 주입합니다.
 
