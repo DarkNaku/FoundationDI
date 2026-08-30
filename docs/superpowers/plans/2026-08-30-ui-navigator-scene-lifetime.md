@@ -724,6 +724,7 @@ MSG
 
 ```csharp
 using DarkNaku.FoundationDI;
+using FoundationDI.Host;   // TestHubBootstrap 이 이 네임스페이스에 있다 (TestHubPresenters.cs:6)
 using UnityEngine;
 using VContainer;
 using VContainer.Unity;
@@ -770,7 +771,7 @@ Unity에서 `Assets/Scenes/Test.unity`를 연 뒤:
 
 1. 빈 GameObject `SceneLifetimeScope`를 만들고 `SceneLifetimeScope` 컴포넌트를 붙인다
 2. 인스펙터의 `Ui Navigator Settings` 슬롯에 `Assets/Settings/UINavigatorSettings.asset`을 연결한다
-3. `LifetimeScope`의 `Parent Reference` 는 **비워 둔다** — VContainer가 런타임에 `LifetimeScope.Find`로 루트를 자동 탐색한다. 루트가 `DontDestroyOnLoad`로 먼저 떠 있어야 하므로, 씬에 `RootLifetimeScope` 프리팹 인스턴스가 함께 있는지 확인한다
+3. `LifetimeScope`의 `Parent Reference` 는 **비워 둔다.** 이 프로젝트의 루트 스코프는 씬에 배치돼 있지 않고 `Assets/Settings/VContainerSettings.asset`의 `RootLifetimeScope` 필드가 `RootLifetimeScope.prefab`을 가리켜 **VContainer가 런타임에 자동 생성**한다(`Test.unity`에는 루트 스코프 오브젝트가 없다). `parentReference`가 비어 있으면 `GetRuntimeParent()`가 마지막 폴백으로 `VContainerSettings.Instance.GetOrCreateRootLifetimeScopeInstance()`를 반환하므로(`LifetimeScope.cs:351-353`) 부모가 정확히 그 루트로 잡힌다. **`Parent Reference`에 타입을 지정하면 오히려 `Find`가 씬에서 루트를 못 찾아 `VContainerParentTypeReferenceNotFound`로 던진다** — 비워 두는 것이 맞다
 4. 씬을 저장한다
 
 `Assets/Scenes/Test2.unity`도 같은 방식으로 배치한다(씬 전환 시 캔버스가 실제로 파괴·재생성되는지 확인하는 대상이다).
