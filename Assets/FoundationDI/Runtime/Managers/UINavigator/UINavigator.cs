@@ -7,9 +7,9 @@ using VContainer;
 
 namespace DarkNaku.FoundationDI
 {
-    public sealed class UIService : IUIService, IUIElementHost, IDisposable
+    public sealed class UINavigator : IUINavigator, IUIElementHost, IDisposable
     {
-        private readonly UIServiceSettings _settings;
+        private readonly UINavigatorSettings _settings;
         private readonly UIInstanceFactory _factory;
         private readonly IResourceService _resource;
         private readonly OperationQueue _queue = new();
@@ -23,7 +23,7 @@ namespace DarkNaku.FoundationDI
         private PoolManager _pool;
         private bool _disposed;
 
-        internal UIService(UIServiceSettings settings, UIInstanceFactory factory, IResourceService resource)
+        internal UINavigator(UINavigatorSettings settings, UIInstanceFactory factory, IResourceService resource)
         {
             _settings = settings;
             _factory = factory;
@@ -60,10 +60,10 @@ namespace DarkNaku.FoundationDI
                 // 제거된 ReferenceResolution이 조용히 사라져도 컴파일 에러가 나지 않고,
                 // 첫 신호가 화면 배율이 뒤바뀌는 시각적 회귀로만 나타난다.
                 Debug.LogWarning(
-                    "[UIService] UIServiceSettings.RootPrefab이 지정되지 않아 코드 기본값" +
+                    "[UINavigator] UINavigatorSettings.RootPrefab이 지정되지 않아 코드 기본값" +
                     "(ScreenSpaceOverlay / 1920x1080)으로 폴백합니다. 세로 화면 등 다른 기준 해상도가 필요하면 " +
                     "Tools/FoundationDI/UI/Create UI Root Prefab으로 루트 프리팹을 만들고 " +
-                    "UIServiceSettings.RootPrefab에 연결하세요.");
+                    "UINavigatorSettings.RootPrefab에 연결하세요.");
                 root = UIRoot.CreateDefault();
             }
 
@@ -76,7 +76,7 @@ namespace DarkNaku.FoundationDI
             if (missingLayers != null)
             {
                 Debug.LogError(
-                    $"[UIService] 루트 '{root.GO.name}'의 레이어가 비어 있습니다: {string.Join(", ", missingLayers)}. " +
+                    $"[UINavigator] 루트 '{root.GO.name}'의 레이어가 비어 있습니다: {string.Join(", ", missingLayers)}. " +
                     "해당 레이어로 향하는 UI는 부모 없이 씬 루트에 붙어 화면에 보이지 않습니다. " +
                     "UIRoot 컴포넌트 인스펙터에서 해당 필드를 프리팹 하위 RectTransform에 연결하세요.");
             }
@@ -92,7 +92,7 @@ namespace DarkNaku.FoundationDI
 
         public T Page<T>() where T : UIPresenter
         {
-            if (_disposed) throw new ObjectDisposedException(nameof(UIService));
+            if (_disposed) throw new ObjectDisposedException(nameof(UINavigator));
             var presenter = (T)_factory.CreatePresenter(typeof(T), this);
             _queue.Enqueue(ct => ShowPageAsync(presenter, ct));
             return presenter;
@@ -100,7 +100,7 @@ namespace DarkNaku.FoundationDI
 
         public T Popup<T>() where T : UIPresenter
         {
-            if (_disposed) throw new ObjectDisposedException(nameof(UIService));
+            if (_disposed) throw new ObjectDisposedException(nameof(UINavigator));
             var presenter = (T)_factory.CreatePresenter(typeof(T), this);
             _queue.Enqueue(ct => ShowPopupAsync(presenter, ct));
             return presenter;
@@ -108,7 +108,7 @@ namespace DarkNaku.FoundationDI
 
         public T Overlay<T>() where T : UIPresenter
         {
-            if (_disposed) throw new ObjectDisposedException(nameof(UIService));
+            if (_disposed) throw new ObjectDisposedException(nameof(UINavigator));
             var presenter = (T)_factory.CreatePresenter(typeof(T), this);
             _queue.Enqueue(ct => ShowOverlayAsync(presenter, ct));
             return presenter;
@@ -122,7 +122,7 @@ namespace DarkNaku.FoundationDI
             if (view == null)
             {
                 throw new InvalidOperationException(
-                    $"[UIService] '{key}' View 로드 실패(프리팹 없음 또는 UIView 부재). ({presenter.GetType().Name})");
+                    $"[UINavigator] '{key}' View 로드 실패(프리팹 없음 또는 UIView 부재). ({presenter.GetType().Name})");
             }
 
             presenter.BindView(view);
@@ -376,18 +376,18 @@ namespace DarkNaku.FoundationDI
 
     internal interface IOverlayPlacement { bool Above { get; } }
 
-    public static class UIServiceVContainerExtensions
+    public static class UINavigatorVContainerExtensions
     {
         /// <summary>
-        /// UIService를 컨테이너에 등록한다.
+        /// UINavigator를 컨테이너에 등록한다.
         /// 전제: 호출 전에 <see cref="IResourceService"/>가 이미 등록되어 있어야 한다
-        /// (UIService 전용 풀과 UIInstanceFactory가 이를 사용).
+        /// (UINavigator 전용 풀과 UIInstanceFactory가 이를 사용).
         /// </summary>
-        public static void RegisterUIService(this IContainerBuilder builder, UIServiceSettings settings)
+        public static void RegisterUINavigator(this IContainerBuilder builder, UINavigatorSettings settings)
         {
             builder.RegisterInstance(settings);
             builder.Register<UIInstanceFactory>(Lifetime.Singleton);
-            builder.Register<UIService>(Lifetime.Singleton).As<IUIService>();
+            builder.Register<UINavigator>(Lifetime.Singleton).As<IUINavigator>();
         }
     }
 }

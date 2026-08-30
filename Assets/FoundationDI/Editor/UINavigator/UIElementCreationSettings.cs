@@ -38,7 +38,7 @@ namespace DarkNaku.FoundationDI.Editor
             return new SettingsProvider("Project/FoundationDI/UI", SettingsScope.Project)
             {
                 label = "UI",
-                keywords = new[] { "FoundationDI", "UI", "UIService", "Page", "Popup", "Overlay" },
+                keywords = new[] { "FoundationDI", "UI", "UINavigator", "Page", "Popup", "Overlay" },
                 guiHandler = _ =>
                 {
                     var settings = UIElementCreationSettings.instance;

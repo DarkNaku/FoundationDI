@@ -6,7 +6,7 @@ namespace DarkNaku.FoundationDI
     /// <summary>
     /// 타깃 위에 손가락을 띄우고 탭 애니메이션을 반복한다.
     /// 트윈 라이브러리에 의존하지 않고 AnimationCurve로 보간한다
-    /// (UIService의 기본 트랜지션 3종과 같은 방식).
+    /// (UINavigator의 기본 트랜지션 3종과 같은 방식).
     /// </summary>
     [RequireComponent(typeof(Canvas))]
     public sealed class HandPointerModule : TutorialModuleBehaviour

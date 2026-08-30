@@ -4,11 +4,11 @@ using DarkNaku.FoundationDI;
 namespace FoundationDI.Host
 {
     /// 메뉴 페이지. 탭(상점/메인/랭킹)은 내부 pager의 coordinated 슬라이드로 전환하고,
-    /// 게임 화면으로는 UIService 페이지 전환(Fade → 검은 페이드)으로 이동한다.
+    /// 게임 화면으로는 UINavigator 페이지 전환(Fade → 검은 페이드)으로 이동한다.
     [UIPrefab("MenuPage")]
     public class MenuPage : UIPagePresenter<MenuPageView>
     {
-        [Inject] private IUIService _ui;
+        [Inject] private IUINavigator _ui;
 
         protected override void OnInitialize()
         {

@@ -2,10 +2,10 @@ using UnityEngine;
 
 namespace DarkNaku.FoundationDI
 {
-    [CreateAssetMenu(fileName = "UIServiceSettings", menuName = "DarkNaku/UIServiceSettings")]
-    public sealed class UIServiceSettings : ScriptableObject
+    [CreateAssetMenu(fileName = "UINavigatorSettings", menuName = "DarkNaku/UINavigatorSettings")]
+    public sealed class UINavigatorSettings : ScriptableObject
     {
-        // UIService가 런타임에 인스턴스화할 캔버스 루트 프리팹.
+        // UINavigator가 런타임에 인스턴스화할 캔버스 루트 프리팹.
         // 캔버스 렌더 모드/CanvasScaler/레이어 구성은 전부 이 프리팹이 결정한다.
         // 비워두면 UIRoot.CreateDefault()로 폴백한다.
         [SerializeField] private UIRoot _rootPrefab;

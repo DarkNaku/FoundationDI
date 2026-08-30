@@ -3,12 +3,12 @@ using UnityEditor;
 using UnityEngine;
 using DarkNaku.FoundationDI;
 
-public class UIServiceSettingsTests
+public class UINavigatorSettingsTests
 {
     [Test]
-    public void UIServiceSettings는_루트프리팹을_설정값으로_반환한다()
+    public void UINavigatorSettings는_루트프리팹을_설정값으로_반환한다()
     {
-        var settings = ScriptableObject.CreateInstance<UIServiceSettings>();
+        var settings = ScriptableObject.CreateInstance<UINavigatorSettings>();
         var root = UIRoot.CreateDefault();
 
         var so = new SerializedObject(settings);

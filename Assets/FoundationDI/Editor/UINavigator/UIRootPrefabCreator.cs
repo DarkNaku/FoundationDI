@@ -4,7 +4,7 @@ using UnityEngine;
 namespace DarkNaku.FoundationDI.Editor
 {
     /// <summary>
-    /// UIService의 캔버스 루트 프리팹을 만든다. 계층 조립은 런타임 폴백과 동일한
+    /// UINavigator의 캔버스 루트 프리팹을 만든다. 계층 조립은 런타임 폴백과 동일한
     /// UIRoot.CreateDefault()를 재사용하므로 코드 기본값과 프리팹이 어긋날 수 없다.
     /// </summary>
     public static class UIRootPrefabCreator
@@ -16,7 +16,7 @@ namespace DarkNaku.FoundationDI.Editor
         {
             var path = EditorUtility.SaveFilePanelInProject(
                 "Create UI Root Prefab", DefaultFileName, "prefab",
-                "UIService가 런타임에 인스턴스화할 캔버스 루트 프리팹을 저장할 위치를 선택하세요.");
+                "UINavigator가 런타임에 인스턴스화할 캔버스 루트 프리팹을 저장할 위치를 선택하세요.");
 
             if (string.IsNullOrEmpty(path)) return;
 

@@ -6,15 +6,15 @@ using DarkNaku.FoundationDI;
 public class DIRegistrationTests
 {
     [Test]
-    public void 컨테이너에서_IUIService를_해석할_수_있다()
+    public void 컨테이너에서_IUINavigator를_해석할_수_있다()
     {
         var builder = new ContainerBuilder();
         builder.Register<IResourceProvider, AddressablesProvider>(Lifetime.Singleton);
         builder.Register<IResourceService, ResourceService>(Lifetime.Singleton);
-        builder.RegisterUIService(ScriptableObject.CreateInstance<UIServiceSettings>());
+        builder.RegisterUINavigator(ScriptableObject.CreateInstance<UINavigatorSettings>());
 
         var container = builder.Build();
-        Assert.IsNotNull(container.Resolve<IUIService>());
+        Assert.IsNotNull(container.Resolve<IUINavigator>());
     }
 
     [Test]

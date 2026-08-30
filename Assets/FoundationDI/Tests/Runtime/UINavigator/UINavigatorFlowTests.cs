@@ -6,7 +6,7 @@ using UnityEngine.TestTools;
 using VContainer;
 using DarkNaku.FoundationDI;
 
-public class UIServiceFlowTests
+public class UINavigatorFlowTests
 {
     public class V : UIView { }
     [UIPrefab("UI/Sample")]
@@ -109,10 +109,10 @@ public class UIServiceFlowTests
         var resource = Substitute.For<IResourceService>();
         resource.Load<GameObject>("UI/Sample").Returns(_prefab);
         var resolver = Substitute.For<IObjectResolver>();
-        var settings = ScriptableObject.CreateInstance<UIServiceSettings>();
+        var settings = ScriptableObject.CreateInstance<UINavigatorSettings>();
         var factory = new UIInstanceFactory(resolver);
 
-        var manager = new UIService(settings, factory, resource);
+        var manager = new UINavigator(settings, factory, resource);
         var p = manager.Page<P>();
 
         await AwaitableTest.WaitUntil(() => p.Shown);
@@ -127,10 +127,10 @@ public class UIServiceFlowTests
         var resource = Substitute.For<IResourceService>();
         resource.Load<GameObject>("UI/SamplePopup").Returns(_popupPrefab);
         var resolver = Substitute.For<IObjectResolver>();
-        var settings = ScriptableObject.CreateInstance<UIServiceSettings>();
+        var settings = ScriptableObject.CreateInstance<UINavigatorSettings>();
         var factory = new UIInstanceFactory(resolver);
 
-        var manager = new UIService(settings, factory, resource);
+        var manager = new UINavigator(settings, factory, resource);
         var p = manager.Popup<PopupP>();
 
         await AwaitableTest.WaitUntil(() => p.Shown);
@@ -145,10 +145,10 @@ public class UIServiceFlowTests
         var resource = Substitute.For<IResourceService>();
         resource.Load<GameObject>("UI/SampleOverlay").Returns(_overlayPrefab);
         var resolver = Substitute.For<IObjectResolver>();
-        var settings = ScriptableObject.CreateInstance<UIServiceSettings>();
+        var settings = ScriptableObject.CreateInstance<UINavigatorSettings>();
         var factory = new UIInstanceFactory(resolver);
 
-        var manager = new UIService(settings, factory, resource);
+        var manager = new UINavigator(settings, factory, resource);
         var p = manager.Overlay<OverlayP>();
 
         await AwaitableTest.WaitUntil(() => p.Shown);
@@ -163,9 +163,9 @@ public class UIServiceFlowTests
         var resource = Substitute.For<IResourceService>();
         resource.Load<GameObject>("UI/ReshowSample").Returns(_reshowPrefab);
         var resolver = Substitute.For<IObjectResolver>();
-        var settings = ScriptableObject.CreateInstance<UIServiceSettings>();
+        var settings = ScriptableObject.CreateInstance<UINavigatorSettings>();
         var factory = new UIInstanceFactory(resolver);
-        var manager = new UIService(settings, factory, resource);
+        var manager = new UINavigator(settings, factory, resource);
 
         var p = manager.Page<ReshowP>();
         await AwaitableTest.WaitUntil(() => p.ShowCount >= 1);
@@ -193,9 +193,9 @@ public class UIServiceFlowTests
         resource.Load<GameObject>("UI/Sample").Returns(_prefab);
         resource.Load<GameObject>("UI/SamplePopup").Returns(_popupPrefab);
         var resolver = Substitute.For<IObjectResolver>();
-        var settings = ScriptableObject.CreateInstance<UIServiceSettings>();
+        var settings = ScriptableObject.CreateInstance<UINavigatorSettings>();
         var factory = new UIInstanceFactory(resolver);
-        var manager = new UIService(settings, factory, resource);
+        var manager = new UINavigator(settings, factory, resource);
 
         var page = manager.Page<P>();
         await AwaitableTest.WaitUntil(() => page.Shown);
@@ -216,9 +216,9 @@ public class UIServiceFlowTests
         resource.Load<GameObject>("UI/SampleOverlay").Returns(_overlayPrefab);
         resource.Load<GameObject>("UI/SamplePopup").Returns(_popupPrefab);
         var resolver = Substitute.For<IObjectResolver>();
-        var settings = ScriptableObject.CreateInstance<UIServiceSettings>();
+        var settings = ScriptableObject.CreateInstance<UINavigatorSettings>();
         var factory = new UIInstanceFactory(resolver);
-        var manager = new UIService(settings, factory, resource);
+        var manager = new UINavigator(settings, factory, resource);
 
         var overlay = manager.Overlay<OverlayP>();
         await AwaitableTest.WaitUntil(() => overlay.Shown);
@@ -239,9 +239,9 @@ public class UIServiceFlowTests
         resource.Load<GameObject>("UI/Sample").Returns(_prefab);
         resource.Load<GameObject>("UI/Sample2").Returns(_prefab2);
         var resolver = Substitute.For<IObjectResolver>();
-        var settings = ScriptableObject.CreateInstance<UIServiceSettings>();
+        var settings = ScriptableObject.CreateInstance<UINavigatorSettings>();
         var factory = new UIInstanceFactory(resolver);
-        var manager = new UIService(settings, factory, resource);
+        var manager = new UINavigator(settings, factory, resource);
 
         var fadeGo = new GameObject("fade", typeof(RectTransform), typeof(FadeTransition));
         var fade = fadeGo.GetComponent<FadeTransition>();
@@ -268,9 +268,9 @@ public class UIServiceFlowTests
         var resource = Substitute.For<IResourceService>();
         resource.Load<GameObject>("UI/SamplePopup").Returns(_popupPrefab);
         var resolver = Substitute.For<IObjectResolver>();
-        var settings = ScriptableObject.CreateInstance<UIServiceSettings>();
+        var settings = ScriptableObject.CreateInstance<UINavigatorSettings>();
         var factory = new UIInstanceFactory(resolver);
-        var manager = new UIService(settings, factory, resource);
+        var manager = new UINavigator(settings, factory, resource);
 
         var p1 = manager.Popup<PopupP>();
         await AwaitableTest.WaitUntil(() => p1.Shown);
@@ -290,9 +290,9 @@ public class UIServiceFlowTests
         var resource = Substitute.For<IResourceService>();
         resource.Load<GameObject>("UI/Sample").Returns(_prefab);
         var resolver = Substitute.For<IObjectResolver>();
-        var settings = ScriptableObject.CreateInstance<UIServiceSettings>();
+        var settings = ScriptableObject.CreateInstance<UINavigatorSettings>();
         var factory = new UIInstanceFactory(resolver);
-        var manager = new UIService(settings, factory, resource);
+        var manager = new UINavigator(settings, factory, resource);
 
         var a = manager.Page<P>();
         await AwaitableTest.WaitUntil(() => a.Shown);
@@ -314,9 +314,9 @@ public class UIServiceFlowTests
         var resource = Substitute.For<IResourceService>();
         resource.Load<GameObject>("UI/HideTrack").Returns(_hideTrackPrefab);
         var resolver = Substitute.For<IObjectResolver>();
-        var settings = ScriptableObject.CreateInstance<UIServiceSettings>();
+        var settings = ScriptableObject.CreateInstance<UINavigatorSettings>();
         var factory = new UIInstanceFactory(resolver);
-        var manager = new UIService(settings, factory, resource);
+        var manager = new UINavigator(settings, factory, resource);
 
         var p = manager.Page<HideTrackP>();
         await AwaitableTest.WaitUntil(() => p.Shown);
@@ -335,9 +335,9 @@ public class UIServiceFlowTests
         var resource = Substitute.For<IResourceService>();
         resource.Load<GameObject>("UI/Sub").Returns(_subPrefab);
         var resolver = Substitute.For<IObjectResolver>();
-        var settings = ScriptableObject.CreateInstance<UIServiceSettings>();
+        var settings = ScriptableObject.CreateInstance<UINavigatorSettings>();
         var factory = new UIInstanceFactory(resolver);
-        var manager = new UIService(settings, factory, resource);
+        var manager = new UINavigator(settings, factory, resource);
 
         // 1회차 Show → Hide
         var s1 = manager.Popup<SubP>();

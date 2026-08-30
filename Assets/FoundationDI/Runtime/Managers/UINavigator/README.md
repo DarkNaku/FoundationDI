@@ -1,4 +1,4 @@
-# UIService
+# UINavigator
 
 uGUI 기반 UI 표시/전환 시스템입니다. Presenter 타입으로 표시 모드(Page/Popup/Overlay)를 컴파일 타임에 고정하고, 모든 Show/Hide 전환을 단일 큐로 순차 직렬화합니다. 프리팹 로딩은 공용 [`IResourceService`](../ResourceService/README.md)에 위임하며, 백엔드(Resources/Addressables)는 어떤 `IResourceProvider`를 등록했는지로 결정됩니다.
 
@@ -6,7 +6,7 @@ uGUI 기반 UI 표시/전환 시스템입니다. Presenter 타입으로 표시 �
 - **빌더 체인** — `Page<T>()` 즉시 인스턴스 반환 + Show 자동 enqueue → 같은 프레임 `.WithParams()/.OnAfterShow()/.WithTransition()/.WithOverlay()` 동기 체인
 - **전환 직렬화** — `OperationQueue`로 모든 전환을 순차 처리(race 제거)
 - **Presenter는 매 표시마다 새로 생성, View는 풀 재사용** — Presenter 인스턴스 캐시는 없음. `Page/Popup/Overlay<T>()`마다 새 Presenter 생성 + `OnInitialize` 재실행. View만 프리팹 키로 풀링되어 재사용됨.
-- **상주 캔버스** — 단일 루트 Canvas는 `DontDestroyOnLoad`로 앱 전체에 1개만 상주. `UIServiceSettings.RootPrefab`을 인스턴스화하며(렌더 모드/CanvasScaler/레이어는 프리팹이 결정), 미지정 시 코드 기본값(ScreenSpaceOverlay/1920x1080)으로 폴백. 씬 전환 시 자식 UI만 clear하고 캔버스는 유지.
+- **상주 캔버스** — 단일 루트 Canvas는 `DontDestroyOnLoad`로 앱 전체에 1개만 상주. `UINavigatorSettings.RootPrefab`을 인스턴스화하며(렌더 모드/CanvasScaler/레이어는 프리팹이 결정), 미지정 시 코드 기본값(ScreenSpaceOverlay/1920x1080)으로 폴백. 씬 전환 시 자식 UI만 clear하고 캔버스는 유지.
 - **WithOverlay** — Page/Popup과 오버레이를 동시에 노출(동시 애니메이션). `persistent` 옵션으로 페이지 전환 간 깜빡임 없이 유지.
 - **트랜지션 추상화** — `IUITransition` + 기본 3종(Fade/Slide/Scale) MonoBehaviour 컴포넌트(공통 기반 `UITransitionBehaviour`), 폴백 Noop. Slide/Scale은 배경(Image)·컨텐츠 분리 연출 지원.
 
@@ -16,7 +16,7 @@ uGUI 기반 UI 표시/전환 시스템입니다. Presenter 타입으로 표시 �
 
 ### 1) DI 등록 (VContainer)
 
-`RegisterUIService` 호출 **전에 `IResourceService`가 등록**되어 있어야 합니다(프리팹 로드를 위임). 상주 캔버스가 앱 전체 단일 인스턴스가 되려면 UIService는 **프로젝트 루트 LifetimeScope**(`VContainerSettings.RootLifetimeScope`)에 등록해야 합니다.
+`RegisterUINavigator` 호출 **전에 `IResourceService`가 등록**되어 있어야 합니다(프리팹 로드를 위임). 상주 캔버스가 앱 전체 단일 인스턴스가 되려면 UINavigator는 **프로젝트 루트 LifetimeScope**(`VContainerSettings.RootLifetimeScope`)에 등록해야 합니다.
 
 ```csharp
 using VContainer;
@@ -25,15 +25,15 @@ using DarkNaku.FoundationDI;
 
 public class RootLifetimeScope : LifetimeScope
 {
-    // 인스펙터에서 Assets/Settings/UIServiceSettings.asset 을 연결한다.
-    public UIServiceSettings settings;
+    // 인스펙터에서 Assets/Settings/UINavigatorSettings.asset 을 연결한다.
+    public UINavigatorSettings settings;
 
     protected override void Configure(IContainerBuilder builder)
     {
         // 프리팹 로드 백엔드는 provider 등록 한 줄로 교체한다(Resources → Addressables 등).
         builder.Register<IResourceProvider, ResourcesProvider>(Lifetime.Singleton);
         builder.Register<IResourceService, ResourceService>(Lifetime.Singleton);
-        builder.RegisterUIService(settings);
+        builder.RegisterUINavigator(settings);
     }
 }
 ```
@@ -66,8 +66,8 @@ public class TitlePresenter : UIPagePresenter<TitleView>
 ```csharp
 public class Example
 {
-    private readonly IUIService _ui;
-    public Example(IUIService ui) => _ui = ui;
+    private readonly IUINavigator _ui;
+    public Example(IUINavigator ui) => _ui = ui;
 
     public void Open()
     {
@@ -115,7 +115,7 @@ public class ConfirmPresenter : UIPopupPresenter<ConfirmView>, IConfigurable<Con
 ### 1) 루트 프리팹 만들기 (프로젝트당 1회)
 
 `Tools/FoundationDI/UI/Create UI Root Prefab` → 저장 위치 선택 → 생성된 프리팹을
-`UIServiceSettings`의 **Root Prefab**에 연결합니다. 캔버스 렌더 모드, `CanvasScaler`,
+`UINavigatorSettings`의 **Root Prefab**에 연결합니다. 캔버스 렌더 모드, `CanvasScaler`,
 기준 해상도, 레이어 구성은 전부 이 프리팹이 결정합니다. 비워두면 코드 기본값
 (ScreenSpaceOverlay / ScaleWithScreenSize / Expand / 1920x1080)으로 폴백합니다.
 
@@ -156,9 +156,9 @@ Page와 Overlay는 전면 배경이 없으므로 빈 영역의 입력이 자연�
 
 ## Canvas 수명(지속)
 
-- 루트 Canvas는 **최초 표시 시 지연 생성**됩니다. `UIServiceSettings`의 **Root Prefab**을 인스턴스화하며(렌더 모드·`CanvasScaler`·레이어 구성은 그 프리팹이 결정), 미지정 시 코드 기본값(`UIRoot.CreateDefault()` — ScreenSpaceOverlay / ScaleWithScreenSize / Expand / 1920x1080)으로 폴백합니다. 어느 경로든 `DontDestroyOnLoad`는 서비스가 인스턴스화 직후 적용하므로 **씬을 넘어 앱 전체에 1개만 상주**합니다. 레이어 렌더 순서(아래→위)는 `Page → BelowOverlay → Popup → AboveOverlay`.
-- **씬 전환(activeSceneChanged) 시** UIService는 자식 UI 컨텐츠를 전부 clear합니다 — 활성 Presenter를 teardown(`OnBeforeHide`/`OnAfterHide` 발화)하고 진행 중인 큐를 취소하며 **View 풀을 dispose**합니다. **캔버스 자체는 유지**되며, 풀은 다음 표시 때 캔버스 아래에 재구성됩니다.
-- 캔버스는 오직 `UIService.Dispose()`(= 소유 루트 스코프 dispose) 시에만 파괴됩니다. 그래서 앱 전체 단일 인스턴스가 되려면 지속되는 **프로젝트 루트 LifetimeScope**에 등록해야 합니다.
+- 루트 Canvas는 **최초 표시 시 지연 생성**됩니다. `UINavigatorSettings`의 **Root Prefab**을 인스턴스화하며(렌더 모드·`CanvasScaler`·레이어 구성은 그 프리팹이 결정), 미지정 시 코드 기본값(`UIRoot.CreateDefault()` — ScreenSpaceOverlay / ScaleWithScreenSize / Expand / 1920x1080)으로 폴백합니다. 어느 경로든 `DontDestroyOnLoad`는 서비스가 인스턴스화 직후 적용하므로 **씬을 넘어 앱 전체에 1개만 상주**합니다. 레이어 렌더 순서(아래→위)는 `Page → BelowOverlay → Popup → AboveOverlay`.
+- **씬 전환(activeSceneChanged) 시** UINavigator는 자식 UI 컨텐츠를 전부 clear합니다 — 활성 Presenter를 teardown(`OnBeforeHide`/`OnAfterHide` 발화)하고 진행 중인 큐를 취소하며 **View 풀을 dispose**합니다. **캔버스 자체는 유지**되며, 풀은 다음 표시 때 캔버스 아래에 재구성됩니다.
+- 캔버스는 오직 `UINavigator.Dispose()`(= 소유 루트 스코프 dispose) 시에만 파괴됩니다. 그래서 앱 전체 단일 인스턴스가 되려면 지속되는 **프로젝트 루트 LifetimeScope**에 등록해야 합니다.
 - 예외적으로 캔버스 GameObject가 외부에서 파괴되면(fake-null) 참조를 버리고 다음 표시에서 재구성합니다.
 
 ---
@@ -173,7 +173,7 @@ Page와 Overlay는 전면 배경이 없으므로 빈 영역의 입력이 자연�
 [UIPrefab("MenuPage")]
 public class MenuPage : UIPagePresenter<MenuPageView>
 {
-    [Inject] private IUIService _ui;
+    [Inject] private IUINavigator _ui;
 
     protected override void OnInitialize()
     {
@@ -210,7 +210,7 @@ _ui.Page<StagePage>()
 
 ## API
 
-### `IUIService`
+### `IUINavigator`
 
 | 멤버 | 시그니처 | 설명 |
 | --- | --- | --- |
@@ -219,7 +219,7 @@ _ui.Page<StagePage>()
 | `Popup<T>` | `T Popup<T>() where T : UIPresenter` | Popup(스택) 모드로 표시. |
 | `Overlay<T>` | `T Overlay<T>() where T : UIPresenter` | Overlay(상주) 모드로 표시. |
 
-구현체 `UIService`는 `IUIService`, `IDisposable`을 구현하며 `RegisterUIService`로 등록합니다(생성자는 internal).
+구현체 `UINavigator`는 `IUINavigator`, `IDisposable`을 구현하며 `RegisterUINavigator`로 등록합니다(생성자는 internal).
 
 ### Presenter 기반 타입
 
@@ -285,12 +285,12 @@ _ui.Page<StagePage>()
 
 ### DI / 설정
 
-- `void RegisterUIService(this IContainerBuilder builder, UIServiceSettings settings)` — UIService 등록 확장(`UIServiceSettings`/`UIInstanceFactory`/`UIService as IUIService` 등록).
+- `void RegisterUINavigator(this IContainerBuilder builder, UINavigatorSettings settings)` — UINavigator 등록 확장(`UINavigatorSettings`/`UIInstanceFactory`/`UINavigator as IUINavigator` 등록).
   **전제: 호출 전에 `IResourceService`가 등록되어 있어야 합니다.**
 - **주입 대상**: Presenter는 생성 시(`UIInstanceFactory`), View는 프리팹 인스턴스 생성 시 계층 전체의 MonoBehaviour가 주입됩니다(`InjectGameObject`). 둘 다 `[Inject]` 필드를 쓸 수 있습니다.
   - View 주입은 **풀 인스턴스당 1회**입니다. 풀에서 재사용될 때는 다시 주입되지 않습니다(씬 전환 시 풀이 dispose되므로 다음 표시에서 새로 생성·주입됩니다).
-  - UIService는 루트 스코프에 등록되므로 Presenter/View 모두 **루트 스코프 의존만** 해석됩니다.
-- `UIServiceSettings`(ScriptableObject) — `RootPrefab`(`UIRoot`) **하나만** 제공합니다. 캔버스 렌더 모드, `CanvasScaler`(스케일 모드/기준 해상도), 레이어 구성은 전부 이 프리팹이 결정합니다. `Tools/FoundationDI/UI/Create UI Root Prefab`으로 만듭니다(자세한 절차는 위 [에디터 워크플로](#에디터-워크플로-디자이너용) 참고). 비워두면 `UIRoot.CreateDefault()`가 조립한 코드 기본값(ScreenSpaceOverlay / Scale With Screen Size + Expand / 1920×1080)으로 폴백합니다.
+  - UINavigator는 루트 스코프에 등록되므로 Presenter/View 모두 **루트 스코프 의존만** 해석됩니다.
+- `UINavigatorSettings`(ScriptableObject) — `RootPrefab`(`UIRoot`) **하나만** 제공합니다. 캔버스 렌더 모드, `CanvasScaler`(스케일 모드/기준 해상도), 레이어 구성은 전부 이 프리팹이 결정합니다. `Tools/FoundationDI/UI/Create UI Root Prefab`으로 만듭니다(자세한 절차는 위 [에디터 워크플로](#에디터-워크플로-디자이너용) 참고). 비워두면 `UIRoot.CreateDefault()`가 조립한 코드 기본값(ScreenSpaceOverlay / Scale With Screen Size + Expand / 1920×1080)으로 폴백합니다.
 
 ---
 
@@ -315,17 +315,17 @@ _ui.Page<StagePage>()
 
 ### 정리(Dispose)
 
-- `UIService.Dispose()`는 `activeSceneChanged` 구독을 해제하고, 진행 중 큐를 취소하며, 활성 Presenter를 전부 teardown하고 View 풀을 dispose한 뒤 상주 캔버스를 파괴합니다. 보통 DI 컨테이너(루트 스코프)가 수명을 관리합니다.
+- `UINavigator.Dispose()`는 `activeSceneChanged` 구독을 해제하고, 진행 중 큐를 취소하며, 활성 Presenter를 전부 teardown하고 View 풀을 dispose한 뒤 상주 캔버스를 파괴합니다. 보통 DI 컨테이너(루트 스코프)가 수명을 관리합니다.
 
 ### 테스트
 
-- **EditMode** (`Tests/Editor/UIService`): `DIRegistrationTests` · `ModeControllerTests` · `NoopTransitionTests` · `OperationQueueTests` · `PresenterLifecycleTests` · `UIInstanceFactoryTests` · `UIPrefabKeyResolverTests` · `UIServiceSettingsTests` · `UIViewPoolLifecycleTests`, 그리고 에디터 도구용 `UIElementCreationRequestTests` · `UIElementCreationSettingsTests` · `UIElementNamingTests` · `UIElementPrefabBuilderTests` · `UIElementTemplatesTests` · `UIRootPrefabCreatorTests`.
-- **PlayMode** (`Tests/Runtime/UIService`): `FadeTransitionTests` · `ScaleTransitionTests` · `SlideTransitionTests` · `UIRootTests` · `UIServiceFlowTests` · `UIServiceRootPrefabTests` · `UIServiceSceneResetTests` · `UIServiceViewInjectionTests` · `UIServiceWithOverlayTests` · `UIViewTests` · `UIViewTransitionResolveTests` (공용 헬퍼 `TransitionTestHelpers`).
+- **EditMode** (`Tests/Editor/UINavigator`): `DIRegistrationTests` · `ModeControllerTests` · `NoopTransitionTests` · `OperationQueueTests` · `PresenterLifecycleTests` · `UIInstanceFactoryTests` · `UIPrefabKeyResolverTests` · `UINavigatorSettingsTests` · `UIViewPoolLifecycleTests`, 그리고 에디터 도구용 `UIElementCreationRequestTests` · `UIElementCreationSettingsTests` · `UIElementNamingTests` · `UIElementPrefabBuilderTests` · `UIElementTemplatesTests` · `UIRootPrefabCreatorTests`.
+- **PlayMode** (`Tests/Runtime/UINavigator`): `FadeTransitionTests` · `ScaleTransitionTests` · `SlideTransitionTests` · `UIRootTests` · `UINavigatorFlowTests` · `UINavigatorRootPrefabTests` · `UINavigatorSceneResetTests` · `UINavigatorViewInjectionTests` · `UINavigatorWithOverlayTests` · `UIViewTests` · `UIViewTransitionResolveTests` (공용 헬퍼 `TransitionTestHelpers`).
 - 프리팹 로드는 `IResourceService`를 NSubstitute로 대체해 가짜 프리팹을 주입합니다.
 
 ### 한계 / 후속 과제
 
-- 상주 캔버스 단일 인스턴스는 UIService를 지속 루트 스코프에 등록했을 때만 보장됩니다(자식 스코프에 등록하면 스코프 dispose 시 캔버스가 파괴됨).
+- 상주 캔버스 단일 인스턴스는 UINavigator를 지속 루트 스코프에 등록했을 때만 보장됩니다(자식 스코프에 등록하면 스코프 dispose 시 캔버스가 파괴됨).
 - 큐 작업 중 발생한 예외는 로그로 남지만 대기 중인 호출자에게 전파되지는 않습니다.
 - 메인 스레드 전제(스레드 안전성 없음).
 
@@ -333,10 +333,10 @@ _ui.Page<StagePage>()
 
 ## 마이그레이션 (0.3.0 → 0.4.0)
 
-**BREAKING:** `UIServiceSettings.ReferenceResolution`이 제거되고 `RootPrefab`으로 대체되었습니다.
+**BREAKING:** `UINavigatorSettings.ReferenceResolution`이 제거되고 `RootPrefab`으로 대체되었습니다.
 
 1. `Tools/FoundationDI/UI/Create UI Root Prefab`으로 루트 프리팹을 만듭니다.
 2. 그 프리팹의 `CanvasScaler`에 기존에 쓰던 기준 해상도를 설정합니다.
-3. `UIServiceSettings`의 **Root Prefab**에 연결합니다.
+3. `UINavigatorSettings`의 **Root Prefab**에 연결합니다.
 
 연결하지 않아도 동작은 하지만, 기준 해상도가 코드 기본값(1920x1080)으로 폴백합니다.

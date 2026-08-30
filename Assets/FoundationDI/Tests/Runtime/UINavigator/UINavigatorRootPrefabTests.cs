@@ -8,7 +8,7 @@ using UnityEngine.UI;
 using VContainer;
 using DarkNaku.FoundationDI;
 
-public class UIServiceRootPrefabTests
+public class UINavigatorRootPrefabTests
 {
     public class V : UIView { }
 
@@ -45,17 +45,17 @@ public class UIServiceRootPrefabTests
         if (_rootTemplate != null) Object.DestroyImmediate(_rootTemplate.GO);
     }
 
-    private UIService CreateService(UIServiceSettings settings)
+    private UINavigator CreateService(UINavigatorSettings settings)
     {
         var resource = Substitute.For<IResourceService>();
         resource.Load<GameObject>("UI/RootPrefabSample").Returns(_viewPrefab);
-        return new UIService(settings, new UIInstanceFactory(Substitute.For<IObjectResolver>()), resource);
+        return new UINavigator(settings, new UIInstanceFactory(Substitute.For<IObjectResolver>()), resource);
     }
 
     [UnityTest]
     public IEnumerator Settings에_루트프리팹이_지정되면_그_프리팹을_인스턴스화한다() => AwaitableTest.Run(async () =>
     {
-        var settings = ScriptableObject.CreateInstance<UIServiceSettings>();
+        var settings = ScriptableObject.CreateInstance<UINavigatorSettings>();
         settings.RootPrefab = _rootTemplate;
 
         var service = CreateService(settings);
@@ -77,11 +77,11 @@ public class UIServiceRootPrefabTests
     [UnityTest]
     public IEnumerator Settings에_루트프리팹이_없으면_코드_기본값으로_폴백한다() => AwaitableTest.Run(async () =>
     {
-        var settings = ScriptableObject.CreateInstance<UIServiceSettings>();
+        var settings = ScriptableObject.CreateInstance<UINavigatorSettings>();
 
         // RootPrefab 미지정은 0.3.0→0.4.0 마이그레이션의 사각지대라 컴파일 에러 없이 조용히
         // 폴백한다 — 그래서 반드시 경고를 남겨야 한다(Finding 2).
-        LogAssert.Expect(LogType.Warning, new Regex(@"\[UIService\].*RootPrefab"));
+        LogAssert.Expect(LogType.Warning, new Regex(@"\[UINavigator\].*RootPrefab"));
 
         var service = CreateService(settings);
         var p = service.Page<P>();
@@ -104,10 +104,10 @@ public class UIServiceRootPrefabTests
         // 검증이 없으면 UI가 조용히 씬 루트로 떨어져 화면에서 사라진다(Finding 1).
         Object.DestroyImmediate(_rootTemplate.PageLayer.gameObject);
 
-        var settings = ScriptableObject.CreateInstance<UIServiceSettings>();
+        var settings = ScriptableObject.CreateInstance<UINavigatorSettings>();
         settings.RootPrefab = _rootTemplate;
 
-        LogAssert.Expect(LogType.Error, new Regex(@"\[UIService\].*PageLayer"));
+        LogAssert.Expect(LogType.Error, new Regex(@"\[UINavigator\].*PageLayer"));
 
         var service = CreateService(settings);
         var p = service.Page<P>();

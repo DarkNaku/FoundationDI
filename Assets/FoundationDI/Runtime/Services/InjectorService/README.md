@@ -104,7 +104,7 @@ public class UIButton : Button
 양쪽 모두 대상마다 `try/catch`로 감싸고 `Debug.LogException`으로 남긴 뒤 계속 진행합니다.
 
 예외를 삼키는 것이 아니라 **치명적이지 않게** 만드는 것입니다 — 콘솔에는 그대로 에러로 뜹니다.
-`MessageService`의 핸들러 예외 격리, `UIService`의 `OperationQueue`와 같은 방침입니다.
+`MessageService`의 핸들러 예외 격리, `UINavigator`의 `OperationQueue`와 같은 방침입니다.
 
 격리가 없으면 피해가 번집니다.
 

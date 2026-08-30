@@ -27,7 +27,7 @@ namespace DarkNaku.FoundationDI.Samples
     [UIPrefab("OverlayHost")]
     public class OverlayHostPage : UIPagePresenter<OverlayHostView>
     {
-        [Inject] private IUIService _ui;
+        [Inject] private IUINavigator _ui;
         private HudAboveOverlay _hud;
 
         protected override void OnBeforeShow()
@@ -48,8 +48,8 @@ namespace DarkNaku.FoundationDI.Samples
 
     public class OverlayDemo : IStartable
     {
-        private readonly IUIService _ui;
-        public OverlayDemo(IUIService ui) => _ui = ui;
+        private readonly IUINavigator _ui;
+        public OverlayDemo(IUINavigator ui) => _ui = ui;
 
         public void Start()
         {

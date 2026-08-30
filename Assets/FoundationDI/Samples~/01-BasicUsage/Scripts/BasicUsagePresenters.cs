@@ -9,7 +9,7 @@ namespace DarkNaku.FoundationDI.Samples
     [UIPrefab("MainMenu")]
     public class MainMenuPage : UIPagePresenter<MainMenuView>
     {
-        [Inject] private IUIService _ui;
+        [Inject] private IUINavigator _ui;
 
         protected override void OnBeforeShow()
         {
@@ -27,7 +27,7 @@ namespace DarkNaku.FoundationDI.Samples
     [UIPrefab("SettingsPopup")]
     public class SettingsPopup : UIPopupPresenter<SettingsView>
     {
-        [Inject] private IUIService _ui;
+        [Inject] private IUINavigator _ui;
 
         protected override void OnBeforeShow()
         {
@@ -58,8 +58,8 @@ namespace DarkNaku.FoundationDI.Samples
 
     public class BasicUsageDemo : IStartable
     {
-        private readonly IUIService _ui;
-        public BasicUsageDemo(IUIService ui) => _ui = ui;
+        private readonly IUINavigator _ui;
+        public BasicUsageDemo(IUINavigator ui) => _ui = ui;
         public void Start() => _ui.Page<MainMenuPage>();
     }
 }

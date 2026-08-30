@@ -52,7 +52,7 @@ public class UIRootTests
         var root = UIRoot.CreateDefault();
 
         Assert.AreNotEqual("DontDestroyOnLoad", root.GO.scene.name,
-            "상주화는 UIService의 책임이다. 에디터 프리팹 조립에도 쓰이므로 여기서 하면 안 된다.");
+            "상주화는 UINavigator의 책임이다. 에디터 프리팹 조립에도 쓰이므로 여기서 하면 안 된다.");
 
         Object.DestroyImmediate(root.GO);
     }

@@ -7,7 +7,7 @@ namespace FoundationDI.Host
     [UIPrefab("GamePage")]
     public class GamePage : UIPagePresenter<GamePageView>
     {
-        [Inject] private IUIService _ui;
+        [Inject] private IUINavigator _ui;
 
         protected override void OnInitialize()
         {

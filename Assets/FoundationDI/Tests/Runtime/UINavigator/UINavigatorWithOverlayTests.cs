@@ -6,7 +6,7 @@ using UnityEngine.TestTools;
 using VContainer;
 using DarkNaku.FoundationDI;
 
-public class UIServiceWithOverlayTests
+public class UINavigatorWithOverlayTests
 {
     public class HostV : UIView { }
 
@@ -54,9 +54,9 @@ public class UIServiceWithOverlayTests
         resource.Load<GameObject>("UI/WithOvHost").Returns(_hostPrefab);
         resource.Load<GameObject>("UI/WithOvOverlay").Returns(_ovPrefab);
         var resolver = Substitute.For<IObjectResolver>();
-        var settings = ScriptableObject.CreateInstance<UIServiceSettings>();
+        var settings = ScriptableObject.CreateInstance<UINavigatorSettings>();
         var factory = new UIInstanceFactory(resolver);
-        var manager = new UIService(settings, factory, resource);
+        var manager = new UINavigator(settings, factory, resource);
 
         // 빌더 메서드는 카테고리 베이스(UIPagePresenter<HostV>)를 반환하므로
         // 구체 프레젠터(HostP) 참조를 유지하기 위해 분리 호출한다.
@@ -88,9 +88,9 @@ public class UIServiceWithOverlayTests
         resource.Load<GameObject>("UI/WithOvHost").Returns(_hostPrefab);
         resource.Load<GameObject>("UI/WithOvOverlay").Returns(_ovPrefab);
         var resolver = Substitute.For<IObjectResolver>();
-        var settings = ScriptableObject.CreateInstance<UIServiceSettings>();
+        var settings = ScriptableObject.CreateInstance<UINavigatorSettings>();
         var factory = new UIInstanceFactory(resolver);
-        var manager = new UIService(settings, factory, resource);
+        var manager = new UINavigator(settings, factory, resource);
 
         var a = manager.Page<HostP>();
         a.WithOverlay<OvP>(persistent: true);
@@ -116,9 +116,9 @@ public class UIServiceWithOverlayTests
         resource.Load<GameObject>("UI/WithOvHost").Returns(_hostPrefab);
         resource.Load<GameObject>("UI/WithOvOverlay").Returns(_ovPrefab);
         var resolver = Substitute.For<IObjectResolver>();
-        var settings = ScriptableObject.CreateInstance<UIServiceSettings>();
+        var settings = ScriptableObject.CreateInstance<UINavigatorSettings>();
         var factory = new UIInstanceFactory(resolver);
-        var manager = new UIService(settings, factory, resource);
+        var manager = new UINavigator(settings, factory, resource);
 
         var a = manager.Page<HostP>();
         a.WithOverlay<OvP>(); // 기본(non-persistent)

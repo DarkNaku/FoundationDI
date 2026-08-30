@@ -5,7 +5,7 @@
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Author](https://img.shields.io/badge/author-DarkNaku-orange)
 
-> **0.4.0 BREAKING** — `UIServiceSettings.ReferenceResolution`이 제거되고 루트 캔버스 프리팹 참조(`RootPrefab`)로 대체되었습니다. 업그레이드 절차는 [UIService 마이그레이션](Runtime/Services/UIService/README.md#마이그레이션-030--040)을 참고하세요. 조치하지 않으면 기준 해상도가 코드 기본값(1920x1080)으로 폴백합니다.
+> **0.4.0 BREAKING** — `UINavigatorSettings.ReferenceResolution`이 제거되고 루트 캔버스 프리팹 참조(`RootPrefab`)로 대체되었습니다. 업그레이드 절차는 [UINavigator 마이그레이션](Runtime/Services/UINavigator/README.md#마이그레이션-030--040)을 참고하세요. 조치하지 않으면 기준 해상도가 코드 기본값(1920x1080)으로 폴백합니다.
 
 DI(의존성 주입) 기반 Unity 게임 개발 파운데이션 패키지입니다. [VContainer](https://github.com/hadashiA/VContainer)를 코어로 Addressables와 Unity `Awaitable`을 조합한 공통 서비스 계층(메시징·리소스·UI·풀·사운드·햅틱·초기화·광고·분석·인앱결제·튜토리얼)을 제공합니다. 각 서비스는 인터페이스(`IXxxService`)로 등록되어 생성자 주입으로 소비되며, 외부 의존(Addressables 등)은 seam으로 분리되어 EditMode 단위 테스트가 가능합니다.
 
@@ -64,7 +64,7 @@ FoundationDI는 다음 패키지를 전제로 합니다. 먼저 설치되어 있
 
 ## 빠른 시작
 
-VContainer의 루트 `LifetimeScope`에서 서비스를 등록합니다. 등록 순서에 주의합니다 — UIService는 프리팹 로드를 `IResourceService`에 위임하므로 `RegisterUIService` **전에** `IResourceService`가 등록되어야 합니다.
+VContainer의 루트 `LifetimeScope`에서 서비스를 등록합니다. 등록 순서에 주의합니다 — UINavigator는 프리팹 로드를 `IResourceService`에 위임하므로 `RegisterUINavigator` **전에** `IResourceService`가 등록되어야 합니다.
 
 ```csharp
 using UnityEngine;
@@ -74,13 +74,13 @@ using DarkNaku.FoundationDI;
 
 public class RootLifetimeScope : LifetimeScope
 {
-    [SerializeField] private UIServiceSettings _uiSettings;
+    [SerializeField] private UINavigatorSettings _uiSettings;
 
     protected override void Configure(IContainerBuilder builder)
     {
         builder.Register<IResourceProvider, ResourcesProvider>(Lifetime.Singleton);
         builder.Register<IResourceService, ResourceService>(Lifetime.Singleton);
-        builder.RegisterUIService(_uiSettings);
+        builder.RegisterUINavigator(_uiSettings);
         builder.RegisterInjector();   // 씬 배치 컴포넌트 주입(UIButton 등)
         builder.RegisterInitializeService();
 
@@ -100,8 +100,8 @@ public class RootLifetimeScope : LifetimeScope
 ```csharp
 public class TitleFlow
 {
-    private readonly IUIService _ui;
-    public TitleFlow(IUIService ui) => _ui = ui;
+    private readonly IUINavigator _ui;
+    public TitleFlow(IUINavigator ui) => _ui = ui;
 
     public void Open() => _ui.Page<TitlePresenter>();
 }
@@ -113,7 +113,7 @@ public class TitleFlow
 
 | 구성 요소 | 설명 | 상세 문서 |
 | --- | --- | --- |
-| **UIService** | uGUI 기반 UI 표시/전환 시스템. Presenter 타입으로 Page(단일 교체)/Popup(LIFO·모달)/Overlay(상주 Above/Below) 모드를 고정. **게임 전역 단일 상주 Canvas**(`DontDestroyOnLoad`, 렌더 모드/CanvasScaler는 `UIServiceSettings.RootPrefab`이 결정·미지정 시 ScreenSpaceOverlay/1920x1080 폴백, 씬 전환 시 자식만 clear), Presenter 매 표시 재생성 + **View 풀링**, `Awaitable` 트랜지션, 모달 입력 차단(`CanvasGroup.interactable`). Page/Popup에 `WithOverlay`(오버레이 동시 노출·`persistent` 연속 유지)와 자동-show 빌더 API 제공. 프리팹 로딩은 `IResourceService`(Resources/Addressables)에 위임. | [README](Runtime/Services/UIService/README.md) |
+| **UINavigator** | uGUI 기반 UI 표시/전환 시스템. Presenter 타입으로 Page(단일 교체)/Popup(LIFO·모달)/Overlay(상주 Above/Below) 모드를 고정. **게임 전역 단일 상주 Canvas**(`DontDestroyOnLoad`, 렌더 모드/CanvasScaler는 `UINavigatorSettings.RootPrefab`이 결정·미지정 시 ScreenSpaceOverlay/1920x1080 폴백, 씬 전환 시 자식만 clear), Presenter 매 표시 재생성 + **View 풀링**, `Awaitable` 트랜지션, 모달 입력 차단(`CanvasGroup.interactable`). Page/Popup에 `WithOverlay`(오버레이 동시 노출·`persistent` 연속 유지)와 자동-show 빌더 API 제공. 프리팹 로딩은 `IResourceService`(Resources/Addressables)에 위임. | [README](Runtime/Services/UINavigator/README.md) |
 | **Components** | 씬 저작용 uGUI 위젯. `UIButton`(클릭 시 SFX 재생 + 햅틱 `Impact`, 두 서비스 모두 선택적)과, 상태(Normal/Highlighted/Pressed/Selected/Disabled)별로 여러 `Image`/텍스트를 동시에 스왑하는 `UIStateButton`. 스왑은 `그 상태 → Normal → 기준값 → 안 씀` 4단으로 해석되어 상태를 벗어나면 원래 값으로 돌아온다. `SoundButton`을 대체한다. | [README](Runtime/Components/README.md) |
 | **ResourceService** | Addressables 추상화. `LoadAsync`/`Load`/`Release`/`Dispose` API로 키 단위 캐싱 + 참조 카운팅. 에셋 로딩이 필요한 모든 서비스의 위임 대상. | [README](Runtime/Services/ResourceService/README.md) |
 | **MessageService** | 외부 라이브러리 없는 인-메모리 pub-sub. 타입을 채널로 삼아 `Publish<T>`/`Subscribe<T>`만 제공하며, 구독 토큰은 `IDisposable`(R3를 쓴다면 `AddTo`로 MonoBehaviour 수명에 바인딩 가능). 발행은 스냅샷으로 완주하고 핸들러 예외는 격리한다. 메인 스레드 전제. | [README](Runtime/Services/MessageService/README.md) |
@@ -125,7 +125,7 @@ public class TitleFlow
 | **AnalyticsService** | 다중 분석/MMP 팬아웃. 게임이 `IAnalyticsService` API를 한 번 호출하면 등록된 모든 provider로 브로드캐스트된다. 라우팅 규칙 없음(무엇을 무시할지는 어댑터가 결정), 초기화 전 이벤트는 순서 보존 버퍼링·유저 상태는 latest-wins, provider 예외는 격리. | [README](Runtime/Services/AnalyticsService/README.md) |
 | **IAPService** | 모바일 인앱 구매(Google Play/App Store). 소모성·비소모성을 `IIapService` 하나로 구매·복원. **지급을 저장한 뒤에만 확정**하는 규율을 `IIapFulfillment` seam 하나로 접어, 신규 구매·재전달·복원이 전부 같은 메서드로 들어온다. 로컬 영수증 검증(Google Play)·상품 상수 생성기 포함. | [README](Runtime/Services/IAPService/README.md) |
 | **InjectorService** | 씬에 배치된 MonoBehaviour에 의존성을 주입하는 인프라. 정적 요청 큐 + EntryPoint로 위치·계층·순서에 무관하게 주입. `InjectableBehaviour` 베이스 상속으로 사용. | [README](Runtime/Services/InjectorService/README.md) |
-| **TutorialManager** | 조건 기반 튜토리얼 진행 엔진. 시퀀스는 순차 리스트가 아니라 각자 `StartTrigger`(Auto/Manual/ButtonClick/`MessageTrigger<T>`)로 발동하는 **조건부 후보 집합**이고, 진행도는 인덱스가 아닌 **시퀀스 ID**로 영속화해 시퀀스를 추가·삭제해도 기존 유저 진행도가 어긋나지 않는다. 진행 규칙은 순수 C#(EditMode 테스트 가능) + 얇은 씬 오써링 어댑터로 분리. 타깃은 씬 오브젝트 직접 참조 또는 키(`TutorialTarget`)로 지정해 **UIService가 런타임 생성한 UI도 하이라이트**할 수 있다. 연출은 `ITutorialModule` seam + 기본 2종. | [README](Runtime/Managers/TutorialManager/README.md) |
+| **TutorialManager** | 조건 기반 튜토리얼 진행 엔진. 시퀀스는 순차 리스트가 아니라 각자 `StartTrigger`(Auto/Manual/ButtonClick/`MessageTrigger<T>`)로 발동하는 **조건부 후보 집합**이고, 진행도는 인덱스가 아닌 **시퀀스 ID**로 영속화해 시퀀스를 추가·삭제해도 기존 유저 진행도가 어긋나지 않는다. 진행 규칙은 순수 C#(EditMode 테스트 가능) + 얇은 씬 오써링 어댑터로 분리. 타깃은 씬 오브젝트 직접 참조 또는 키(`TutorialTarget`)로 지정해 **UINavigator가 런타임 생성한 UI도 하이라이트**할 수 있다. 연출은 `ITutorialModule` seam + 기본 2종. | [README](Runtime/Managers/TutorialManager/README.md) |
 
 > 상세 문서가 아직 없는 구성 요소는 소스(`Runtime/Services/<이름>/`)와 인터페이스(`IXxxService`)를 참고하세요.
 

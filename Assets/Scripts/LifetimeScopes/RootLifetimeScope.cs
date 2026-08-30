@@ -6,8 +6,8 @@ using VContainer.Unity;
 
 public class RootLifetimeScope : LifetimeScope
 {
-    // 인스펙터에서 Assets/Settings/UIServiceSettings.asset 을 연결한다.
-    public UIServiceSettings settings;
+    // 인스펙터에서 Assets/Settings/UINavigatorSettings.asset 을 연결한다.
+    public UINavigatorSettings settings;
 
     // 인스펙터에서 Assets/Settings/AdServiceSettings.asset 을 연결한다.
     [SerializeField] private AdServiceSettings _adServiceSettings;
@@ -29,7 +29,7 @@ public class RootLifetimeScope : LifetimeScope
         // 씬에 직접 배치된 컴포넌트(TutorialSequenceBehaviour/TutorialTarget 등)의 주입 경로.
         builder.RegisterInjector();
 
-        builder.RegisterUIService(settings);
+        builder.RegisterUINavigator(settings);
         builder.RegisterHapticService();
         builder.RegisterInitializeService();
         builder.RegisterAdService(_adServiceSettings);
