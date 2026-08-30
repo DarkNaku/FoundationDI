@@ -38,12 +38,17 @@ namespace DarkNaku.FoundationDI
         public UIImageStateValue Selected;
         public UIImageStateValue Disabled;
 
+        [NonSerialized] private bool _baselineCaptured;
+        [NonSerialized] private UIImageStateValue _baseline;
+
         /// <summary>
-        /// 상태를 적용한다. 필드마다 "그 상태 → Normal → 안 씀" 3단으로 값을 고른다.
+        /// 상태를 적용한다. 필드마다 "그 상태 → Normal → 기준값 → 안 씀" 순으로 값을 고른다.
         /// </summary>
         public void Apply(UIButtonState state)
         {
             if (Target == null) return;
+
+            CaptureBaseline();
 
             if (TryResolve(state, UIImageSwap.Sprite, out var sprite)) Target.sprite = sprite.Sprite;
             if (TryResolve(state, UIImageSwap.Color, out var color)) Target.color = color.Color;
@@ -62,10 +67,40 @@ namespace DarkNaku.FoundationDI
             }
         }
 
+        /// <summary>
+        /// 첫 <see cref="Apply"/> 시점의 타깃 값을 복원 기준으로 잡는다. 그 시점엔 아직 이 세트가
+        /// 아무것도 쓰지 않았으므로 프리팹 값이다. <c>[NonSerialized]</c>라 프리팹 인스턴스마다
+        /// 새로 잡히고, View가 풀에서 재사용돼도 세트 객체가 살아 있는 한 다시 잡지 않는다.
+        /// </summary>
+        private void CaptureBaseline()
+        {
+            if (_baselineCaptured) return;
+
+            _baselineCaptured = true;
+            _baseline = new UIImageStateValue
+            {
+                Override = UIImageSwap.Sprite | UIImageSwap.Color | UIImageSwap.Visible,
+                Sprite = Target.sprite,
+                Color = Target.color,
+                Visible = Target.enabled,
+            };
+        }
+
+        private UIImageSwap AllOverrides() =>
+            Normal.Override | Highlighted.Override | Pressed.Override | Selected.Override | Disabled.Override;
+
         // 폴백 대상이 Normal인 것이 핵심이다. "가장 가까운 상태"(Selected→Highlighted)로
         // 떨어뜨리면 모바일에서 탭한 버튼이 계속 하이라이트된 채 남는다.
         private bool TryResolve(UIButtonState state, UIImageSwap field, out UIImageStateValue value)
         {
+            // 아무 상태도 이 필드를 관리하지 않으면 손대지 않는다.
+            // 외부 코드가 런타임에 바꾼 값을 기준값으로 되돌려 버리지 않기 위해서다.
+            if ((AllOverrides() & field) == 0)
+            {
+                value = default;
+                return false;
+            }
+
             var current = Get(state);
 
             if ((current.Override & field) != 0)
@@ -80,8 +115,11 @@ namespace DarkNaku.FoundationDI
                 return true;
             }
 
-            value = default;
-            return false;
+            // 다른 상태는 이 필드를 오버라이드하는데 지금 상태와 Normal은 아닌 경우다.
+            // 기준값으로 되돌리지 않으면 그 상태를 벗어나도 값이 그대로 남는다
+            // (예: Highlighted만 색을 지정하면 호버를 벗어나도 색이 유지된다).
+            value = _baseline;
+            return true;
         }
     }
 }

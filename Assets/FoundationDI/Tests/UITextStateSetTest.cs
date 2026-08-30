@@ -115,4 +115,21 @@ public class UITextStateSetTest
 
         Assert.DoesNotThrow(() => set.Apply(UIButtonState.Normal));
     }
+
+    [Test]
+    public void 텍스트도_Normal이_오버라이드하지_않는_필드가_기준값으로_돌아온다()
+    {
+        _tmp.text = "시작";                                  // 프리팹 값
+        var set = new UITextStateSet { Target = _tmp };
+        set.Normal = new UITextStateValue { Override = UITextSwap.None };
+        set.Disabled = new UITextStateValue { Override = UITextSwap.Text, Text = "잠김" };
+
+        set.Apply(UIButtonState.Normal);
+        set.Apply(UIButtonState.Disabled);
+        Assert.AreEqual("잠김", _tmp.text);
+
+        set.Apply(UIButtonState.Normal);
+
+        Assert.AreEqual("시작", _tmp.text);
+    }
 }

@@ -41,9 +41,17 @@ namespace DarkNaku.FoundationDI
         public UITextStateValue Selected;
         public UITextStateValue Disabled;
 
+        [NonSerialized] private bool _baselineCaptured;
+        [NonSerialized] private UITextStateValue _baseline;
+
+        /// <summary>
+        /// 상태를 적용한다. 필드마다 "그 상태 → Normal → 기준값 → 안 씀" 순으로 값을 고른다.
+        /// </summary>
         public void Apply(UIButtonState state)
         {
             if (Target == null) return;
+
+            CaptureBaseline();
 
             if (TryResolve(state, UITextSwap.Text, out var text)) SetText(text.Text);
             if (TryResolve(state, UITextSwap.Color, out var color)) Target.color = color.Color;
@@ -79,8 +87,49 @@ namespace DarkNaku.FoundationDI
             }
         }
 
+        /// <summary>
+        /// 첫 <see cref="Apply"/> 시점의 타깃 값을 복원 기준으로 잡는다.
+        /// <see cref="UIImageStateSet"/>와 같은 규칙이다.
+        /// </summary>
+        private void CaptureBaseline()
+        {
+            if (_baselineCaptured) return;
+
+            _baselineCaptured = true;
+            _baseline = new UITextStateValue
+            {
+                Override = UITextSwap.Text | UITextSwap.Color | UITextSwap.Material,
+                Text = GetText(),
+                Color = Target.color,
+                Material = GetMaterial(),
+            };
+        }
+
+        private string GetText()
+        {
+            switch (Target)
+            {
+                case TMP_Text tmp: return tmp.text;
+                case Text legacy: return legacy.text;
+                default: return null;
+            }
+        }
+
+        private Material GetMaterial() =>
+            Target is TMP_Text tmp ? tmp.fontSharedMaterial : Target.material;
+
+        private UITextSwap AllOverrides() =>
+            Normal.Override | Highlighted.Override | Pressed.Override | Selected.Override | Disabled.Override;
+
         private bool TryResolve(UIButtonState state, UITextSwap field, out UITextStateValue value)
         {
+            // 아무 상태도 이 필드를 관리하지 않으면 손대지 않는다.
+            if ((AllOverrides() & field) == 0)
+            {
+                value = default;
+                return false;
+            }
+
             var current = Get(state);
 
             if ((current.Override & field) != 0)
@@ -95,8 +144,8 @@ namespace DarkNaku.FoundationDI
                 return true;
             }
 
-            value = default;
-            return false;
+            value = _baseline;
+            return true;
         }
     }
 }
