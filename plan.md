@@ -63,7 +63,7 @@ EditMode 범위 밖: Pressed/Highlighted/Selected 매핑은 EventSystem 포인�
 격리는 예외를 삼키는 게 아니라 치명적이지 않게 만든다 — `Debug.LogException`으로 콘솔에는
 그대로 남는다. 저장소에 이미 있는 `OperationQueue.ProcessLoop`와 같은 패턴이다.
 
-## 대기: SoundService 기본 Output
+## 완료: SoundService 기본 Output
 
 `UIButton` 설계 중 확인한 구조적 빈틈이다. SoundService에는 "기본 Output" 개념이 전혀 없다 —
 `SoundServiceSettings`에도 `SoundData`에도 없다. 그래서 Output을 비워 두면
@@ -73,9 +73,12 @@ EditMode 범위 밖: Pressed/Highlighted/Selected 매핑은 EventSystem 포인�
 `SoundServiceSettings`에 `DefaultOutput`을 두고, Output이 비면 SoundService가 그걸로 해석하게 한다.
 `Sound`/`Music`/`Playlist`/`DynamicMusic` 전부가 대상이라 별도 스펙·계획이 필요하다.
 
-- [ ] Output을 지정하지 않으면 설정의 기본 Output으로 재생된다
-- [ ] 기본 Output도 지정되지 않으면 이전처럼 믹서를 우회한다
-- [ ] 명시한 Output이 기본 Output보다 우선한다
+- [x] Output을 지정하지 않으면 설정의 기본 Output으로 해석된다
+- [x] 기본 Output도 지정되지 않으면 이전처럼 믹서를 우회한다
+- [x] 명시한 Output이 기본 Output보다 우선한다
+
+해석 정책은 `SoundService.ResolveOutput`(internal) 순수 메서드로 분리해 AudioMixer 에셋 없이
+EditMode에서 검증한다. 실제 `AudioMixerGroup` 조회가 붙는 경로는 실기 확인 대상이다.
 
 ## 대기: UIStateButton 복원 기준값
 

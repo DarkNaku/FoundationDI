@@ -109,12 +109,12 @@ uGUI가 클릭한 버튼을 선택 상태로 계속 유지하는 성질과 겹�
 바꾸지 않는다. 상태에 따라 굵기나 외곽선처럼 폰트를 바꿔야 표현되는 효과가 필요하면, TMP 표준 방식대로
 Material Preset을 만들어 `Material` 필드로 교체한다.
 
-**주의 4 — `Output`을 비우면 믹서를 우회한다.**
+**주의 4 — `Output`을 비우면 설정의 기본 Output을 탄다.**
 `Output`은 이 클릭음을 어느 `AudioMixerGroup`으로 보낼지 고르는 항목이다. 비워 두면
-`Sound.SetOutput`이 `null`을 그대로 넘기고 `SoundSource`가 `outputAudioMixerGroup`을 `null`로
-세팅해 버려 믹서를 통째로 지나친다. 그 결과 유저가 효과음 볼륨을 0으로 내려도 버튼 클릭음은 그대로
-난다. SoundService에는 아직 "기본 Output" 개념이 없으므로 지금은 반드시 채워야 한다(기본 Output
-지원은 `plan.md`의 대기 항목으로 남아 있다).
+`SoundServiceSettings.DefaultOutput`으로 해석된다. **그 기본값도 비어 있으면** `SoundSource`가
+`outputAudioMixerGroup`을 `null`로 세팅해 믹서를 통째로 지나치고, 그러면 유저가 효과음 볼륨을 0으로
+내려도 버튼 클릭음은 그대로 난다. UI 클릭음이 볼륨 설정을 따르게 하려면 버튼의 `Output`을 채우거나
+`SoundServiceSettings`의 `Default Output`을 지정한다.
 
 **주의 5 — `_sfx`/`_volume`/`_output`은 첫 클릭 이후 런타임 변경이 반영되지 않는다.**
 `UIButton`은 첫 클릭 시 `Sound`를 한 번 빌드해 `_sound` 필드에 캐싱하고, 이후 클릭은 그 인스턴스의
@@ -249,6 +249,5 @@ EditMode 범위 밖: `Pressed`/`Highlighted`/`Selected`로의 실제 전이는 `
 
 ## 한계 / 후속 과제
 
-- SoundService에 "기본 Output" 개념이 없어 `Output`을 비우면 믹서를 우회한다(위 주의 4). 별도 계획
-  대상(`plan.md`).
+- `Output`과 `SoundServiceSettings.DefaultOutput`이 둘 다 비면 믹서를 우회한다(위 주의 4).
 - 폰트 에셋 자체는 스왑 대상이 아니다(위 주의 3).
