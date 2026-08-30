@@ -2,7 +2,8 @@
     "name": "FoundationDI.Editor",
     "rootNamespace": "",
     "references": [
-        "FoundationDI"
+        "FoundationDI",
+        "UnityEditor.UI"
     ],
     "includePlatforms": [
         "Editor"

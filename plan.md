@@ -6,6 +6,90 @@
 
 ---
 
+## 완료: UIButton / UIStateButton
+
+uGUI Button을 상속한 피드백 버튼(사운드+햅틱)과, 상태별로 여러 Image/Text를 스왑하는 버튼.
+스왑 세트는 Selectable을 모르는 순수 타입이라 EditMode에서 단독으로 테스트된다.
+
+세부: `docs/superpowers/specs/2026-08-30-ui-button-design.md`
+계획: `docs/superpowers/plans/2026-08-30-ui-button.md`
+
+- [x] 상태가 필드를 오버라이드하면 그 상태의 값을 쓴다
+- [x] 상태가 오버라이드하지 않으면 Normal 값으로 떨어진다
+- [x] Normal도 오버라이드하지 않으면 그 필드를 건드리지 않는다
+- [x] Selected를 지정하지 않으면 Normal로 떨어진다
+- [x] 색만 오버라이드하면 스프라이트는 원본 그대로다
+- [x] 타깃이 null이면 예외 없이 아무 일도 하지 않는다
+- [x] Visible 오버라이드는 타깃의 enabled를 바꾼다
+- [x] TMP 타깃의 문자열이 바뀐다
+- [x] 레거시 Text 타깃의 문자열이 바뀐다
+- [x] 색은 타깃 종류와 무관하게 Graphic.color에 들어간다
+- [x] TMP 머티리얼은 fontSharedMaterial에 들어간다
+- [x] 레거시 Text 머티리얼은 material에 들어간다
+- [x] 텍스트 세트도 Selected 미지정이면 Normal로 떨어진다
+- [x] 텍스트 타깃이 null이면 예외 없이 아무 일도 하지 않는다
+- [x] 서비스가 하나도 등록되지 않아도 클릭이 예외를 내지 않는다
+- [x] 햅틱서비스가 등록되지 않아도 주입이 예외를 내지 않는다
+- [x] 사운드서비스가 등록되면 클릭시 지정한 SFX로 사운드를 만든다
+- [x] SFX를 지정하지 않으면 사운드를 만들지 않는다
+- [x] 햅틱을 켜면 클릭시 지정한 강도로 Impact를 부른다
+- [x] 햅틱을 끄면 클릭해도 Impact를 부르지 않는다
+- [x] SFX가 지정됐는데 사운드서비스가 없으면 한 번만 경고한다
+- [x] ApplyState에 각 상태를 넣으면 세트가 그 상태로 적용된다
+- [x] interactable을 끄면 Disabled 세트가 적용된다
+- [x] interactable을 다시 켜면 Normal 세트가 적용된다
+- [x] 세트가 비어도 상태 전이가 예외를 내지 않는다
+- [x] 텍스트 세트도 함께 적용된다
+
+EditMode 범위 밖: Pressed/Highlighted/Selected 매핑은 EventSystem 포인터 시뮬레이션이
+필요하다. Disabled 경로로 switch 배선은 확인되고, 나머지는 플레이 모드 확인으로 대신한다.
+
+---
+
+## 대기: InjectorService/PoolManager 주입 실패 격리
+
+`UIButton` 설계 중 발견한 기존 결함이다. `[Inject]` 필드를 든 컴포넌트가 미등록 서비스를
+요구하면 `PoolManager.cs:154`(`InjectGameObject`)와 `InjectorService.Start()` 둘 다
+`try/catch`가 없어 피해가 번진다. 전자는 풀 생성 중 예외로 인스턴스가 씬에 고아로 남고,
+후자는 VContainer가 `EntryPointExceptionHandler` 미등록 시 그대로 rethrow하므로
+나머지 pending 컴포넌트가 영영 주입을 못 받는다.
+
+세부: `docs/superpowers/specs/2026-08-30-ui-button-design.md` "결정 사항과 근거 > 5"
+
+- [ ] 주입이 실패한 컴포넌트가 있어도 나머지 pending이 모두 주입된다
+- [ ] 풀 생성 중 주입이 실패해도 인스턴스가 씬에 고아로 남지 않는다
+
+## 대기: SoundService 기본 Output
+
+`UIButton` 설계 중 확인한 구조적 빈틈이다. SoundService에는 "기본 Output" 개념이 전혀 없다 —
+`SoundServiceSettings`에도 `SoundData`에도 없다. 그래서 Output을 비워 두면
+`Sound.SetOutput`이 `null`을 넘기고 `SoundSource.cs:308`이 `outputAudioMixerGroup = null`로
+세팅해 **믹서를 통째로 우회한다**. 결과적으로 유저가 효과음 볼륨을 0으로 내려도 소리가 그대로 난다.
+
+`SoundServiceSettings`에 `DefaultOutput`을 두고, Output이 비면 SoundService가 그걸로 해석하게 한다.
+`Sound`/`Music`/`Playlist`/`DynamicMusic` 전부가 대상이라 별도 스펙·계획이 필요하다.
+
+- [ ] Output을 지정하지 않으면 설정의 기본 Output으로 재생된다
+- [ ] 기본 Output도 지정되지 않으면 이전처럼 믹서를 우회한다
+- [ ] 명시한 Output이 기본 Output보다 우선한다
+
+## 대기: UIStateButton 복원 기준값
+
+스왑 세트가 복원 기준을 갖고 있지 않아 생기는 문제 두 가지를 함께 푼다. 뿌리가 같다 —
+직렬화 필드(`Image.sprite`/`color`/`enabled`)를 되돌릴 기준 없이 직접 쓴다.
+
+1. `Normal`이 오버라이드하지 않는 필드를 다른 상태가 오버라이드하면, 그 상태를 벗어나도
+   원래 값으로 돌아오지 않는다. 지금은 인스펙터 경고로만 막고 있다.
+2. `Selectable`이 `[ExecuteAlways]`라 에디터에서도 `OnValidate` → `DoStateTransition`이 돌고
+   (`Selectable.cs:578-586`), 우리 스왑은 uGUI의 `overrideSprite`/`CanvasRenderer`와 달리
+   직렬화 필드를 직접 쓴다. 인스펙터에서 `interactable`을 껐다 켜면 Disabled 값이 프리팹에 구워진다.
+
+- [ ] Normal이 오버라이드하지 않는 필드도 상태를 벗어나면 원래 값으로 돌아온다
+- [ ] 풀에서 재사용된 View도 첫 프리팹 값을 기준으로 복원한다
+- [ ] 에디터에서 상태를 미리 보아도 프리팹에 값이 구워지지 않는다
+
+---
+
 ## 완료: AnalyticsService — Adjust 어댑터
 
 Firebase 어댑터와 같은 모양으로 Adjust(MMP) 어댑터를 붙인다. Adjust는 이벤트 "이름"이 아니라
