@@ -64,4 +64,26 @@ public class UINavigatorSceneLifetimeTests
 
         nav.Dispose();
     });
+
+    [UnityTest]
+    public IEnumerator 활성씬이_바뀌어도_표시중인_UI를_스스로_리셋하지_않는다() => AwaitableTest.Run(async () =>
+    {
+        var nav = CreateNavigator();
+        var p = nav.Page<P>();
+        await AwaitableTest.WaitUntil(() => p.Shown);
+
+        var previous = SceneManager.GetActiveScene();
+        var temp = SceneManager.CreateScene("uinavigator_scene_switch");
+        SceneManager.SetActiveScene(temp);
+        await AwaitableTest.NextFrame();
+
+        // 정리 경로는 Dispose 하나뿐이다. 씬 이벤트는 더 이상 teardown을 촉발하지 않는다.
+        Assert.IsFalse(p.AfterHideCalled, "씬 전환이 presenter를 teardown하면 안 된다");
+        Assert.IsTrue(p.ViewBase != null, "표시 중인 View가 파괴되면 안 된다");
+        Assert.IsTrue(p.ViewBase.gameObject.activeSelf, "표시 중인 View가 비활성화되면 안 된다");
+
+        SceneManager.SetActiveScene(previous);
+        nav.Dispose();
+        await Awaitable.FromAsyncOperation(SceneManager.UnloadSceneAsync(temp));
+    });
 }

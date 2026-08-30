@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 using VContainer;
 
 namespace DarkNaku.FoundationDI
@@ -28,7 +27,6 @@ namespace DarkNaku.FoundationDI
             _settings = settings;
             _factory = factory;
             _resource = resource;
-            SceneManager.activeSceneChanged += OnActiveSceneChanged;
         }
 
         private UIRoot Root
@@ -83,7 +81,7 @@ namespace DarkNaku.FoundationDI
             return root;
         }
 
-        // 전용 풀: 상주 Canvas 아래에 위치한다. 씬 전환 시 dispose되고 다음 표시에서 재구성된다.
+        // 전용 풀: 캔버스(씬 수명) 아래에 위치한다. Dispose 또는 캔버스 파괴 감지(DiscardRoot) 시 정리되고 다음 표시에서 재구성된다.
         // resolver를 넘겨 View 프리팹 계층의 MonoBehaviour도 인스턴스 생성 시 1회 주입되게 한다.
         private PoolManager Pool => _pool ??= new PoolManager(_resource, _factory.Resolver, Root.GO.transform);
 
@@ -324,14 +322,7 @@ namespace DarkNaku.FoundationDI
             RefreshInputBlocking();
         }
 
-        private void OnActiveSceneChanged(Scene previous, Scene next)
-        {
-            if (_disposed || _root == null) return;
-            // 캔버스(DontDestroyOnLoad)는 유지하고 자식 UI만 전부 clear한다.
-            ClearContent();
-        }
-
-        // 씬 전환 시: 활성 UI를 전부 teardown하고 풀을 dispose한다. 캔버스는 유지한다.
+        // 활성 UI를 전부 teardown하고 풀을 dispose한다. 캔버스 파괴는 호출자(Dispose)가 한다.
         private void ClearContent()
         {
             _queue.CancelAndClear();
@@ -364,9 +355,8 @@ namespace DarkNaku.FoundationDI
         {
             if (_disposed) return;
             _disposed = true;
-            SceneManager.activeSceneChanged -= OnActiveSceneChanged;
 
-            // 서비스 종료(=지속 루트 스코프 dispose) 시에만 상주 캔버스를 실제로 파괴한다.
+            // 정리 경로는 이것 하나다. 씬 수명이므로 씬 이벤트를 따로 듣지 않는다.
             ClearContent();
             if (_root != null && _root.GO != null) UnityEngine.Object.Destroy(_root.GO);
             _root = null;
