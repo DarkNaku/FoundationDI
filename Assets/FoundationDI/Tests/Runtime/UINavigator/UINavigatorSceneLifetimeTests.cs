@@ -86,4 +86,76 @@ public class UINavigatorSceneLifetimeTests
         nav.Dispose();
         await Awaitable.FromAsyncOperation(SceneManager.UnloadSceneAsync(temp));
     });
+
+    [UnityTest]
+    public IEnumerator Dispose_이후_Hide요청이_캔버스를_되살리지_않는다() => AwaitableTest.Run(async () =>
+    {
+        var nav = CreateNavigator();
+        var p = nav.Page<P>();
+        await AwaitableTest.WaitUntil(() => p.Shown);
+
+        nav.Dispose();
+        await AwaitableTest.NextFrame();   // Object.Destroy 반영
+
+        // 이름으로 GameObject.Find하지 않는 이유: 이 호스트 프로젝트는 VContainerSettings.asset이
+        // RootLifetimeScope.prefab을 모든 Play 세션(PlayMode 테스트 포함)에 자동 부트스트랩하므로,
+        // 이 테스트의 nav와 무관한 "진짜" UINavigator가 같은 이름("[UINavigator]")의 캔버스를 이미
+        // 갖고 있다. 그래서 "존재 자체"가 아니라 "개수가 늘었는가"로 재생성 여부를 판정한다.
+        var before = UnityEngine.Object.FindObjectsByType<UIRoot>(FindObjectsSortMode.None).Length;
+
+        // 게임 코드가 들고 있던 presenter로 뒤늦게 Hide를 부르는 경로.
+        // 큐 → 내부 Pool/Root 접근으로 이어지면 다음 씬에 고아 캔버스가 생긴다.
+        Assert.DoesNotThrow(() => p.Hide());
+        await AwaitableTest.NextFrame();
+
+        var after = UnityEngine.Object.FindObjectsByType<UIRoot>(FindObjectsSortMode.None).Length;
+        Assert.AreEqual(before, after,
+            "dispose 이후에는 캔버스가 다시 만들어지면 안 된다");
+    });
+
+    [UnityTest]
+    public IEnumerator Dispose하면_캔버스GO가_파괴된다() => AwaitableTest.Run(async () =>
+    {
+        var nav = CreateNavigator();
+        var p = nav.Page<P>();
+        await AwaitableTest.WaitUntil(() => p.Shown);
+
+        var rootGO = p.ViewBase.transform.root.gameObject;
+        Assert.IsTrue(rootGO != null, "사전 조건: 캔버스가 살아 있다");
+
+        nav.Dispose();
+        // Object.Destroy는 현재 Update 루프 이후로 지연된다. 실측 결과 NextFrame() 1회(심지어 3회)로도
+        // 반영이 보장되지 않아(엔진 정리 시점이 우리 커스텀 프레임 펌프와 어긋난다), WaitUntil로 기다린다.
+        await AwaitableTest.WaitUntil(() => rootGO == null, timeoutSeconds: 5f);
+
+        Assert.IsTrue(rootGO == null, "Dispose는 캔버스를 파괴해야 한다");
+    });
+
+    [UnityTest]
+    public IEnumerator Dispose하면_활성presenter가_OnAfterHide까지_teardown된다() => AwaitableTest.Run(async () =>
+    {
+        var nav = CreateNavigator();
+        var p = nav.Page<P>();
+        await AwaitableTest.WaitUntil(() => p.Shown);
+
+        nav.Dispose();
+
+        Assert.IsTrue(p.AfterHideCalled,
+            "Dispose는 활성 presenter의 수명 콜백을 끝까지 흘려야 한다");
+    });
+
+    [UnityTest]
+    public IEnumerator 캔버스가_먼저_파괴된_뒤_Dispose해도_예외가_없다() => AwaitableTest.Run(async () =>
+    {
+        var nav = CreateNavigator();
+        var p = nav.Page<P>();
+        await AwaitableTest.WaitUntil(() => p.Shown);
+
+        // 씬 언로드 시 GameObject 파괴와 컨테이너 Dispose의 순서는 보장되지 않는다.
+        // 캔버스가 먼저 가는 쪽을 재현한다.
+        Object.DestroyImmediate(p.ViewBase.transform.root.gameObject);
+
+        Assert.DoesNotThrow(() => nav.Dispose(),
+            "이미 파괴된 캔버스에 대한 Dispose는 예외 없이 통과해야 한다");
+    });
 }

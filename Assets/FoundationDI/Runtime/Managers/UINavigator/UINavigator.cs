@@ -33,6 +33,11 @@ namespace DarkNaku.FoundationDI
         {
             get
             {
+                // dispose 이후에는 절대 재구성하지 않는다. 여기서 만들면 파괴되는 씬이 아니라
+                // "다음 씬"에 캔버스가 생겨 고아로 남는다. 진입점(Page/Popup/Overlay)의
+                // _disposed 검사만으로는 큐에 남은 내부 경로(Pool → Root)를 막지 못한다.
+                if (_disposed) throw new ObjectDisposedException(nameof(UINavigator));
+
                 // 캔버스는 씬 수명이다. 씬 언로드와 Dispose의 순서는 보장되지 않으므로
                 // 파괴된 뒤(fake-null) 접근이 올 수 있다 — 참조를 버리고 재구성한다.
                 // UIRoot는 MonoBehaviour다 → ??= 는 fake-null을 못 걸러내므로 쓰지 않는다.
