@@ -410,7 +410,7 @@ HelpBox 경고 두 가지:
 - `Assets/FoundationDI/Samples~/05-Sound/Scripts/SoundSampleScope.cs`
 - `CLAUDE.md` (새 `Runtime/Components/` 버킷 소개)
 
-패키지 버전은 `0.8.0` → `0.9.0`.
+패키지 버전은 `0.8.0` → `0.8.1`(패치 증가).
 
 ---
 
