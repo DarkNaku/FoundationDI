@@ -162,7 +162,7 @@ public sealed class MyArrowModule : TutorialModuleBehaviour
 }
 ```
 
-**모듈은 타깃을 자식으로 삼지 않습니다.** 스크린 rect만 읽으므로 타깃이 `UIRoot`(DontDestroyOnLoad) 안에 있든, 씬 캔버스에 있든, 3D 월드에 있든 똑같이 동작합니다. `TutorialScreenRect`가 `RectTransform`이면 코너 4점을, 일반 `Transform`이면 `Renderer`/`Collider` 바운즈를 스크린으로 투영합니다.
+**모듈은 타깃을 자식으로 삼지 않습니다.** 스크린 rect만 읽으므로 타깃이 `UIRoot`(씬 수명 캔버스) 안에 있든, 씬 캔버스에 있든, 3D 월드에 있든 똑같이 동작합니다. `TutorialScreenRect`가 `RectTransform`이면 코너 4점을, 일반 `Transform`이면 `Renderer`/`Collider` 바운즈를 스크린으로 투영합니다.
 
 ### 정렬 — 기존 UI를 가리거나 가려지지 않나?
 

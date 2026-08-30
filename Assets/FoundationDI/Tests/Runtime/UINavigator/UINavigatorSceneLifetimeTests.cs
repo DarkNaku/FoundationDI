@@ -101,10 +101,9 @@ public class UINavigatorSceneLifetimeTests
         // 파괴가 끼면 개수가 줄어 재생성과 무관하게 실패한다.
         await AwaitableTest.WaitUntil(() => rootGO == null, timeoutSeconds: 5f);
 
-        // 이름으로 GameObject.Find하지 않는 이유: 이 호스트 프로젝트는 VContainerSettings.asset이
-        // RootLifetimeScope.prefab을 모든 Play 세션(PlayMode 테스트 포함)에 자동 부트스트랩하므로,
-        // 이 테스트의 nav와 무관한 "진짜" UINavigator가 같은 이름("[UINavigator]")의 캔버스를 이미
-        // 갖고 있다. 그래서 "존재 자체"가 아니라 "개수가 늘었는가"로 재생성 여부를 판정한다.
+        // 이름으로 GameObject.Find하지 않는 이유: 이름 일치는 태생적으로 모호하다 — 어느 출처에서
+        // 왔든 "[UINavigator]"라는 이름의 캔버스면 다 걸린다. 이 테스트가 실제로 확인하고 싶은 것은
+        // "dispose가 새 루트를 만들었는가"이므로, 존재 자체가 아니라 개수 델타로 재생성 여부를 판정한다.
         var before = UnityEngine.Object.FindObjectsByType<UIRoot>(FindObjectsSortMode.None).Length;
 
         // 게임 코드가 들고 있던 presenter로 뒤늦게 Hide를 부르는 경로.

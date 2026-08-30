@@ -8,7 +8,7 @@ namespace DarkNaku.FoundationDI
     /// 셰이더/스텐실 없이 구멍 이미지 1장 + 상하좌우 딤 패널 4장으로 만든다.
     /// 딤 패널이 raycastTarget을 켜고 있어 입력 차단이 부수효과로 따라온다.
     ///
-    /// 자기 root Canvas를 sortingOrder 높게 들고 있으므로 UINavigator의 UIRoot(DontDestroyOnLoad)
+    /// 자기 root Canvas를 sortingOrder 높게 들고 있으므로 UINavigator의 UIRoot(씬 수명 캔버스)
     /// 위에 그려진다 — ScreenSpaceOverlay 캔버스는 하이어라키가 아니라 sortingOrder로 전역 정렬된다.
     /// </summary>
     [RequireComponent(typeof(Canvas), typeof(GraphicRaycaster))]

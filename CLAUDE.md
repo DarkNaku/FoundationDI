@@ -40,7 +40,9 @@ NuGet 의존성은 **NuGetForUnity**(`Assets/NuGet/`)가 `Assets/packages.config
 ## 아키텍처
 
 ### DI 컴포지션 루트
-`Assets/Scripts/LifetimeScopes/RootLifetimeScope.cs`가 VContainer의 `LifetimeScope`를 상속한 루트 스코프다. `RootLifetimeScope.prefab`으로 씬에 배치되며, `Configure(IContainerBuilder)`에서 서비스를 등록한다. 새 서비스는 인터페이스(`IXxxService`)로 등록하여 생성자 주입으로 소비한다.
+`Assets/Scripts/LifetimeScopes/RootLifetimeScope.cs`가 VContainer의 `LifetimeScope`를 상속한 루트 스코프다. `RootLifetimeScope.prefab`으로 씬에 배치되며, `Configure(IContainerBuilder)`에서 앱 수명 서비스를 등록한다. 새 서비스는 인터페이스(`IXxxService`)로 등록하여 생성자 주입으로 소비한다.
+
+씬 수명 컴포넌트는 별도로 `Assets/Scripts/LifetimeScopes/SceneLifetimeScope.cs`(자식 스코프)에 등록한다. `UINavigator`가 대표 사례다 — 씬에 배치되는 스코프에 등록해야 캔버스·풀·프리젠터가 그 씬의 수명을 갖는다. `IResourceService` 등 앱 수명 서비스는 부모(`RootLifetimeScope`)에서 해결된다.
 
 ### 핵심 서비스 (`Assets/FoundationDI/Runtime/`)
 모든 런타임 코드는 단일 asmdef `FoundationDI`(`Runtime/FoundationDI.asmdef`)에 들어간다.
@@ -50,18 +52,6 @@ NuGet 의존성은 **NuGetForUnity**(`Assets/NuGet/`)가 `Assets/packages.config
   - 발행은 `GetInvocationList()` 스냅샷으로 진행하므로 핸들러 안에서 구독/해제해도 안전하고, 핸들러별 try/catch로 예외를 격리한다.
   - 메인 스레드 전제(잠금 없음). DI 등록은 `builder.RegisterMessageService()`.
   - 상세: `Assets/FoundationDI/Runtime/Services/MessageService/README.md`.
-- **UIService** (`Services/UIService/`): uGUI 기반 UI 시스템. 네임스페이스 `DarkNaku.FoundationDI`.
-  - **빌더 API**: `_ui.Page<TPresenter>()` / `Popup<TPresenter>()` / `Overlay<TPresenter>()` → 인스턴스 즉시 반환 + Show 자동 enqueue (`.Show()` 별도 호출 불필요) → 같은 프레임 내 `.WithParams(params)` / `.OnAfterShow(...)` / `.WithTransition(...)` / `.WithOverlay(...)` 동기 체인.
-  - **표시 모드**: Presenter 타입으로 컴파일 타임 고정 — `UIPagePresenter<TView>`(단일 교체) / `UIPopupPresenter<TView>`(LIFO 스택) / `UIOverlayPresenter<TView>`(Popup 기준 Above/Below 상주). View 공통 기반 `UIView : MonoBehaviour`.
-  - **`OperationQueue`**: 모든 Show/Hide 전환을 단일 큐로 순차 직렬화 → race 조건 제거.
-  - **prefab 매핑**: `[UIPrefab("키")]` 속성을 Presenter 타입에 부착. 로딩은 `IResourceService`에 위임(Resources/Addressables 중 어느 쪽이든 등록된 `IResourceProvider`가 결정).
-  - **Presenter는 매 표시마다 새로 생성**(인스턴스 캐시 없음, `OnInitialize` 재실행) — **View는 프리팹 키로 풀링**되어 재사용됨.
-  - **상주 캔버스**: 루트는 `UIServiceSettings.RootPrefab`으로 지정한 프리팹을 인스턴스화하며(렌더 모드/`CanvasScaler`/레이어 구성은 프리팹이 결정), 미지정 시 `UIRoot.CreateDefault()`(ScreenSpaceOverlay/1920x1080)로 폴백한다. `DontDestroyOnLoad`로 앱 전체에 1개만 상주하며 씬 전환 시 자식 UI만 clear.
-  - **트랜지션**: `IUITransition` 추상화 + 기본 3종 MonoBehaviour 컴포넌트(`FadeTransition`/`ScaleTransition`/`SlideTransition`, 공통 기반 `UITransitionBehaviour`). 트윈 라이브러리 비의존 — `Awaitable` 자체 보간(`AnimationCurve` 인스펙터 커스터마이즈). 폴백 `NoopTransition`(즉시). 해석 우선순위: 빌더 오버라이드 > View의 트랜지션 컴포넌트 > Noop.
-  - **DI 등록**: `builder.RegisterUIService(settings)` 확장 메서드(루트 `LifetimeScope`에서, `IResourceService` 등록 이후에 호출). Presenter/View는 VContainer가 주입.
-  - **에디터 도구**(`Assets/FoundationDI/Editor/UIService/`): `Tools/FoundationDI/UI/Create UI Root Prefab`(루트 프리팹 생성) · `Create UI Element...`(View/Presenter 스크립트 + 프리팹 생성 마법사).
-  - 상세: `Assets/FoundationDI/Runtime/Services/UIService/README.md`.
-- **PoolManager** (`Managers/PoolManager/`): 키 기반 GameObject 오브젝트 풀. **프리팹 로드는 `IResourceService`에 위임한다.** `ObjectPool<IPoolItem>` 기반이며 `PoolData`가 풀을, `PoolItem`(MonoBehaviour)이 풀 항목 생명주기 콜백(`OnGetItem`/`OnReleaseItem` 등)과 지연 반환(`Release(delay)`)을 담당. 풀 루트는 `DontDestroyOnLoad`가 아니라 씬 스코프에 귀속시켜 씬 언로드 시 함께 정리된다. 생성 시 계층 전체에 DI를 주입하며, **주입 실패는 인스턴스 단위로 격리**된다(격리가 없으면 생성 콜백이 반환하지 못해 인스턴스가 씬에 고아로 남는다).
 - **SoundService** (`Services/SoundService/`): 태그 기반 오디오 시스템.
   - 공개 API는 `ISoundService` 하나. `CreateSound/CreateMusic/CreatePlaylist/CreateDynamicMusic` 팩토리로 빌더를 만들고 체이닝 후 `Play()`. 빌더가 쓰는 내부 seam은 `ISoundEngine`(internal).
   - `SoundSource`(MonoBehaviour)를 `[SoundService] Sources Pool` 아래에 풀링. 페이드·루프·플레이리스트 진행·오클루전을 담당.
@@ -102,17 +92,29 @@ NuGet 의존성은 **NuGetForUnity**(`Assets/NuGet/`)가 `Assets/packages.config
   - 상품 상수는 `Tools/FoundationDI/IAP/Generate Product Constants`가 `IapProducts` 클래스로 생성한다(SoundService의 Generated/asmref 패턴).
   - 상세: `Assets/FoundationDI/Runtime/Services/IAPService/README.md`.
 
+- **PoolManager** (`Managers/PoolManager/`): 키 기반 GameObject 오브젝트 풀. **프리팹 로드는 `IResourceService`에 위임한다.** `ObjectPool<IPoolItem>` 기반이며 `PoolData`가 풀을, `PoolItem`(MonoBehaviour)이 풀 항목 생명주기 콜백(`OnGetItem`/`OnReleaseItem` 등)과 지연 반환(`Release(delay)`)을 담당. 풀 루트는 `DontDestroyOnLoad`가 아니라 씬 스코프에 귀속시켜 씬 언로드 시 함께 정리된다. 생성 시 계층 전체에 DI를 주입하며, **주입 실패는 인스턴스 단위로 격리**된다(격리가 없으면 생성 콜백이 반환하지 못해 인스턴스가 씬에 고아로 남는다).
 - **TutorialManager** (`Managers/TutorialManager/`): 조건 기반 튜토리얼 진행 엔진. "1레벨 시작 시 조작 안내, 3레벨에서 새 시스템, 5레벨에서 특정 아이템 등장 시" 같이 **게임 조건에 따라 나뉘어 발동**하는 튜토리얼을 다룬다. `Service`가 아니라 `Manager`인 이유는 씬 수명이기 때문이다(PoolManager와 같은 자리).
   - **시퀀스는 순차 리스트가 아니라 조건부 후보 집합**이다. 각 `TutorialSequence`가 자기 `StartTrigger`로 발동하며, 앞의 것이 끝나서 뜨는 게 아니다. 한 번에 하나만 실행되고 겹치면 `Order` 오름차순 대기열로 직렬화한다.
   - **진행도는 인덱스가 아니라 시퀀스 ID로 저장한다** — 시퀀스를 중간에 추가·삭제해도 기존 유저 진행도가 어긋나지 않는다. `ITutorialProgressStorage`(기본 `PlayerPrefsTutorialProgressStorage`) seam.
   - **두 층 분리**: 진행 규칙은 순수 C#(`TutorialManager`/`TutorialSequence`/`TutorialStep`)이라 씬·프리팹 없이 EditMode에서 전부 테스트되고, 씬 오써링은 얇은 MonoBehaviour 어댑터(`TutorialSequenceBehaviour`/`TutorialStepBehaviour`)가 인스펙터 데이터를 넘기기만 한다.
   - **트리거는 arm/disarm 구독 모델** (`ITutorialTrigger`, `Awaitable` 아님) — `IMessageService.Subscribe`가 구독 모델이고, `[SerializeReference]` 객체라 생성자 주입이 안 되며(의존은 `Arm`의 `TutorialTriggerContext`로 받는다), 테스트 검증이 호출 확인으로 끝나기 때문. 기본 4종 `Auto`/`Manual`/`ButtonClick`/`MessageTrigger<T>`. **Collision/Distance는 일부러 뺐다**(프레임 펌프와 물리 가정을 엔진에 끌어들인다).
   - **`MessageTrigger<T>`는 구체 서브클래스 한 줄**로 인스펙터 드롭다운에 뜬다. 게임 코드는 원래 발행하던 메시지만 발행하고 튜토리얼을 모른다.
-  - **타깃은 `TutorialTargetRef`(직접 참조 | 키)** — UIService가 런타임 생성하는 View 내부 버튼도 `TutorialTarget` 컴포넌트가 키로 등록해 가리킬 수 있다. **모듈은 타깃을 리페어런팅하지 않고 스크린 rect만 추적**하므로 `UIRoot`의 `DontDestroyOnLoad`와 무관하게 동작한다. 타깃 소실/복귀는 `TutorialTargetHandle`이 흡수한다.
+  - **타깃은 `TutorialTargetRef`(직접 참조 | 키)** — UINavigator가 런타임 생성하는 View 내부 버튼도 `TutorialTarget` 컴포넌트가 키로 등록해 가리킬 수 있다. **모듈은 타깃을 리페어런팅하지 않고 스크린 rect만 추적**하므로 `UIRoot`가 씬과 함께 파괴돼도 타깃 소실/복귀를 `TutorialTargetHandle`이 흡수한다.
   - **시계는 `ITutorialClock` seam** — EditMode에서 `Awaitable.WaitForSecondsAsync`/`NextFrameAsync`가 완료되지 않아 지연 경로를 테스트할 수 없기 때문이다.
   - **연출은 인터페이스만 개방** — `ITutorialModule` + 기본 2종(`HighlightModule`, `HandPointerModule`). 나머지는 `TutorialModuleBehaviour`를 상속해 프로젝트가 만든다.
   - ⚠️ **`RegisterTutorialManager`는 `RegisterInjector`와 같은 스코프에 등록한다.** `InjectorService`가 정적 컨테이너 참조 하나를 공유하는 단일 컨테이너 모델이라, 씬(자식) 스코프에 두면 루트 리졸버가 `ITutorialManager`를 해결하지 못해 주입이 **조용히 실패**한다. 씬 스코프에 두려면 그 스코프에서 `RegisterComponentInHierarchy<TutorialSequenceBehaviour>()`를 함께 부른다.
   - 상세: `Assets/FoundationDI/Runtime/Managers/TutorialManager/README.md`.
+- **UINavigator** (`Managers/UINavigator/`): uGUI 기반 UI 시스템. 네임스페이스 `DarkNaku.FoundationDI`.
+  - **빌더 API**: `_ui.Page<TPresenter>()` / `Popup<TPresenter>()` / `Overlay<TPresenter>()` → 인스턴스 즉시 반환 + Show 자동 enqueue (`.Show()` 별도 호출 불필요) → 같은 프레임 내 `.WithParams(params)` / `.OnAfterShow(...)` / `.WithTransition(...)` / `.WithOverlay(...)` 동기 체인.
+  - **표시 모드**: Presenter 타입으로 컴파일 타임 고정 — `UIPagePresenter<TView>`(단일 교체) / `UIPopupPresenter<TView>`(LIFO 스택) / `UIOverlayPresenter<TView>`(Popup 기준 Above/Below 상주). View 공통 기반 `UIView : MonoBehaviour`.
+  - **`OperationQueue`**: 모든 Show/Hide 전환을 단일 큐로 순차 직렬화 → race 조건 제거.
+  - **prefab 매핑**: `[UIPrefab("키")]` 속성을 Presenter 타입에 부착. 로딩은 `IResourceService`에 위임(Resources/Addressables 중 어느 쪽이든 등록된 `IResourceProvider`가 결정).
+  - **Presenter는 매 표시마다 새로 생성**(인스턴스 캐시 없음, `OnInitialize` 재실행) — **View는 프리팹 키로 풀링**되어 재사용됨.
+  - **씬 수명**: 씬 `LifetimeScope`가 소유한다. 루트 캔버스는 활성 씬에 붙고 씬 언로드 시 캔버스·풀·프리젠터가 함께 파괴된다. 정리 경로는 `Dispose()` 하나뿐이다.
+  - **트랜지션**: `IUITransition` 추상화 + 기본 3종 MonoBehaviour 컴포넌트(`FadeTransition`/`ScaleTransition`/`SlideTransition`, 공통 기반 `UITransitionBehaviour`). 트윈 라이브러리 비의존 — `Awaitable` 자체 보간(`AnimationCurve` 인스펙터 커스터마이즈). 폴백 `NoopTransition`(즉시). 해석 우선순위: 빌더 오버라이드 > View의 트랜지션 컴포넌트 > Noop.
+  - **DI 등록**: `builder.RegisterUINavigator(settings)` 확장 메서드(**씬** `LifetimeScope`에서, `IResourceService` 등록 이후에 호출). Presenter/View는 VContainer가 주입.
+  - **에디터 도구**(`Assets/FoundationDI/Editor/UINavigator/`): `Tools/FoundationDI/UI/Create UI Root Prefab`(루트 프리팹 생성) · `Create UI Element...`(View/Presenter 스크립트 + 프리팹 생성 마법사).
+  - 상세: `Assets/FoundationDI/Runtime/Managers/UINavigator/README.md`.
 
 ### 씬 저작 컴포넌트 (`Assets/FoundationDI/Runtime/Components/`)
 서비스를 소비하는 씬 저작용 위젯이 사는 자리다(서비스도 매니저도 아니다).
@@ -137,7 +139,7 @@ NuGet 의존성은 **NuGetForUnity**(`Assets/NuGet/`)가 `Assets/packages.config
 - 계산은 순수 함수 `SdkDefineSynchronizer.Resolve(current, present)`로 분리돼 EditMode에서 검증된다. 쓰기는 값이 실제로 달라질 때만 일어난다(안 그러면 재컴파일 무한 루프).
 - 옵트아웃은 `Tools/FoundationDI/SDK Defines/Auto Manage` 토글(EditorPrefs).
 
-공통 패턴: 에셋 로딩은 `IResourceService`에 위임한다(`UIService`, `PoolManager`). `ResourceService`가 등록된 `IResourceProvider`(Resources/Addressables)로 실제 로드를 수행하고 키 단위 캐싱·참조 카운팅으로 핸들 생명주기를 한 곳에서 관리한다. SoundService는 `SoundData`가 `AudioClip`을 컴파일 타임 직접 참조로 보유하므로 이 패턴에 해당하지 않는다.
+공통 패턴: 에셋 로딩은 `IResourceService`에 위임한다(`UINavigator`, `PoolManager`). `ResourceService`가 등록된 `IResourceProvider`(Resources/Addressables)로 실제 로드를 수행하고 키 단위 캐싱·참조 카운팅으로 핸들 생명주기를 한 곳에서 관리한다. SoundService는 `SoundData`가 `AudioClip`을 컴파일 타임 직접 참조로 보유하므로 이 패턴에 해당하지 않는다.
 
 ### 네임스페이스
 런타임 코드는 `DarkNaku.FoundationDI` 단일 네임스페이스로 통일한다(UIManager 리뉴얼로 구 `FoundationDI` 네임스페이스는 제거됨). 새 코드를 추가할 때 같은 디렉터리의 기존 파일이 쓰는 네임스페이스를 따른다.

@@ -160,6 +160,7 @@ public static void RegisterInjector(this IContainerBuilder builder);
 ### 단일 컨테이너 모델
 
 - 정적 컨테이너 참조를 전제로 합니다. 이 패키지는 루트 단일 `LifetimeScope` + `DontDestroyOnLoad`를 가정합니다. 자식 스코프에서 `RegisterInjector`를 중복 등록하지 마세요.
+  씬 스코프에 등록한 서비스(예: `IUINavigator`)는 이 정적 리졸버로 해결되지 않습니다. 씬 배치 컴포넌트가 그런 서비스를 요구하면 `RegisterInjector`를 같은 씬 스코프에 두어야 합니다.
 
 ### 테스트
 

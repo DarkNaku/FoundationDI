@@ -6,7 +6,7 @@ uGUI 기반 UI 표시/전환 시스템입니다. Presenter 타입으로 표시 �
 - **빌더 체인** — `Page<T>()` 즉시 인스턴스 반환 + Show 자동 enqueue → 같은 프레임 `.WithParams()/.OnAfterShow()/.WithTransition()/.WithOverlay()` 동기 체인
 - **전환 직렬화** — `OperationQueue`로 모든 전환을 순차 처리(race 제거)
 - **Presenter는 매 표시마다 새로 생성, View는 풀 재사용** — Presenter 인스턴스 캐시는 없음. `Page/Popup/Overlay<T>()`마다 새 Presenter 생성 + `OnInitialize` 재실행. View만 프리팹 키로 풀링되어 재사용됨.
-- **상주 캔버스** — 단일 루트 Canvas는 `DontDestroyOnLoad`로 앱 전체에 1개만 상주. `UINavigatorSettings.RootPrefab`을 인스턴스화하며(렌더 모드/CanvasScaler/레이어는 프리팹이 결정), 미지정 시 코드 기본값(ScreenSpaceOverlay/1920x1080)으로 폴백. 씬 전환 시 자식 UI만 clear하고 캔버스는 유지.
+- **씬 수명 캔버스** — 루트 Canvas는 자신을 만든 씬에 속한다. `UINavigatorSettings.RootPrefab`을 인스턴스화하며(렌더 모드/CanvasScaler/레이어는 프리팹이 결정), 미지정 시 코드 기본값(ScreenSpaceOverlay/1920x1080)으로 폴백. 씬이 언로드되면 캔버스·풀·프리젠터가 함께 파괴된다.
 - **WithOverlay** — Page/Popup과 오버레이를 동시에 노출(동시 애니메이션). `persistent` 옵션으로 페이지 전환 간 깜빡임 없이 유지.
 - **트랜지션 추상화** — `IUITransition` + 기본 3종(Fade/Slide/Scale) MonoBehaviour 컴포넌트(공통 기반 `UITransitionBehaviour`), 폴백 Noop. Slide/Scale은 배경(Image)·컨텐츠 분리 연출 지원.
 
@@ -16,7 +16,7 @@ uGUI 기반 UI 표시/전환 시스템입니다. Presenter 타입으로 표시 �
 
 ### 1) DI 등록 (VContainer)
 
-`RegisterUINavigator` 호출 **전에 `IResourceService`가 등록**되어 있어야 합니다(프리팹 로드를 위임). 상주 캔버스가 앱 전체 단일 인스턴스가 되려면 UINavigator는 **프로젝트 루트 LifetimeScope**(`VContainerSettings.RootLifetimeScope`)에 등록해야 합니다.
+`RegisterUINavigator` 호출 **전에 `IResourceService`가 등록**되어 있어야 합니다(프리팹 로드를 위임). **`RegisterUINavigator`는 씬 `LifetimeScope`에서 호출합니다** — UINavigator는 씬 수명(루트 캔버스가 자신을 만든 씬에 속하고, 씬이 언로드되면 캔버스·풀·프리젠터가 함께 파괴됨)이기 때문입니다. `IResourceService`는 프로젝트 루트 `LifetimeScope`에 남겨도 됩니다(자식인 씬 스코프가 부모에서 해결합니다).
 
 ```csharp
 using VContainer;
@@ -25,14 +25,23 @@ using DarkNaku.FoundationDI;
 
 public class RootLifetimeScope : LifetimeScope
 {
-    // 인스펙터에서 Assets/Settings/UINavigatorSettings.asset 을 연결한다.
-    public UINavigatorSettings settings;
-
     protected override void Configure(IContainerBuilder builder)
     {
         // 프리팹 로드 백엔드는 provider 등록 한 줄로 교체한다(Resources → Addressables 등).
         builder.Register<IResourceProvider, ResourcesProvider>(Lifetime.Singleton);
         builder.Register<IResourceService, ResourceService>(Lifetime.Singleton);
+    }
+}
+
+// 씬에 배치되는 스코프. UINavigator를 여기서 등록하면 씬 수명을 갖는다.
+public class SceneLifetimeScope : LifetimeScope
+{
+    // 인스펙터에서 Assets/Settings/UINavigatorSettings.asset 을 연결한다.
+    public UINavigatorSettings settings;
+
+    protected override void Configure(IContainerBuilder builder)
+    {
+        // IResourceService는 부모(RootLifetimeScope)에서 해결된다.
         builder.RegisterUINavigator(settings);
     }
 }
@@ -154,12 +163,19 @@ Page와 Overlay는 전면 배경이 없으므로 빈 영역의 입력이 자연�
 
 ---
 
-## Canvas 수명(지속)
+## Canvas 수명
 
-- 루트 Canvas는 **최초 표시 시 지연 생성**됩니다. `UINavigatorSettings`의 **Root Prefab**을 인스턴스화하며(렌더 모드·`CanvasScaler`·레이어 구성은 그 프리팹이 결정), 미지정 시 코드 기본값(`UIRoot.CreateDefault()` — ScreenSpaceOverlay / ScaleWithScreenSize / Expand / 1920x1080)으로 폴백합니다. 어느 경로든 `DontDestroyOnLoad`는 서비스가 인스턴스화 직후 적용하므로 **씬을 넘어 앱 전체에 1개만 상주**합니다. 레이어 렌더 순서(아래→위)는 `Page → BelowOverlay → Popup → AboveOverlay`.
-- **씬 전환(activeSceneChanged) 시** UINavigator는 자식 UI 컨텐츠를 전부 clear합니다 — 활성 Presenter를 teardown(`OnBeforeHide`/`OnAfterHide` 발화)하고 진행 중인 큐를 취소하며 **View 풀을 dispose**합니다. **캔버스 자체는 유지**되며, 풀은 다음 표시 때 캔버스 아래에 재구성됩니다.
-- 캔버스는 오직 `UINavigator.Dispose()`(= 소유 루트 스코프 dispose) 시에만 파괴됩니다. 그래서 앱 전체 단일 인스턴스가 되려면 지속되는 **프로젝트 루트 LifetimeScope**에 등록해야 합니다.
-- 예외적으로 캔버스 GameObject가 외부에서 파괴되면(fake-null) 참조를 버리고 다음 표시에서 재구성합니다.
+- 루트 Canvas는 **최초 표시 시 지연 생성**됩니다. `UINavigatorSettings`의 **Root Prefab**을 인스턴스화하며(렌더 모드·`CanvasScaler`·레이어 구성은 그 프리팹이 결정), 미지정 시 코드 기본값(`UIRoot.CreateDefault()` — ScreenSpaceOverlay / ScaleWithScreenSize / Expand / 1920x1080)으로 폴백합니다. 어느 경로든 상주화는 하지 않습니다 — 루트는 부모 없이 인스턴스화되어 **활성 씬에 붙고, 그 씬과 함께 파괴**됩니다. 레이어 렌더 순서(아래→위)는 `Page → BelowOverlay → Popup → AboveOverlay`.
+- **정리 경로는 `UINavigator.Dispose()`(= 소유 스코프 dispose) 하나뿐입니다.** 진행 중인 큐를 취소하고, 활성 Presenter를 전부 teardown(`OnBeforeHide`/`OnAfterHide` 발화)하고, View 풀을 dispose한 뒤 캔버스 GameObject를 파괴합니다. 씬 전환 자체는 이 정리를 촉발하지 않습니다 — 보통 씬이 언로드되면 UINavigator를 소유한 씬 `LifetimeScope`도 함께 dispose되므로 결과적으로 같은 타이밍에 정리됩니다.
+- 캔버스 GameObject가 (씬 언로드 등으로) **`Dispose()`보다 먼저 외부에서 파괴되면**(fake-null), 그 뒤의 `Page/Popup/Overlay<T>()` 호출은 죽은 참조를 버리고 **그 시점의 활성 씬에 새 캔버스를 재구성**합니다. `Dispose()`가 이미 끝난 뒤라면 대신 `ObjectDisposedException`을 던져 재구성을 막습니다(자세한 내용은 아래 [알려진 한계](#알려진-한계) 참고).
+
+### additive 씬
+
+씬 둘이 각자 `LifetimeScope`를 가지면 `UINavigator`도 둘, 캔버스도 둘입니다. 각 씬이 자기 UI를 갖는다는 뜻이며 막지 않습니다. 겹침 정렬은 각 `RootPrefab`의 `Canvas.sortingOrder`로 정하세요 — 코어는 관여하지 않습니다.
+
+### 알려진 한계
+
+캔버스가 이미 파괴됐지만 아직 `Dispose()`가 오지 않은 창(씬 언로드 도중 게임 코드가 UI를 새로 여는 경우)에서 `Page<T>()`를 부르면, 캔버스가 **다음 씬에** 만들어져 고아로 남습니다. 캔버스가 예기치 않게 파괴됐을 때 UI가 영구히 죽지 않도록 재구성 동작을 유지한 결과입니다. 씬 전환 중에는 UI를 새로 열지 마세요.
 
 ---
 
@@ -288,8 +304,8 @@ _ui.Page<StagePage>()
 - `void RegisterUINavigator(this IContainerBuilder builder, UINavigatorSettings settings)` — UINavigator 등록 확장(`UINavigatorSettings`/`UIInstanceFactory`/`UINavigator as IUINavigator` 등록).
   **전제: 호출 전에 `IResourceService`가 등록되어 있어야 합니다.**
 - **주입 대상**: Presenter는 생성 시(`UIInstanceFactory`), View는 프리팹 인스턴스 생성 시 계층 전체의 MonoBehaviour가 주입됩니다(`InjectGameObject`). 둘 다 `[Inject]` 필드를 쓸 수 있습니다.
-  - View 주입은 **풀 인스턴스당 1회**입니다. 풀에서 재사용될 때는 다시 주입되지 않습니다(씬 전환 시 풀이 dispose되므로 다음 표시에서 새로 생성·주입됩니다).
-  - UINavigator는 루트 스코프에 등록되므로 Presenter/View 모두 **루트 스코프 의존만** 해석됩니다.
+  - View 주입은 **풀 인스턴스당 1회**입니다. 풀에서 재사용될 때는 다시 주입되지 않습니다(UINavigator가 dispose되면 풀도 함께 dispose되므로, 다음 씬에서는 새로 생성·주입됩니다).
+  - Presenter/View는 UINavigator를 **등록한 스코프**의 리졸버로 주입됩니다. 씬 `LifetimeScope`에 등록했다면 그 씬 스코프(및 부모인 루트 스코프) 의존까지 해석되고, 형제 씬 스코프나 자식 스코프의 의존은 해석되지 않습니다.
 - `UINavigatorSettings`(ScriptableObject) — `RootPrefab`(`UIRoot`) **하나만** 제공합니다. 캔버스 렌더 모드, `CanvasScaler`(스케일 모드/기준 해상도), 레이어 구성은 전부 이 프리팹이 결정합니다. `Tools/FoundationDI/UI/Create UI Root Prefab`으로 만듭니다(자세한 절차는 위 [에디터 워크플로](#에디터-워크플로-디자이너용) 참고). 비워두면 `UIRoot.CreateDefault()`가 조립한 코드 기본값(ScreenSpaceOverlay / Scale With Screen Size + Expand / 1920×1080)으로 폴백합니다.
 
 ---
@@ -306,7 +322,7 @@ _ui.Page<StagePage>()
 
 - `Page/Popup/Overlay<T>()`는 인스턴스를 **즉시 동기 반환**하고 실제 표시는 `OperationQueue`에 enqueue됩니다. 큐 작업은 `Awaitable.NextFrameAsync`로 한 프레임 양보한 뒤 실행되므로, 같은 프레임에 빌더 체인(`.With/.OnAfterShow/.WithTransition/.WithOverlay`)을 동기로 구성할 수 있습니다.
 - 모든 Show/Hide 전환은 `OperationQueue`로 **순차 직렬화**되어 동시 전환의 race를 방지합니다. 큐 예외는 로그로 처리되며 루프를 중단하지 않습니다.
-- 큐는 씬 전환/Dispose 시 `CancelAndClear`로 취소됩니다.
+- 큐는 `Dispose` 시 `CancelAndClear`로 취소됩니다(씬 전환 자체는 별도로 큐를 건드리지 않습니다).
 
 ### 프리팹 로딩
 
@@ -315,19 +331,37 @@ _ui.Page<StagePage>()
 
 ### 정리(Dispose)
 
-- `UINavigator.Dispose()`는 `activeSceneChanged` 구독을 해제하고, 진행 중 큐를 취소하며, 활성 Presenter를 전부 teardown하고 View 풀을 dispose한 뒤 상주 캔버스를 파괴합니다. 보통 DI 컨테이너(루트 스코프)가 수명을 관리합니다.
+- `UINavigator.Dispose()`는 진행 중 큐를 취소하고, 활성 Presenter를 전부 teardown하고, View 풀을 dispose한 뒤 캔버스를 파괴합니다. 정리 경로는 이것 하나뿐입니다(씬 전환 이벤트를 별도로 듣지 않습니다). 보통 DI 컨테이너(UINavigator를 등록한 스코프)가 수명을 관리하며, 씬 `LifetimeScope`에 등록했다면 씬 언로드 시 함께 dispose됩니다.
 
 ### 테스트
 
 - **EditMode** (`Tests/Editor/UINavigator`): `DIRegistrationTests` · `ModeControllerTests` · `NoopTransitionTests` · `OperationQueueTests` · `PresenterLifecycleTests` · `UIInstanceFactoryTests` · `UIPrefabKeyResolverTests` · `UINavigatorSettingsTests` · `UIViewPoolLifecycleTests`, 그리고 에디터 도구용 `UIElementCreationRequestTests` · `UIElementCreationSettingsTests` · `UIElementNamingTests` · `UIElementPrefabBuilderTests` · `UIElementTemplatesTests` · `UIRootPrefabCreatorTests`.
-- **PlayMode** (`Tests/Runtime/UINavigator`): `FadeTransitionTests` · `ScaleTransitionTests` · `SlideTransitionTests` · `UIRootTests` · `UINavigatorFlowTests` · `UINavigatorRootPrefabTests` · `UINavigatorSceneResetTests` · `UINavigatorViewInjectionTests` · `UINavigatorWithOverlayTests` · `UIViewTests` · `UIViewTransitionResolveTests` (공용 헬퍼 `TransitionTestHelpers`).
+- **PlayMode** (`Tests/Runtime/UINavigator`): `FadeTransitionTests` · `ScaleTransitionTests` · `SlideTransitionTests` · `UIRootTests` · `UINavigatorFlowTests` · `UINavigatorRootPrefabTests` · `UINavigatorSceneLifetimeTests` · `UINavigatorViewInjectionTests` · `UINavigatorWithOverlayTests` · `UIViewTests` · `UIViewTransitionResolveTests` (공용 헬퍼 `TransitionTestHelpers`).
 - 프리팹 로드는 `IResourceService`를 NSubstitute로 대체해 가짜 프리팹을 주입합니다.
 
 ### 한계 / 후속 과제
 
-- 상주 캔버스 단일 인스턴스는 UINavigator를 지속 루트 스코프에 등록했을 때만 보장됩니다(자식 스코프에 등록하면 스코프 dispose 시 캔버스가 파괴됨).
+- 캔버스·풀·프리젠터는 UINavigator를 등록한 스코프(보통 씬)의 수명을 따릅니다. 앱 전체에서 유지되는 UI가 필요하면 이 컴포넌트 밖에서 별도로 관리하세요(자세한 내용은 위 [Canvas 수명](#canvas-수명) 참고).
 - 큐 작업 중 발생한 예외는 로그로 남지만 대기 중인 호출자에게 전파되지는 않습니다.
 - 메인 스레드 전제(스레드 안전성 없음).
+
+---
+
+## 0.8.x → 0.9.0 마이그레이션
+
+| 구 (0.8.x) | 신 (0.9.0) |
+|---|---|
+| `IUIService` | `IUINavigator` |
+| `UIServiceSettings` | `UINavigatorSettings` |
+| `builder.RegisterUIService(settings)` | `builder.RegisterUINavigator(settings)` |
+
+**등록 위치가 바뀝니다**: 루트 `LifetimeScope` → 씬 `LifetimeScope`. `IResourceService`는 루트에 남겨도 됩니다(자식 스코프가 부모에서 해결).
+
+**동작이 바뀝니다**: 씬이 언로드되면 캔버스·풀·프리젠터가 모두 파괴됩니다. 씬을 가로질러 살아남아야 하는 UI(로딩 화면·페이드)는 이 컴포넌트 밖에서 별도 캔버스로 만드세요.
+
+**`InjectorService`로 주입되는 씬 배치 컴포넌트는 `IUINavigator`를 해결하지 못합니다.** `InjectorService`는 정적 리졸버 하나를 들고 있어, `RegisterInjector`가 루트에 있으면 씬 배치 MonoBehaviour가 루트 컨테이너로 주입됩니다. `IUINavigator`가 필요하면 `RegisterInjector`도 같은 씬 스코프에 두거나(권장하지 않음), UI를 `UIPresenter`/`View` 계층에서만 다루세요 — 이 경로는 `UIInstanceFactory`가 씬 스코프 리졸버를 쓰므로 정상 동작합니다.
+
+`UIPresenter`/`UIView`/`UIRoot`/`[UIPrefab]`은 이름이 그대로이므로 **프리젠터·뷰 선언부는 손댈 필요가 없습니다.**
 
 ---
 
