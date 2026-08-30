@@ -34,8 +34,9 @@ public class RootLifetimeScope : LifetimeScope
 ```
 
 `ISoundService`/`IHapticService`는 **선택적**이다. `UIButton`은 `IObjectResolver.TryResolve`로
-두 서비스를 찾고, 못 찾으면 그 기능(사운드 또는 햅틱)만 꺼진 채로 나머지는 정상 동작한다. SFX나
-햅틱을 켰는데 해당 서비스가 없으면 컴포넌트당 한 번만 경고를 남긴다.
+두 서비스를 찾고, 못 찾으면 그 기능(사운드 또는 햅틱)만 꺼진 채로 나머지는 정상 동작한다. SFX를
+지정했는데 `ISoundService`가 없으면 **컴포넌트당** 한 번, 햅틱을 켰는데 `IHapticService`가 없으면
+**세션당** 한 번만 경고를 남긴다(햅틱 쪽은 전역 미등록 보고라 인스턴스 수만큼 찍을 이유가 없다).
 
 ### 2) 씬에 배치
 
@@ -45,6 +46,12 @@ public class RootLifetimeScope : LifetimeScope
 
 인스펙터에서 SFX/Output/Volume/RandomPitch(Sound)와 UseHaptic/HapticImpact(Haptic)를 설정한다.
 `UIStateButton`은 그 아래에 이미지 세트/텍스트 세트 목록과 `Deselect On Click`이 추가로 나온다.
+
+**기존 `Button`을 붙였던 자리를 마이그레이션하는 경우** — Add Component 대신 인스펙터 하단의
+컨텍스트 메뉴로 **Script**를 `UIButton`/`UIStateButton`으로 교체하는 경로를 더 많이 쓰게 된다. 이
+경로는 `Reset()`을 부르지 않으므로 기존 `Button`의 `m_Transition`(예: `ColorTint`)과
+`targetGraphic`이 그대로 남는다. 스왑 세트를 아직 추가하지 않았다면 인스펙터 경고도 뜨지 않으니,
+**Transition을 손으로 `None`으로 바꿔야 한다**(위 "`transition`은 `None`으로 둘 것" 참고).
 
 ---
 
@@ -68,6 +75,17 @@ Normal도 오버라이드하지 않았다 → 그 필드를 건드리지 않는�
 uGUI가 클릭한 버튼을 선택 상태로 계속 유지하는 성질과 겹쳐, 모바일에서 탭한 버튼이 계속 하이라이트된
 채로 남는 결과가 된다.
 
+**⚠️ 위 3단 규칙은 `Normal`이 오버라이드하지 않는 필드를 `Highlighted`/`Pressed`/`Selected`/`Disabled`
+중 하나가 오버라이드할 때 깨진다.** 세 번째 분기("아무것도 쓰지 않는다")는 *어느 상태도* 그 필드를
+오버라이드하지 않을 때만 안전하다. 예를 들어 `Highlighted.Override`에 `Color`를 켜고 노란색을 지정하되
+`Normal.Override`는 `Color`를 켜지 않았다면, 호버 시 노란색이 적용된 뒤 호버를 벗어나 `Normal`로
+돌아가도 그 값을 복원할 근거가 없어 **버튼이 노란색인 채로 계속 남는다**. `Visible`도 마찬가지다 —
+`Disabled`만 `Visible`을 꺼서 아이콘을 숨기면, 다시 활성화해도 아이콘이 돌아오지 않는다. 해법은
+간단하다: 다른 상태가 오버라이드하는 필드는 **`Normal`에서도 같은 필드를 오버라이드**해 복원 기준값을
+명시한다. 인스펙터가 이 조합을 감지하면 경고를 띄운다(`UIStateButtonEditor`). 근본적으로 스왑 세트가
+직렬화 필드를 복원 기준 없이 직접 쓰는 구조적 문제이며, 런타임에서 자동 복원하는 개선은 `plan.md`의
+"대기: UIStateButton 복원 기준값"으로 남아 있다.
+
 ---
 
 ## 주의사항
@@ -75,7 +93,11 @@ uGUI가 클릭한 버튼을 선택 상태로 계속 유지하는 성질과 겹�
 **주의 1 — `onClick.RemoveAllListeners()`는 클릭 피드백도 지운다.**
 `PlayFeedback()`(사운드+햅틱)은 다른 리스너와 마찬가지로 `Awake`에서 `onClick.AddListener`로 걸려
 있다. `RemoveAllListeners()`를 부르고 자기 리스너만 다시 등록하면 피드백이 조용히 사라진다.
-`onClick.AddListener(PlayFeedback)`을 함께 다시 걸어야 한다.
+`onClick.AddListener(PlayFeedback)`을 함께 다시 걸어야 한다. **`UIStateButton`에서 `_deselectOnClick`을
+켰다면 문제가 하나 더 있다** — 이 옵션은 `onClick`에 `Deselect`라는 **private** 메서드를 별도로
+등록하는데, `RemoveAllListeners()`는 이것도 함께 지우고 `private`이라 게임 코드가 다시 등록할 수
+없다. `_deselectOnClick`을 쓰는 버튼에서는 애초에 `RemoveAllListeners()`를 피하고, 필요하면 특정
+리스너만 `onClick.RemoveListener(...)`로 지운다.
 
 **주의 2 — `UITextSwap.Text`(문자열 스왑)는 로컬라이제이션과 충돌할 수 있다.**
 상태별로 문자열 자체를 바꾸는 기능은 로컬라이제이션 시스템이 같은 `Text`/`TMP_Text`를 갱신하는
@@ -93,6 +115,12 @@ Material Preset을 만들어 `Material` 필드로 교체한다.
 세팅해 버려 믹서를 통째로 지나친다. 그 결과 유저가 효과음 볼륨을 0으로 내려도 버튼 클릭음은 그대로
 난다. SoundService에는 아직 "기본 Output" 개념이 없으므로 지금은 반드시 채워야 한다(기본 Output
 지원은 `plan.md`의 대기 항목으로 남아 있다).
+
+**주의 5 — `_sfx`/`_volume`/`_output`은 첫 클릭 이후 런타임 변경이 반영되지 않는다.**
+`UIButton`은 첫 클릭 시 `Sound`를 한 번 빌드해 `_sound` 필드에 캐싱하고, 이후 클릭은 그 인스턴스의
+`Play()`만 다시 부른다. 즉 `_sfx`/`_volume`/`_output`을 코드로 바꿔도 이미 캐싱된 `_sound`에는
+반영되지 않는다(`_randomPitch`만 클릭마다 다시 적용된다). 런타임에 값을 바꿔야 한다면 새
+`UIButton` 인스턴스를 쓰거나, 캐시를 무효화하는 API가 추가되기 전까지는 이 제약을 감안한다.
 
 ---
 
@@ -201,7 +229,8 @@ public class UITextStateSet
 
 - `UIButtonEditor` — 기본 `ButtonEditor` 위에 Sound/Haptic 섹션을 추가로 그린다.
 - `UIStateButtonEditor` — 위 에디터를 상속해 State Swap 섹션을 추가하고, 스왑 세트가 있는데
-  `Transition`이 `None`이 아니면 경고, 세트의 `Target`이 비어 있으면 경고를 띄운다.
+  `Transition`이 `None`이 아니면 경고, 세트의 `Target`이 비어 있으면 경고, `Normal`이 오버라이드하지
+  않는 필드를 다른 상태가 오버라이드하면 경고를 띄운다(위 "상태 5종과 폴백 규칙"의 하자).
 - `UIImageStateValueDrawer`/`UITextStateValueDrawer`(`UIStateValueDrawers.cs`) — 각각
   `UIImageStateValue`/`UITextStateValue`의 `PropertyDrawer`. `Override` 플래그로 켠 필드만
   인스펙터에 노출한다.

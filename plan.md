@@ -73,6 +73,21 @@ EditMode 범위 밖: Pressed/Highlighted/Selected 매핑은 EventSystem 포인�
 - [ ] 기본 Output도 지정되지 않으면 이전처럼 믹서를 우회한다
 - [ ] 명시한 Output이 기본 Output보다 우선한다
 
+## 대기: UIStateButton 복원 기준값
+
+스왑 세트가 복원 기준을 갖고 있지 않아 생기는 문제 두 가지를 함께 푼다. 뿌리가 같다 —
+직렬화 필드(`Image.sprite`/`color`/`enabled`)를 되돌릴 기준 없이 직접 쓴다.
+
+1. `Normal`이 오버라이드하지 않는 필드를 다른 상태가 오버라이드하면, 그 상태를 벗어나도
+   원래 값으로 돌아오지 않는다. 지금은 인스펙터 경고로만 막고 있다.
+2. `Selectable`이 `[ExecuteAlways]`라 에디터에서도 `OnValidate` → `DoStateTransition`이 돌고
+   (`Selectable.cs:578-586`), 우리 스왑은 uGUI의 `overrideSprite`/`CanvasRenderer`와 달리
+   직렬화 필드를 직접 쓴다. 인스펙터에서 `interactable`을 껐다 켜면 Disabled 값이 프리팹에 구워진다.
+
+- [ ] Normal이 오버라이드하지 않는 필드도 상태를 벗어나면 원래 값으로 돌아온다
+- [ ] 풀에서 재사용된 View도 첫 프리팹 값을 기준으로 복원한다
+- [ ] 에디터에서 상태를 미리 보아도 프리팹에 값이 구워지지 않는다
+
 ---
 
 ## 완료: AnalyticsService — Adjust 어댑터

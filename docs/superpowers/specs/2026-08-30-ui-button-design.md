@@ -124,8 +124,7 @@ Assets/FoundationDI/Runtime/Components/          ← 신설
 Assets/FoundationDI/Editor/Components/           ← 신설
     UIButtonEditor.cs
     UIStateButtonEditor.cs
-    UIImageStateValueDrawer.cs
-    UITextStateValueDrawer.cs
+    UIStateValueDrawers.cs           ← UIImageStateValueDrawer + UITextStateValueDrawer 둘 다 여기 있다
 ```
 
 기존 구조는 `Runtime/Services/*`와 `Runtime/Managers/*` 둘뿐인데 `UIButton`은 둘 다 아니다. SoundService와 HapticService **두 서비스를** 소비하므로 어느 한 서비스 폴더 아래에 두면 소속이 틀린다. UIService 아래도 아니다 — UIService에 대한 의존이 0이다. "서비스를 소비하는 씬 저작용 위젯"을 담는 세 번째 버킷을 연다.
@@ -349,7 +348,7 @@ public class UIStateButton : UIButton
 |---|---|
 | `UIButtonEditor : UnityEditor.UI.ButtonEditor` | 기본 Button 인스펙터 + Sound/Haptic 섹션 |
 | `UIStateButtonEditor : UIButtonEditor` | 위 + 세트 리스트 + 경고 HelpBox |
-| `UIImageStateValueDrawer` / `UITextStateValueDrawer` | `Override`에서 켜진 필드만 그린다 |
+| `UIImageStateValueDrawer` / `UITextStateValueDrawer`(둘 다 `UIStateValueDrawers.cs`) | `Override`에서 켜진 필드만 그린다 |
 
 `ButtonEditor` 상속이 `interactable`·`transition`·`navigation`·`onClick` 기본 UI를 공짜로 준다.
 
@@ -389,12 +388,12 @@ HelpBox 경고 두 가지:
 - ApplyState에 각 상태를 넣으면 세트가 그 상태로 적용된다
 - interactable을 끄면 Disabled 세트가 적용된다
 - 서비스가 하나도 등록되지 않아도 클릭이 예외를 내지 않는다
-- 사운드 서비스만 등록돼도 클릭 시 사운드가 재생된다
+- 사운드 서비스가 등록되면 클릭 시 지정한 SFX로 `CreateSound`가 호출된다
 ```
 
 `interactable` 테스트가 성립하는 근거: `Selectable.interactable` setter가 `OnSetProperty()`(`Selectable.cs:535`) → `DoStateTransition`을 부른다. 컴포넌트를 붙이고 `interactable = false`만 대입하면 매핑 경로 전체가 한 번 돈다.
 
-**테스트하지 않는 것**: `Pressed`/`Highlighted`/`Selected` 매핑은 `EventSystem` 포인터 시뮬레이션이 필요해 EditMode 범위 밖이다. `Disabled` 경로로 `switch` 배선 자체는 확인되고, 나머지는 플레이 모드 확인으로 대신한다. (AdService 3사 어댑터, Firebase/Adjust 어댑터와 같은 처리다.)
+**테스트하지 않는 것**: `Pressed`/`Highlighted`/`Selected` 매핑은 `EventSystem` 포인터 시뮬레이션이 필요해 EditMode 범위 밖이다. `Disabled` 경로로 `switch` 배선 자체는 확인되고, 나머지는 플레이 모드 확인으로 대신한다. (AdService 3사 어댑터, Firebase/Adjust 어댑터와 같은 처리다.) `Sound` 빌더 체인(`SetVolume`/`SetSpatialSound`/`SetOutput`/`SetRandomPitch`/`Play`)과 `SetSpatialSound(false)` 자체도 자동화 커버리지가 없다 — `Sound`가 `internal` 생성자를 가진 구체 클래스라 NSubstitute가 대체하지 못하고, `ISoundService.CreateSound`의 테스트 더블은 `null`을 돌려준다. `UIButton`은 그 `null`을 보고 조기 반환하므로 빌더 체인은 EditMode에서 한 번도 실행되지 않는다.
 
 ---
 
@@ -423,7 +422,7 @@ Tidy First 원칙에 따라 구조 변경을 먼저, 별도 커밋으로 낸다.
 3. `[BEHAVIORAL]` `UIButton` 피드백
 4. `[BEHAVIORAL]` `UIStateButton` 배선
 5. `[STRUCTURAL]` 에디터 인스펙터/드로어
-6. `[STRUCTURAL]` `SoundButton` 삭제 + 문서 갱신 + 버전 0.9.0
+6. `[STRUCTURAL]` `SoundButton` 삭제 + 문서 갱신 + 버전 0.8.1
 
 ---
 
