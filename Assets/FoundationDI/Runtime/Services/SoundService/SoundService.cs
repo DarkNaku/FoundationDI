@@ -42,14 +42,21 @@ namespace DarkNaku.FoundationDI
 
             _disposed = true;
 
-            StopAll();
+            // 플레이모드 종료 시 Unity의 오브젝트 파괴와 Container.Dispose 순서가 보장되지 않는다.
+            // 풀 루트가 이미 파괴됐다면 그 아래 SoundSource도 함께 파괴된 상태라 정지시킬 대상이 없다.
+            // fake-null 가드가 StopAll 위에 있어야 파괴된 SoundSource를 건드려
+            // MissingReferenceException을 내지 않는다.
+            bool poolAlive = _poolParent != null;
+
+            if (poolAlive)
+            {
+                StopAll();
+            }
 
             _sourcePool.Clear();
             _cachedListener = null;
 
-            // 플레이모드 종료 시 Unity의 오브젝트 파괴와 Container.Dispose 순서가 보장되지 않는다.
-            // fake-null 가드로 이미 파괴된 경우를 건너뛴다.
-            if (_poolParent == null) return;
+            if (!poolAlive) return;
 
             if (Application.isPlaying)
             {

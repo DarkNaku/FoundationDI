@@ -121,6 +121,18 @@ public class SoundServiceTest
     }
 
     [Test]
+    public void 소스가_먼저_파괴돼도_Dispose는_예외를_내지_않는다()
+    {
+        var source = ((ISoundEngine)_service).GetSource();
+        var poolParent = source.transform.parent.gameObject;
+
+        // 플레이모드 종료 시 Unity의 오브젝트 파괴가 Container.Dispose보다 먼저 일어나는 상황.
+        Object.DestroyImmediate(poolParent);
+
+        Assert.DoesNotThrow(() => _service.Dispose());
+    }
+
+    [Test]
     public void Output을_지정하지_않으면_설정의_기본_Output으로_해석된다()
     {
         _settings.DefaultOutput = Output.FromTag("SFX");
