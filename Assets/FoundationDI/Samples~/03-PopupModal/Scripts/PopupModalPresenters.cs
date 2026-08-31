@@ -41,9 +41,9 @@ namespace DarkNaku.FoundationDI.Samples
             View.dummyButton.onClick.AddListener(() => Debug.Log("[Modal] dummy clicked"));
             View.askButton.onClick.AddListener(() =>
             {
-                // 결과 반환: Presenter의 Result 프로퍼티를 OnAfterHide 콜백에서 읽는다.
-                var dialog = _ui.Popup<ConfirmDialog>();
-                dialog.OnAfterHide(_ => View.resultLabel.text = dialog.Confirmed ? "결과: 확인" : "결과: 취소");
+                // 결과 반환: 콜백 파라미터가 ConfirmDialog 그대로라 캡처 없이 바로 읽는다.
+                _ui.Popup<ConfirmDialog>()
+                   .OnAfterHide(p => View.resultLabel.text = p.Confirmed ? "결과: 확인" : "결과: 취소");
             });
         }
     }

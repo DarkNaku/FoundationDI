@@ -22,7 +22,7 @@ public class ConfirmDialog : UIPopupPresenter<ConfirmDialogView>
 
 // 결과 반환: OnAfterHide에서 Confirmed 읽기
 var dialog = _ui.Popup<ConfirmDialog>();
-dialog.OnAfterHide(_ => View.resultLabel.text = dialog.Confirmed ? "결과: 확인" : "결과: 취소");
+.OnAfterHide(p => View.resultLabel.text = p.Confirmed ? "결과: 확인" : "결과: 취소");
 ```
 
 ## 실행

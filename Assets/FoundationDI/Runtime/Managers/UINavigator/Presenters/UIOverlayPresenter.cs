@@ -1,6 +1,6 @@
 namespace DarkNaku.FoundationDI
 {
-    public abstract class UIOverlayPresenter<TView> : UIPresenterBuilder<UIOverlayPresenter<TView>, TView>, IOverlayPlacement
+    public abstract class UIOverlayPresenter<TView> : UIPresenterBuilder<TView>, IOverlayPlacement
         where TView : UIView
     {
         protected internal virtual bool Above => true;

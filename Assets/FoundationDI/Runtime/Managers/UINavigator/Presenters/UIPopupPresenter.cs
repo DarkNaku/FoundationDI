@@ -1,6 +1,6 @@
 namespace DarkNaku.FoundationDI
 {
-    public abstract class UIPopupPresenter<TView> : UIPresenterBuilder<UIPopupPresenter<TView>, TView>
+    public abstract class UIPopupPresenter<TView> : UIPresenterBuilder<TView>
         where TView : UIView
     {
     }
