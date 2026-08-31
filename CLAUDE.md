@@ -105,7 +105,7 @@ NuGet 의존성은 **NuGetForUnity**(`Assets/NuGet/`)가 `Assets/packages.config
   - ⚠️ **`RegisterTutorialManager`는 `RegisterInjector`와 같은 스코프에 등록한다.** `InjectorService`가 정적 컨테이너 참조 하나를 공유하는 단일 컨테이너 모델이라, 씬(자식) 스코프에 두면 루트 리졸버가 `ITutorialManager`를 해결하지 못해 주입이 **조용히 실패**한다. 씬 스코프에 두려면 그 스코프에서 `RegisterComponentInHierarchy<TutorialSequenceBehaviour>()`를 함께 부른다.
   - 상세: `Assets/FoundationDI/Runtime/Managers/TutorialManager/README.md`.
 - **UINavigator** (`Managers/UINavigator/`): uGUI 기반 UI 시스템. 네임스페이스 `DarkNaku.FoundationDI`.
-  - **빌더 API**: `_ui.Page<TPresenter>()` / `Popup<TPresenter>()` / `Overlay<TPresenter>()` → 인스턴스 즉시 반환 + Show 자동 enqueue (`.Show()` 별도 호출 불필요) → 같은 프레임 내 `.WithParams(params)` / `.OnAfterShow(...)` / `.WithTransition(...)` / `.WithOverlay(...)` 동기 체인.
+  - **빌더 API**: `_ui.Page<TPresenter>()` / `Popup<TPresenter>()` / `Overlay<TPresenter>()` → 인스턴스 즉시 반환 + Show 자동 enqueue (`.Show()` 별도 호출 불필요) → 같은 프레임 내 `.WithParams(params)` / `.OnAfterShow(...)` / `.WithTransition(...)` 동기 체인. 빌더는 `UIPresenterExtensions`의 확장 메서드라 수신자에서 타입이 추론되어 **콜백 파라미터와 체인 반환이 선언한 Presenter 타입 그대로**다. `.WithOverlay(...)`만 타입 인자 추론이 불가능해 인스턴스 메서드로 남았고 반환값 없이 문으로 쓴다.
   - **표시 모드**: Presenter 타입으로 컴파일 타임 고정 — `UIPagePresenter<TView>`(단일 교체) / `UIPopupPresenter<TView>`(LIFO 스택) / `UIOverlayPresenter<TView>`(Popup 기준 Above/Below 상주). View 공통 기반 `UIView : MonoBehaviour`.
   - **`OperationQueue`**: 모든 Show/Hide 전환을 단일 큐로 순차 직렬화 → race 조건 제거.
   - **prefab 매핑**: `[UIPrefab("키")]` 속성을 Presenter 타입에 부착. 로딩은 `IResourceService`에 위임(Resources/Addressables 중 어느 쪽이든 등록된 `IResourceProvider`가 결정).

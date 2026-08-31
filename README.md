@@ -1,7 +1,7 @@
 # FoundationDI
 
 ![Unity](https://img.shields.io/badge/Unity-6000.3%2B-black?logo=unity)
-![Version](https://img.shields.io/badge/version-0.9.0-blue)
+![Version](https://img.shields.io/badge/version-0.9.1-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Author](https://img.shields.io/badge/author-DarkNaku-orange)
 
@@ -121,7 +121,7 @@ public class TitleFlow
 
 | 구성 요소 | 설명 | 상세 문서 |
 | --- | --- | --- |
-| **UINavigator** | uGUI 기반 UI 표시/전환 시스템. Presenter 타입으로 Page(단일 교체)/Popup(LIFO·모달)/Overlay(상주 Above/Below) 모드를 고정. **씬 수명 Canvas**(씬 `LifetimeScope`가 소유, 렌더 모드/CanvasScaler는 `UINavigatorSettings.RootPrefab`이 결정·미지정 시 ScreenSpaceOverlay/1920x1080 폴백, 씬 언로드 시 캔버스·풀·프리젠터가 함께 파괴), Presenter 매 표시 재생성 + **View 풀링**, `Awaitable` 트랜지션, 모달 입력 차단(`CanvasGroup.interactable`). Page/Popup에 `WithOverlay`(오버레이 동시 노출·`persistent` 연속 유지)와 자동-show 빌더 API 제공. 프리팹 로딩은 `IResourceService`(Resources/Addressables)에 위임. | [README](Assets/FoundationDI/Runtime/Managers/UINavigator/README.md) |
+| **UINavigator** | uGUI 기반 UI 표시/전환 시스템. Presenter 타입으로 Page(단일 교체)/Popup(LIFO·모달)/Overlay(상주 Above/Below) 모드를 고정. **씬 수명 Canvas**(씬 `LifetimeScope`가 소유, 렌더 모드/CanvasScaler는 `UINavigatorSettings.RootPrefab`이 결정·미지정 시 ScreenSpaceOverlay/1920x1080 폴백, 씬 언로드 시 캔버스·풀·프리젠터가 함께 파괴), Presenter 매 표시 재생성 + **View 풀링**, `Awaitable` 트랜지션, 모달 입력 차단(`CanvasGroup.interactable`). Page/Popup에 `WithOverlay`(오버레이 동시 노출·`persistent` 연속 유지)와 자동-show 빌더 API 제공(빌더는 확장 메서드라 콜백·체인이 구체 Presenter 타입 유지). 프리팹 로딩은 `IResourceService`(Resources/Addressables)에 위임. | [README](Assets/FoundationDI/Runtime/Managers/UINavigator/README.md) |
 | **Components** | 씬 저작용 uGUI 위젯. `UIButton`(클릭 시 SFX 재생 + 햅틱 `Impact`, 두 서비스 모두 **선택적** 주입)과, 상태(Normal/Highlighted/Pressed/Selected/Disabled)별로 여러 `Image`/텍스트를 동시에 스왑하는 `UIStateButton`. 스왑은 `그 상태 → Normal → 기준값 → 안 씀` 4단으로 해석되어 상태를 벗어나면 원래 값으로 돌아온다. | [README](Assets/FoundationDI/Runtime/Components/README.md) |
 | **ResourceService** | Addressables 추상화. `LoadAsync`/`Load`/`Release`/`Dispose` API로 키 단위 캐싱 + 참조 카운팅. 에셋 로딩이 필요한 모든 서비스의 위임 대상. | [README](Assets/FoundationDI/Runtime/Services/ResourceService/README.md) |
 | **MessageService** | 외부 라이브러리 없는 인-메모리 pub-sub. 타입을 채널로 삼아 `Publish<T>`/`Subscribe<T>`만 제공하며, 구독 토큰은 `IDisposable`(R3를 쓴다면 `AddTo`로 MonoBehaviour 수명에 바인딩 가능). 발행은 스냅샷으로 완주하고 핸들러 예외는 격리한다. 메인 스레드 전제. | [README](Assets/FoundationDI/Runtime/Services/MessageService/README.md) |

@@ -3,7 +3,7 @@
 uGUI 기반 UI 표시/전환 시스템입니다. Presenter 타입으로 표시 모드(Page/Popup/Overlay)를 컴파일 타임에 고정하고, 모든 Show/Hide 전환을 단일 큐로 순차 직렬화합니다. 프리팹 로딩은 공용 [`IResourceService`](../../Services/ResourceService/README.md)에 위임하며, 백엔드(Resources/Addressables)는 어떤 `IResourceProvider`를 등록했는지로 결정됩니다.
 
 - **3가지 표시 모드** — Page(단일 교체), Popup(LIFO 스택·모달), Overlay(상주, Popup 기준 Above/Below)
-- **빌더 체인** — `Page<T>()` 즉시 인스턴스 반환 + Show 자동 enqueue → 같은 프레임 `.WithParams()/.OnAfterShow()/.WithTransition()/.WithOverlay()` 동기 체인
+- **빌더 체인** — `Page<T>()` 즉시 인스턴스 반환 + Show 자동 enqueue → 같은 프레임 `.WithParams()/.OnAfterShow()/.WithTransition()` 동기 체인. 콜백 파라미터와 체인 반환은 **선언한 Presenter 타입 그대로**다(확장 메서드라 수신자에서 추론). `WithOverlay()`는 체인이 아니라 문으로 쓴다
 - **전환 직렬화** — `OperationQueue`로 모든 전환을 순차 처리(race 제거)
 - **Presenter는 매 표시마다 새로 생성, View는 풀 재사용** — Presenter 인스턴스 캐시는 없음. `Page/Popup/Overlay<T>()`마다 새 Presenter 생성 + `OnInitialize` 재실행. View만 프리팹 키로 풀링되어 재사용됨.
 - **씬 수명 캔버스** — 루트 Canvas는 자신을 만든 씬에 속한다. `UINavigatorSettings.RootPrefab`을 인스턴스화하며(렌더 모드/CanvasScaler/레이어는 프리팹이 결정), 미지정 시 코드 기본값(ScreenSpaceOverlay/1920x1080)으로 폴백. 씬이 언로드되면 캔버스·풀·프리젠터가 함께 파괴된다.
@@ -206,17 +206,19 @@ public class MenuPage : UIPagePresenter<MenuPageView>
 
 ## WithOverlay
 
-Page/Popup에 `WithOverlay<TOverlay>(bool persistent = false, Action<TOverlay> configure = null)`를 체인하면 호스트와 **함께** 오버레이를 노출합니다.
+Page/Popup에서 `WithOverlay<TOverlay>(bool persistent = false, Action<TOverlay> configure = null)`를 호출하면 호스트와 **함께** 오버레이를 노출합니다. 이 메서드만 빌더 체인에 끼지 않고 **문(statement)으로** 씁니다 — 이유는 아래 참고.
 
 - 오버레이는 호스트와 **동시에(concurrent)** 애니메이션되고, 호스트의 트랜지션 오버라이드(`WithTransition`)를 공유합니다.
 - 호스트가 숨겨지면 링크된 오버레이도 **함께 숨겨집니다**.
 - `configure`는 View 바인딩/`OnInitialize` 전에 호출되므로 **params만** 저장하고 View에 접근하지 마세요.
 
 ```csharp
-_ui.Page<StagePage>()
-   .WithOverlay<HudOverlay>(persistent: true)
-   .WithOverlay<TouchGuardOverlay>();     // 기본(per-host) 오버레이
+var page = _ui.Page<StagePage>();
+page.WithOverlay<HudOverlay>(persistent: true);
+page.WithOverlay<TouchGuardOverlay>();     // 기본(per-host) 오버레이
 ```
+
+> **왜 체인이 아닌가** — 다른 빌더 메서드는 확장 메서드라 수신자에서 타입이 추론되어 구체 Presenter 타입을 유지합니다. `WithOverlay`는 타입 인자가 둘(수신자, `TOverlay`)이 되는데 C#은 일부만 명시하고 나머지를 추론할 수 없어 `WithOverlay<HudOverlay>()`가 성립하지 않습니다. 그래서 인스턴스 메서드로 남았고, 체인 중간에 끼면 그 뒤로 구체 타입이 소실되는 순서 의존 함정이 생기므로 반환값을 두지 않습니다.
 
 ### persistent 시맨틱
 
@@ -253,13 +255,15 @@ _ui.Page<StagePage>()
 
 | 메서드 | 설명 |
 | --- | --- |
-| `WithParams<TParams>(TParams p)` | Presenter가 `IConfigurable<TParams>`면 `Configure(p)` 호출(아니면 경고 후 무시) |
-| `OnBeforeShow(Action<TSelf> cb)` | BeforeShow 라이프사이클에 콜백 등록 |
-| `OnAfterShow(Action<TSelf> cb)` | AfterShow 라이프사이클에 콜백 등록 |
-| `OnBeforeHide(Action<TSelf> cb)` | BeforeHide 라이프사이클에 콜백 등록 |
-| `OnAfterHide(Action<TSelf> cb)` | AfterHide 라이프사이클에 콜백 등록 |
+| `WithParams(TParams p)` | Presenter가 `IConfigurable<TParams>`면 `Configure(p)` 호출(아니면 경고 후 무시) |
+| `OnBeforeShow(Action<T> cb)` | BeforeShow 라이프사이클에 콜백 등록 |
+| `OnAfterShow(Action<T> cb)` | AfterShow 라이프사이클에 콜백 등록 |
+| `OnBeforeHide(Action<T> cb)` | BeforeHide 라이프사이클에 콜백 등록 |
+| `OnAfterHide(Action<T> cb)` | AfterHide 라이프사이클에 콜백 등록 |
 | `WithTransition(IUITransition t)` | 이번 표시에 한해 트랜지션 오버라이드 |
-| `WithOverlay<TOverlay>(bool persistent = false, Action<TOverlay> configure = null)` | 호스트와 함께 오버레이 노출(위 [WithOverlay](#withoverlay) 참고) |
+| `WithOverlay<TOverlay>(bool persistent = false, Action<TOverlay> configure = null)` | 호스트와 함께 오버레이 노출. **반환값 없음 — 문으로 호출**(위 [WithOverlay](#withoverlay) 참고) |
+
+위 표의 `T`는 **호출한 Presenter의 구체 타입**입니다. `UIPresenterExtensions`의 확장 메서드라 수신자에서 추론되므로, `dialog.OnAfterHide(p => ...)`의 `p`는 `dialog`의 선언 타입 그대로이고 캐스트가 필요 없습니다.
 
 `UIPresenter<TView>`는 `protected TView View` 접근자를 제공합니다.
 
@@ -322,7 +326,7 @@ _ui.Page<StagePage>()
 
 ### 표시 흐름과 OperationQueue
 
-- `Page/Popup/Overlay<T>()`는 인스턴스를 **즉시 동기 반환**하고 실제 표시는 `OperationQueue`에 enqueue됩니다. 큐 작업은 `Awaitable.NextFrameAsync`로 한 프레임 양보한 뒤 실행되므로, 같은 프레임에 빌더 체인(`.With/.OnAfterShow/.WithTransition/.WithOverlay`)을 동기로 구성할 수 있습니다.
+- `Page/Popup/Overlay<T>()`는 인스턴스를 **즉시 동기 반환**하고 실제 표시는 `OperationQueue`에 enqueue됩니다. 큐 작업은 `Awaitable.NextFrameAsync`로 한 프레임 양보한 뒤 실행되므로, 같은 프레임에 빌더 체인(`.WithParams/.OnAfterShow/.WithTransition`)을 동기로 구성할 수 있습니다.
 - 모든 Show/Hide 전환은 `OperationQueue`로 **순차 직렬화**되어 동시 전환의 race를 방지합니다. 큐 예외는 로그로 처리되며 루프를 중단하지 않습니다.
 - 큐는 `Dispose` 시 `CancelAndClear`로 취소됩니다(씬 전환 자체는 별도로 큐를 건드리지 않습니다).
 
@@ -346,6 +350,36 @@ _ui.Page<StagePage>()
 - 캔버스·풀·프리젠터는 UINavigator를 등록한 스코프(보통 씬)의 수명을 따릅니다. 앱 전체에서 유지되는 UI가 필요하면 이 컴포넌트 밖에서 별도로 관리하세요(자세한 내용은 위 [Canvas 수명](#canvas-수명) 참고).
 - 큐 작업 중 발생한 예외는 로그로 남지만 대기 중인 호출자에게 전파되지는 않습니다.
 - 메인 스레드 전제(스레드 안전성 없음).
+
+---
+
+## 0.9.0 → 0.9.1 마이그레이션
+
+빌더가 확장 메서드(`UIPresenterExtensions`)로 옮겨져 **콜백 파라미터와 체인 반환이 구체 Presenter 타입**이 됩니다. 대부분의 코드는 그대로 컴파일되며, 캐스트나 캡처 없이 파라미터를 바로 쓸 수 있게 됩니다.
+
+```csharp
+// 0.9.0 — p가 UIPopupPresenter<ConfirmDialogView>라 캡처한 변수를 대신 읽었다
+var dialog = _ui.Popup<ConfirmDialog>();
+dialog.OnAfterHide(_ => label.text = dialog.Confirmed ? "확인" : "취소");
+
+// 0.9.1 — p가 ConfirmDialog
+_ui.Popup<ConfirmDialog>()
+   .OnAfterHide(p => label.text = p.Confirmed ? "확인" : "취소");
+```
+
+손봐야 하는 곳은 둘뿐입니다.
+
+- **`WithOverlay`를 체인했다면** 문으로 분리하세요. 반환값이 없어졌습니다.
+  ```csharp
+  // 0.9.0
+  _ui.Page<StagePage>().WithOverlay<HudOverlay>(persistent: true);
+  // 0.9.1
+  var page = _ui.Page<StagePage>();
+  page.WithOverlay<HudOverlay>(persistent: true);
+  ```
+- **람다 파라미터에 타입을 명시했다면** 지우거나 구체 타입으로 바꾸세요. `(UIPopupPresenter<V> p) => ...`는 더 이상 맞지 않습니다.
+
+`UIPresenterBuilder`의 타입 인자도 `<TSelf, TView>`에서 `<TView>`로 줄었지만, 이 타입을 직접 이름으로 쓰는 코드는 보통 없습니다(`UIPagePresenter<TView>` 등을 상속하므로).
 
 ---
 
