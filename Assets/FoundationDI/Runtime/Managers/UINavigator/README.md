@@ -321,7 +321,7 @@ page.WithOverlay<TouchGuardOverlay>();     // 기본(per-host) 오버레이
 ### 표시 모드
 
 - **Page** — 단일 활성. 새 Page를 표시하면 이전 Page를 Hide하고 교체합니다.
-- **Popup** — LIFO 스택. 여러 개가 쌓이며, **최상단 팝업만 입력 활성**이고 하위 팝업·Page·BelowOverlay는 입력 차단(모달)됩니다. AboveOverlay는 팝업 표시 중에도 입력을 유지합니다. 입력 차단은 `CanvasGroup.interactable`(`UIView.InputEnabled`) 토글이며, 클릭 흡수/통과(`blocksRaycasts`/`raycastTarget`)는 프리팹 책임입니다.
+- **Popup** — LIFO 스택. 여러 개가 쌓이며, **최상단 팝업만 입력 활성**이고 하위 팝업·Page·BelowOverlay는 입력 차단(모달)됩니다. (전환이 진행되는 동안에는 이와 별개로 캔버스 전체 입력이 차단됩니다 — 위 [표시 흐름과 OperationQueue](#표시-흐름과-operationqueue) 참고.) AboveOverlay는 팝업 표시 중에도 입력을 유지합니다. 입력 차단은 `CanvasGroup.interactable`(`UIView.InputEnabled`) 토글이며, 클릭 흡수/통과(`blocksRaycasts`/`raycastTarget`)는 프리팹 책임입니다.
 - **Overlay** — 상주형. `Above`(기본 true)면 Popup 위 레이어(AboveOverlay), false면 Popup 아래 레이어(BelowOverlay)에 배치됩니다. `WithOverlay`로 Page/Popup에 링크하거나 `Overlay<T>()`로 단독 표시할 수 있습니다.
 
 ### 표시 흐름과 OperationQueue
@@ -329,6 +329,15 @@ page.WithOverlay<TouchGuardOverlay>();     // 기본(per-host) 오버레이
 - `Page/Popup/Overlay<T>()`는 인스턴스를 **즉시 동기 반환**하고 실제 표시는 `OperationQueue`에 enqueue됩니다. 큐 작업은 `Awaitable.NextFrameAsync`로 한 프레임 양보한 뒤 실행되므로, 같은 프레임에 빌더 체인(`.WithParams/.OnAfterShow/.WithTransition`)을 동기로 구성할 수 있습니다.
 - 모든 Show/Hide 전환은 `OperationQueue`로 **순차 직렬화**되어 동시 전환의 race를 방지합니다. 큐 예외는 로그로 처리되며 루프를 중단하지 않습니다.
 - 큐는 `Dispose` 시 `CancelAndClear`로 취소됩니다(씬 전환 자체는 별도로 큐를 건드리지 않습니다).
+- **큐가 비어 있지 않은 동안 UI 입력이 차단됩니다.** 큐가 작업을 시작하면 루트 캔버스의 `GraphicRaycaster`가 꺼지고, 큐가 완전히 비면 다시 켜집니다(`UIRoot.InputBlocked`). 차단은 `Page/Popup/Overlay<T>()`를 호출한 **바로 그 프레임에 동기로** 걸리므로 연출 도중의 버튼 연타가 큐에 쌓이지 않습니다.
+
+이 차단은 아래 [표시 모드](#표시-모드)의 팝업 모달 차단과 **다른 축**입니다 — 모달 차단은 "무엇이 위에 있느냐"(레이어별 `CanvasGroup.interactable`), 이 차단은 "지금 전환 중이냐"(캔버스 전체 레이캐스트)입니다. 둘은 독립적으로 동작합니다.
+
+레이캐스터를 끄면 히트 자체가 사라지므로 `CanvasGroup.interactable`이 막지 못하는 커스텀 `IPointerClickHandler` 구현체까지 함께 차단됩니다. 다만 캔버스 단위라는 데서 오는 한계가 있습니다:
+
+- **레이어별 예외가 불가능합니다.** 팝업 모달과 달리 AboveOverlay도 전환 중에는 같이 차단됩니다.
+- **View 프리팹이 자체 `Canvas` + `GraphicRaycaster`를 가지면 우회됩니다**(sorting 목적의 중첩 캔버스). 그런 프리팹은 전환 중에도 입력을 받습니다.
+- **`OnSubmit` 경로는 막지 못합니다.** `GraphicRaycaster`는 포인터 레이캐스트만 담당하므로, `EventSystem.currentSelectedGameObject`에 Submit을 보내는 게임패드/키보드 입력은 그대로 전달됩니다.
 
 ### 프리팹 로딩
 
