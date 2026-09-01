@@ -3,6 +3,7 @@ using NSubstitute;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
+using UnityEngine.UI;
 using VContainer;
 using DarkNaku.FoundationDI;
 
@@ -356,5 +357,78 @@ public class UINavigatorFlowTests
         Assert.AreEqual(1, SubP.TickHandlerCalls, "이전 presenter 구독이 남지 않아 핸들러는 1회만 호출");
 
         manager.Dispose();
+    });
+
+    [UnityTest]
+    public IEnumerator 전환_요청_즉시_입력이_차단되고_큐가_비면_복원된다() => AwaitableTest.Run(async () =>
+    {
+        var resource = Substitute.For<IResourceService>();
+        resource.Load<GameObject>("UI/Sample").Returns(_prefab);
+        resource.Load<GameObject>("UI/Sample2").Returns(_prefab2);
+        var resolver = Substitute.For<IObjectResolver>();
+        var settings = ScriptableObject.CreateInstance<UINavigatorSettings>();
+        var factory = new UIInstanceFactory(resolver);
+        var manager = new UINavigator(settings, factory, resource);
+
+        var fadeGo = new GameObject("fade", typeof(RectTransform), typeof(FadeTransition));
+        var fade = fadeGo.GetComponent<FadeTransition>();
+        TransitionTestHelpers.SetPrivate(fade, "_duration", 0.2f);
+
+        var a = manager.Page<P>();
+        a.WithTransition(fade);
+        await AwaitableTest.WaitUntil(() => a.Shown, 3f);
+
+        var raycaster = a.ViewBase.GetComponentInParent<GraphicRaycaster>();
+        Assert.IsNotNull(raycaster, "루트 캔버스의 GraphicRaycaster를 찾을 수 있어야 한다");
+        Assert.IsTrue(raycaster.enabled, "유휴 상태에서는 입력이 열려 있다");
+
+        var b = manager.Page<P2>();
+        b.WithTransition(fade);
+
+        // 연타 차단의 핵심: 큐가 다음 프레임에 깨어나기 전, 요청과 같은 프레임에 이미 막혀야 한다.
+        Assert.IsFalse(raycaster.enabled, "전환 요청과 같은 프레임에 입력이 차단된다");
+
+        await AwaitableTest.WaitUntil(() => b.Shown, 3f);
+        await AwaitableTest.NextFrame();
+        Assert.IsTrue(raycaster.enabled, "큐가 비면 입력이 복원된다");
+
+        manager.Dispose();
+        Object.DestroyImmediate(fadeGo);
+    });
+
+    [UnityTest]
+    public IEnumerator 큐에_전환이_연달아_쌓여도_모두_끝날_때까지_차단이_유지된다() => AwaitableTest.Run(async () =>
+    {
+        var resource = Substitute.For<IResourceService>();
+        resource.Load<GameObject>("UI/Sample").Returns(_prefab);
+        resource.Load<GameObject>("UI/Sample2").Returns(_prefab2);
+        var resolver = Substitute.For<IObjectResolver>();
+        var settings = ScriptableObject.CreateInstance<UINavigatorSettings>();
+        var factory = new UIInstanceFactory(resolver);
+        var manager = new UINavigator(settings, factory, resource);
+
+        var fadeGo = new GameObject("fade", typeof(RectTransform), typeof(FadeTransition));
+        var fade = fadeGo.GetComponent<FadeTransition>();
+        TransitionTestHelpers.SetPrivate(fade, "_duration", 0.1f);
+
+        var a = manager.Page<P>();
+        await AwaitableTest.WaitUntil(() => a.Shown, 3f);
+        var raycaster = a.ViewBase.GetComponentInParent<GraphicRaycaster>();
+
+        // 연타 재현: 한 프레임에 전환 두 건이 큐에 쌓인다.
+        var b = manager.Page<P2>();
+        b.WithTransition(fade);
+        var c = manager.Page<P>();
+        c.WithTransition(fade);
+
+        await AwaitableTest.WaitUntil(() => b.Shown, 3f);
+        Assert.IsFalse(raycaster.enabled, "큐에 전환이 남아 있는 한 차단이 유지된다");
+
+        await AwaitableTest.WaitUntil(() => c.Shown, 3f);
+        await AwaitableTest.NextFrame();
+        Assert.IsTrue(raycaster.enabled, "큐가 완전히 비면 복원된다");
+
+        manager.Dispose();
+        Object.DestroyImmediate(fadeGo);
     });
 }

@@ -21,12 +21,30 @@ namespace DarkNaku.FoundationDI
         private UIRoot _root;
         private PoolManager _pool;
         private bool _disposed;
+        private bool _inputBlocked;
 
         internal UINavigator(UINavigatorSettings settings, UIInstanceFactory factory, IResourceService resource)
         {
             _settings = settings;
             _factory = factory;
             _resource = resource;
+            _queue.BusyChanged = OnQueueBusyChanged;
+        }
+
+        // 전환이 진행되는 동안 루트 캔버스의 입력을 통째로 막는다. RefreshInputBlocking이 다루는
+        // "팝업 모달 계층"과는 다른 축이다 — 그쪽은 무엇이 위에 있느냐, 이쪽은 지금 전환 중이냐.
+        private void OnQueueBusyChanged(bool busy)
+        {
+            // Dispose는 CancelAndClear로 큐를 끊지만 ProcessLoop의 finally는 그 뒤에 풀리므로
+            // 해제 통지가 dispose 이후에 도착한다. 아래 _root null 검사만으로도 예외는 나지 않지만,
+            // 폐기된 내비게이터의 상태를 되쓰지 않도록 여기서 끊는다.
+            if (_disposed) return;
+
+            _inputBlocked = busy;
+
+            // 캔버스가 아직(또는 이미) 없으면 여기서 만들지 않는다 — 없는 캔버스에는 막을 입력도
+            // 없고, 지연 생성 시점을 앞당기면 씬 귀속 타이밍이 바뀐다. 상태는 CreateRoot가 반영한다.
+            if (_root != null) _root.InputBlocked = busy;
         }
 
         private UIRoot Root
@@ -86,6 +104,9 @@ namespace DarkNaku.FoundationDI
                     "해당 레이어로 향하는 UI는 부모 없이 씬 루트에 붙어 화면에 보이지 않습니다. " +
                     "UIRoot 컴포넌트 인스펙터에서 해당 필드를 프리팹 하위 RectTransform에 연결하세요.");
             }
+
+            // 큐가 이미 busy인 상태에서 캔버스가 생겨날 수 있다(첫 표시가 곧 첫 전환이다).
+            root.InputBlocked = _inputBlocked;
 
             return root;
         }

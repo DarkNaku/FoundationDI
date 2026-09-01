@@ -20,6 +20,24 @@ namespace DarkNaku.FoundationDI
         [SerializeField] private RectTransform _aboveOverlayLayer;
 
         public GameObject GO => gameObject;
+
+        // MonoBehaviour는 fake-null이라 ??= 로 캐시하면 파괴된 참조를 되쓴다.
+        private GraphicRaycaster _raycaster;
+        private GraphicRaycaster Raycaster
+            => _raycaster != null ? _raycaster : (_raycaster = GetComponent<GraphicRaycaster>());
+
+        /// <summary>
+        /// 전환 중 입력 차단. 레이캐스터를 끄면 이 캔버스에서 히트가 아예 나오지 않으므로
+        /// CanvasGroup.interactable이 막지 못하는 커스텀 IPointerClickHandler까지 함께 차단된다.
+        /// 대신 캔버스 단위라 레이어별 예외(AboveOverlay만 살리기)는 불가능하고,
+        /// EventSystem 선택 기반 OnSubmit(게임패드/키보드) 경로도 막지 못한다.
+        /// </summary>
+        public bool InputBlocked
+        {
+            get => Raycaster != null && !Raycaster.enabled;
+            set { if (Raycaster != null) Raycaster.enabled = !value; }
+        }
+
         public Transform PageLayer => _pageLayer;
         public Transform BelowOverlayLayer => _belowOverlayLayer;
         public Transform PopupLayer => _popupLayer;

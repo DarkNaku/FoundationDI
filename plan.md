@@ -6,6 +6,20 @@
 
 ---
 
+## 완료: UINavigator 전환 중 입력 차단
+
+Show/Hide 전환이 진행되는 동안 UI 입력이 열려 있어 버튼 연타가 그대로 큐에 쌓인다.
+`RefreshInputBlocking()`은 팝업 모달 계층만 모델링하고 큐의 busy 상태를 보지 않는다.
+루트 캔버스의 `GraphicRaycaster`를 큐 busy 동안 끄는 것으로 막는다 — 레이캐스트 자체가
+사라지므로 `CanvasGroup.interactable`이 못 막는 커스텀 `IPointerClickHandler`까지 차단된다.
+캔버스 단위라 레이어별 예외(AboveOverlay만 살리기)는 불가능하고, 중첩 캔버스를 가진 View
+프리팹과 게임패드 `OnSubmit` 경로는 막지 못한다 — README "표시 흐름과 OperationQueue" 참고.
+
+- [x] 전환 요청 즉시 입력이 차단되고 큐가 비면 복원된다
+- [x] 큐에 전환이 연달아 쌓여도 모두 끝날 때까지 차단이 유지된다
+
+---
+
 ## 완료: UINavigator 씬 수명 전환
 
 UIService를 씬 LifetimeScope가 소유하는 UINavigator로 바꿨다. 캔버스가 활성 씬에
