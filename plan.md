@@ -6,6 +6,37 @@
 
 ---
 
+## 완료: UIScaleButton
+
+호버하면 커지고 누르면 작아졌다가 떼면 다시 커지는 버튼. 커서가 벗어나면 원래 크기로 돌아온다.
+
+핵심 제약 두 가지다.
+
+1. **히트 영역이 변하면 안 된다.** uGUI의 레이캐스트 영역은 `Graphic`의 rect에 트랜스폼 스케일이
+   곱해진 것이라, 버튼 자신을 축소하면 히트 영역도 줄어 경계에서 exit→확대→enter→축소 진동이 난다.
+   그래서 스케일은 `_scaleTarget`(자식 `RectTransform`)에만 걸고 버튼 자신의 트랜스폼은 건드리지
+   않는다. 레이캐스트를 받는 `Graphic`은 버튼 본체에 남는다.
+2. **`SelectionState`를 쓰지 않는다.** uGUI의 우선순위는 `Pressed > Selected > Highlighted`라
+   PC에서 클릭 후 마우스를 떼면 `Selected`가 되어 `Highlighted`로 돌아오지 않는다(`UIStateButton`이
+   `_deselectOnClick`을 둔 이유). 대신 `OnPointerEnter/Exit/Down/Up`으로 `_pointerInside`/
+   `_pointerDown`을 직접 추적해 "떼면 다시 커진다"가 PC·모바일 양쪽에서 그대로 나오게 한다.
+
+보간은 `Awaitable`이 아니라 `Update` → `Tick(deltaTime)`이다. EditMode에서 프레임 펌프 없이
+보간 전체를 검증하기 위해서다. `localScale`은 직렬화 프로퍼티라 에디터에서 값이 구워지지 않도록
+쓰기는 `Application.isPlaying`일 때만 한다.
+
+- [x] 포인터 상태(호버/누름/이탈)에 따라 목표 배율이 정해진다
+- [x] 비활성이면 Disabled 배율을 쓰고 오버라이드가 없으면 기본 배율로 떨어진다
+- [x] 지정한 시간 동안 커브로 보간하고 끝나면 정확히 목표 배율이 된다
+- [x] 보간 도중 목표가 바뀌면 현재 배율에서 이어서 보간한다
+- [x] 스케일은 지정한 자식에만 걸리고 버튼 자신의 크기는 변하지 않는다
+- [x] 스케일 타깃이 없어도 예외 없이 동작한다
+
+런타임 배선(`Update`/`OnEnable`/`OnDisable`/`DoStateTransition`)은 `Application.isPlaying` 가드가
+걸려 있어 EditMode에서 돌지 않는다 — 플레이 확인으로 대신한다.
+
+---
+
 ## 완료: UINavigator 전환 중 입력 차단
 
 Show/Hide 전환이 진행되는 동안 UI 입력이 열려 있어 버튼 연타가 그대로 큐에 쌓인다.

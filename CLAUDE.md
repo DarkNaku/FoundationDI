@@ -127,6 +127,11 @@ NuGet 의존성은 **NuGetForUnity**(`Assets/NuGet/`)가 `Assets/packages.config
   - **자체 `UIButtonState` enum을 쓴다** — uGUI의 `Selectable.SelectionState`는 `protected` 중첩 enum이라 공개 API·테스트에서 쓸 수 없다. 순서가 같아도 캐스팅하지 않고 명시적 `switch`로 번역한다.
   - **폴백 규칙**: `그 상태가 오버라이드 → Normal이 오버라이드 → 기준값 → 아무것도 안 씀`. 폴백 대상이 **`Normal`이라는 게 핵심**이다. `Selected`를 `Highlighted`로 떨어뜨리면 uGUI가 클릭한 버튼을 선택 상태로 남기기 때문에 모바일에서 탭한 버튼이 계속 하이라이트된 채 남는다.
   - 스왑 세트는 `Selectable`을 전혀 모르는 순수 타입이라 EditMode에서 단독 테스트된다.
+- **UIScaleButton** (`Components/UIScaleButton.cs`): `UIButton` 상속 + 호버 확대 / 누름 축소.
+  - **스케일은 지정한 자식(`_scaleTarget`)에만 건다.** uGUI 레이캐스트 영역은 `Graphic`의 rect에 트랜스폼 스케일이 곱해진 것이라, 버튼 자신을 축소하면 히트 영역이 같이 줄어 경계에서 `축소→exit→확대→enter→축소` 진동이 난다. 클릭용 `Image`는 버튼 본체에 남기고 시각 요소만 자식으로 내린다. 타깃 하위에 `raycastTarget`이 켜진 `Graphic`이 있으면 같은 문제가 재발하므로 인스펙터가 경고한다(TMP는 기본이 켜짐).
+  - **`SelectionState`를 쓰지 않고 포인터 안/밖·누름을 직접 추적한다.** uGUI 우선순위가 `Pressed > Selected > Highlighted`라 PC에서 클릭 후 떼면 `Selected`로 남아 `Highlighted`로 돌아오지 않는다(`UIStateButton`의 `_deselectOnClick`이 우회하던 그 문제).
+  - **`localScale` 쓰기는 `Application.isPlaying`일 때만.** 직렬화 프로퍼티라 `[ExecuteAlways]`인 `Selectable`의 에디터 상태 전이에서 값이 프리팹에 구워진다. 그래서 `Update`/`OnEnable`/`OnDisable`/`DoStateTransition`이 전부 가드되고, 로직은 `RefreshTarget()`/`Tick(deltaTime)`(둘 다 `internal`)로 노출돼 EditMode에서 프레임 펌프 없이 검증된다.
+  - 배율은 자식의 원래 `localScale`에 곱해지고, 목표가 도중에 바뀌면 현재 값에서 이어서 보간한다.
   - 상세: `Assets/FoundationDI/Runtime/Components/README.md`.
 
 ### SDK 스크립팅 심볼 자동 관리
