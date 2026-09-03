@@ -208,7 +208,59 @@ Dummy가 기록한 소유는 `FoundationDI.IAP.Dummy.Owned.<storeId>` PlayerPref
 
 ---
 
-## 9. 범위 밖
+## 9. IL2CPP 빌드에서의 어댑터 보존
+
+**어댑터 어셈블리(`FoundationDI.UnityIAP`)는 IL2CPP 빌드에서 보존되어야 한다.**
+
+코어(`FoundationDI`)는 어댑터를 참조하지 않는다 — 참조하면 순환이 된다. 대신 어댑터가
+`[RuntimeInitializeOnLoadMethod]`로 스스로를 `IapProviderRegistry`에 등록하고 코어는 조회만 한다.
+그 결과 어댑터는 참조 그래프상 어디에서도 닿지 않는 섬이 되고, IL2CPP 링커는 닿지 않는
+어셈블리를 통째로 걷어낸다. 등록이 일어나지 않으면 조회가 비어 서비스가 조용히 Dummy provider로 떨어진다. 즉 **실기에서 결제가
+가짜로 성공한다** — 스토어에 아무것도 청구되지 않은 채 지급만 일어난다.
+
+**에디터에서는 링커가 돌지 않아 재현되지 않는다 — 빌드해 봐야만 드러난다.** 문서가 없으면
+매번 같은 시간을 쓰게 되는 종류의 실패다.
+
+### 9.1 패키지가 스스로 막는다 (소비 프로젝트가 할 일 없음)
+
+- `FoundationDILinkXmlGenerator`(`Editor/Linker/`)가 `IUnityLinkerProcessor`로 빌드마다
+  link.xml을 생성해 링커에 넘긴다. 어댑터 어셈블리와 **그 뒤의 SDK 어셈블리**(`Unity.Purchasing`, `Unity.Purchasing.Security`, `Unity.Purchasing.SecurityCore`)를
+  함께 보존한다.
+- 각 어댑터 폴더의 `AssemblyInfo.cs`에 `[assembly: AlwaysLinkAssembly]`가 붙어 있다.
+  생성 link.xml이 닿지 않는 빌드 경로에서도 어댑터 자신은 살아남게 하는 2차 방어선이다.
+
+> **link.xml 파일을 패키지에 그냥 넣어 두는 방법은 통하지 않는다.** 에디터가 사용자 link.xml을
+> 수집하는 곳은 `UnityEditorInternal.AssemblyStripper.GetUserBlacklistFiles` 하나뿐이고, 그
+> 구현은 `Directory.GetFiles("Assets", "link.xml", SearchOption.AllDirectories)`다. 즉 `Assets/`
+> 아래만 본다. UPM(git URL)으로 설치하면 패키지는 `Library/PackageCache/` 아래에 놓이므로
+> 거기 넣어 둔 link.xml은 영원히 읽히지 않는다.
+
+### 9.2 빌드에서 확인하는 방법
+
+빌드 산출물의 global-metadata에 타입 이름이 남아 있는지 본다.
+
+```bash
+# Android APK
+unzip -p app.apk assets/bin/Data/Managed/Metadata/global-metadata.dat \
+  | strings | grep -E 'UnityIapInstaller|UnityIapProvider|CrossPlatformReceiptValidator'
+```
+
+하나도 안 나오면 어셈블리가 통째로 스트리핑된 것이다. 런타임 증상은 이 에러 로그다.
+
+```
+[IAPService] UnityIAP provider가 요청됐지만 등록된 creator가 없다. FOUNDATIONDI_UNITYIAP 심볼이
+없어 어댑터가 컴파일되지 않았거나, IL2CPP 빌드에서 FoundationDI.UnityIAP 어셈블리가 통째로
+스트리핑된 것이다(에디터에서는 재현되지 않는다). Dummy provider로 대체한다.
+```
+
+### 9.3 어댑터를 추가할 때
+
+`SdkDefineTable.Entries`(`Editor/SdkDefines/`)에 한 줄 넣는 것이 전부다 — 심볼, 판정용
+어셈블리, 어댑터 어셈블리, 보존할 SDK 어셈블리가 한 곳에 있다. 빠뜨리면
+`FoundationDILinkXmlTest`가 asmdef와 대조해 EditMode에서 잡는다(스트리핑 자체는 EditMode에서
+재현할 수 없지만, 표 누락은 잡을 수 있다).
+
+## 10. 범위 밖
 
 - 구독 상품 (별도 계획)
 - 서버 영수증 검증 (`IReceiptValidator` seam만 열려 있다)

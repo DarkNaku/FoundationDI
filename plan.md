@@ -6,6 +6,37 @@
 
 ---
 
+## 완료: IL2CPP 빌드에서 옵셔널 어댑터 어셈블리 보존
+
+코어가 어댑터를 참조할 수 없어(순환 참조) 어댑터는 참조 그래프상 섬이 되고, IL2CPP 링커가
+닿지 않는 어셈블리를 통째로 걷어내면 `[RuntimeInitializeOnLoadMethod]` 등록 자체가 일어나지
+않아 AdService·AnalyticsService·IAPService가 모두 조용히 Dummy provider로 떨어졌다.
+
+**link.xml 파일을 패키지에 두는 것만으로는 안 된다.** 에디터가 사용자 link.xml을 수집하는 곳은
+`AssemblyStripper.GetUserBlacklistFiles` 하나뿐이고 그 구현이
+`Directory.GetFiles("Assets", "link.xml", SearchOption.AllDirectories)`라, UPM으로 설치된
+패키지(`Library/PackageCache/`)의 link.xml은 영원히 읽히지 않는다. 그래서 위치와 무관하게
+동작하는 `IUnityLinkerProcessor.GenerateAdditionalLinkXmlFile`로 생성해 넘긴다.
+
+어댑터만 보존해서는 부족하다 — MAX/LevelPlay/Adjust는 네이티브가 `UnitySendMessage`로 이름을
+찍어 관리 코드를 되부르므로 링커가 그 사용을 볼 수 없다. SDK 어셈블리도 함께 보존한다.
+
+런타임 스트리핑은 EditMode에서 재현할 수 없다. 대신 재발할 실패 모드("어댑터를 추가하고 표에
+넣는 것을 잊는다")를 asmdef와 대조해 잡는다.
+
+- [x] 어댑터 어셈블리는 모두 보존표에 있다
+- [x] 어댑터가 참조하는 SDK 어셈블리는 모두 보존표에 있다
+- [x] 어댑터 폴더마다 AlwaysLinkAssembly가 있다
+- [x] 생성된 link.xml은 표의 모든 어셈블리를 보존한다
+- [x] 모든 항목에 ignoreIfMissing이 붙는다
+- [x] 같은 어셈블리를 두 번 쓰지 않는다
+- [x] 링커에 넘길 파일을 Assets 밖에 쓰고 절대경로를 돌려준다
+
+실제 보존 여부는 실기 빌드의 `global-metadata.dat`에서 타입 이름을 grep해 확인한다
+(각 서비스 README의 "IL2CPP 빌드에서의 어댑터 보존" 참고).
+
+---
+
 ## 완료: UIScaleButton
 
 호버하면 커지고 누르면 작아졌다가 떼면 다시 커지는 버튼. 커서가 벗어나면 원래 크기로 돌아온다.
