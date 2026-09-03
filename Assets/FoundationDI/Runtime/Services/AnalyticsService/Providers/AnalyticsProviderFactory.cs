@@ -35,10 +35,8 @@ namespace DarkNaku.FoundationDI
 
                 if (!AnalyticsProviderRegistry.TryResolve(type, out var creator))
                 {
-                    Debug.LogError(
-                        $"[AnalyticsService] {type} provider가 요청됐지만 등록된 creator가 없다. " +
-                        $"SDK와 FOUNDATIONDI_{type.ToString().ToUpperInvariant()} 심볼이 있는지 확인하라. " +
-                        "이 provider만 건너뛴다.");
+                    Debug.LogError(ProviderDiagnostics.MissingCreator(
+                        "AnalyticsService", type.ToString(), "이 provider만 건너뛴다."));
                     continue;
                 }
 

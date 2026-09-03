@@ -60,10 +60,11 @@ namespace DarkNaku.FoundationDI
                 return creator(new IapProviderCreationContext());
             }
 
-            // 심볼은 정의됐는데 아무도 등록하지 않았다는 뜻이다. 조용히 Dummy로 대체하면
-            // 아무도 이 상태를 알아채지 못한다 — 반드시 에러로 남긴다.
-            Debug.LogError($"[IAPService] {effective} provider는 사용 가능하다고 판단됐지만 " +
-                           "아무도 IapProviderRegistry에 등록하지 않았다. Dummy provider로 대체한다.");
+            // 심볼은 정의됐는데 아무도 등록하지 않았다는 뜻이다 — 어댑터 어셈블리가 없거나,
+            // IL2CPP 빌드에서 통째로 스트리핑됐거나. 조용히 Dummy로 대체하면 아무도 이 상태를
+            // 알아채지 못한다 — 반드시 에러로 남긴다.
+            Debug.LogError(ProviderDiagnostics.MissingCreator(
+                "IAPService", effective.ToString(), "Dummy provider로 대체한다."));
             return new DummyIapProvider(dummyOptions);
         }
     }
