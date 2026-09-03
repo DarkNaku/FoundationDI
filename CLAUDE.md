@@ -138,13 +138,35 @@ NuGet 의존성은 **NuGetForUnity**(`Assets/NuGet/`)가 `Assets/packages.config
 
 3사 SDK 어댑터를 게이트하는 `FOUNDATIONDI_*` 심볼은 **손으로 정의하지 않는다.** `Assets/FoundationDI/Editor/SdkDefines/`의 `SdkDefineSynchronizer`가 도메인 리로드마다 SDK 대표 어셈블리의 존재 여부를 보고 Android/iOS/Standalone 심볼을 켜거나 끈다.
 
-- 관리 대상은 `SdkDefineTable.Entries` 한 곳에 있다. 어댑터를 추가하면 여기에 한 줄 넣는다(심볼·마커 어셈블리·표시 이름).
+- 관리 대상은 `SdkDefineTable.Entries` 한 곳에 있다. 어댑터를 추가하면 여기에 한 줄 넣는다(심볼·마커 어셈블리·표시 이름·어댑터 어셈블리·보존할 SDK 어셈블리).
 - **관리 대상 심볼만 건드린다** — `LEVELPLAY_DEPENDENCIES_INSTALLED` 같은 남의 심볼은 순서까지 보존한다.
 - `FOUNDATIONDI_ADMOB`는 어댑터 어셈블리가 없어 표에서 일부러 빠져 있다. 켜면 `AdProviderFactory`가 "creator 없음" 에러를 낸다.
 - 계산은 순수 함수 `SdkDefineSynchronizer.Resolve(current, present)`로 분리돼 EditMode에서 검증된다. 쓰기는 값이 실제로 달라질 때만 일어난다(안 그러면 재컴파일 무한 루프).
 - 옵트아웃은 `Tools/FoundationDI/SDK Defines/Auto Manage` 토글(EditorPrefs).
 
 공통 패턴: 에셋 로딩은 `IResourceService`에 위임한다(`UINavigator`, `PoolManager`). `ResourceService`가 등록된 `IResourceProvider`(Resources/Addressables)로 실제 로드를 수행하고 키 단위 캐싱·참조 카운팅으로 핸들 생명주기를 한 곳에서 관리한다. SoundService는 `SoundData`가 `AudioClip`을 컴파일 타임 직접 참조로 보유하므로 이 패턴에 해당하지 않는다.
+
+### IL2CPP 스트리핑에서 어댑터 보존
+
+코어는 옵셔널 어댑터 어셈블리를 참조할 수 없어(순환) 어댑터는 참조 그래프상 섬이 된다. IL2CPP
+링커는 닿지 않는 어셈블리를 통째로 걷어내므로, 그대로 두면 `[RuntimeInitializeOnLoadMethod]`
+등록이 실기 빌드에서 아예 일어나지 않아 세 서비스가 **조용히 Dummy provider로 떨어진다**.
+에디터에서는 재현되지 않는다.
+
+- **패키지에 link.xml 파일을 두는 방법은 통하지 않는다.** 에디터의 수집 지점은
+  `AssemblyStripper.GetUserBlacklistFiles` 하나뿐이고 구현이
+  `Directory.GetFiles("Assets", "link.xml", SearchOption.AllDirectories)`라 `Assets/` 아래만
+  본다. UPM 설치 시 패키지는 `Library/PackageCache/`에 있어 읽히지 않는다.
+- `Assets/FoundationDI/Editor/Linker/FoundationDILinkXmlGenerator`가 `IUnityLinkerProcessor`로
+  빌드마다 link.xml을 생성해 넘긴다. 내용은 `SdkDefineTable.Entries`의
+  `AdapterAssembly`/`PreservedAssemblies`에서 나온다 — **어댑터를 추가하면 그 한 줄이 심볼
+  동기화와 링커 보존 양쪽을 동시에 채운다.**
+- 어댑터만 보존해서는 부족하다. MAX/LevelPlay/Adjust는 네이티브가 `UnitySendMessage`로 이름을
+  찍어 관리 코드를 되부르므로 링커가 그 사용을 볼 수 없다 — SDK 어셈블리도 통째로 보존한다.
+- 각 어댑터 폴더의 `AssemblyInfo.cs`에 `[assembly: AlwaysLinkAssembly]`가 2차 방어선으로 있다.
+- 표 누락은 `FoundationDILinkXmlTest`가 asmdef와 대조해 EditMode에서 잡는다(스트리핑 자체는
+  EditMode에서 재현 불가).
+
 
 ### 네임스페이스
 런타임 코드는 `DarkNaku.FoundationDI` 단일 네임스페이스로 통일한다(UIManager 리뉴얼로 구 `FoundationDI` 네임스페이스는 제거됨). 새 코드를 추가할 때 같은 디렉터리의 기존 파일이 쓰는 네임스페이스를 따른다.

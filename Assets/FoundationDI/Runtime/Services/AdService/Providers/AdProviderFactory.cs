@@ -92,11 +92,12 @@ namespace DarkNaku.FoundationDI
             }
 
             // IsAvailable이 참(SDK 심볼 있음)이라 Resolve가 요청 그대로를 돌려줬는데
-            // 레지스트리에 creator가 없는 경우. "심볼은 정의됐지만 아무도 등록하지 않았다"는
-            // 옵셔널 어셈블리가 아예 없거나 등록을 빠뜨렸다는 뜻이다. 조용히 Dummy로
+            // 레지스트리에 creator가 없는 경우. 옵셔널 어셈블리가 아예 없거나, 등록을
+            // 빠뜨렸거나, IL2CPP 빌드에서 통째로 스트리핑됐다는 뜻이다. 조용히 Dummy로
             // 대체하면 이 상태를 아무도 알아채지 못한다 — 반드시 에러로 남긴다.
-            Debug.LogError($"[AdService] {effective} provider는 사용 가능하다고 판단됐지만 " +
-                          "AdProviderFactory.Build에 아직 구현되지 않았다. Dummy provider로 대체한다.");
+            // 문구는 세 서비스가 ProviderDiagnostics로 공유한다(같은 사고, 같은 꼴).
+            Debug.LogError(ProviderDiagnostics.MissingCreator(
+                "AdService", effective.ToString(), "Dummy provider로 대체한다."));
             return new DummyAdProvider(_dispatcher, dummyOptions);
         }
     }

@@ -431,7 +431,64 @@ AnalyticsService/
 
 ---
 
-## 10. 알려진 범위 밖
+## 10. IL2CPP 빌드에서의 어댑터 보존
+
+**어댑터 어셈블리(`FoundationDI.Firebase`, `FoundationDI.Adjust`)는 IL2CPP 빌드에서 보존되어야 한다.**
+
+코어(`FoundationDI`)는 어댑터를 참조하지 않는다 — 참조하면 순환이 된다. 대신 어댑터가
+`[RuntimeInitializeOnLoadMethod]`로 스스로를 `AnalyticsProviderRegistry`에 등록하고 코어는 조회만 한다.
+그 결과 어댑터는 참조 그래프상 어디에서도 닿지 않는 섬이 되고, IL2CPP 링커는 닿지 않는
+어셈블리를 통째로 걷어낸다. 등록이 일어나지 않으면 조회가 비어 그 provider만 팬아웃에서 빠진다. 다른 provider는 그대로 동작하므로
+**서비스가 죽지 않고 데이터만 조용히 덜 들어온다** — 셋 중 가장 늦게 발견되는 형태다.
+
+**에디터에서는 링커가 돌지 않아 재현되지 않는다 — 빌드해 봐야만 드러난다.** 문서가 없으면
+매번 같은 시간을 쓰게 되는 종류의 실패다.
+
+### 10.1 패키지가 스스로 막는다 (소비 프로젝트가 할 일 없음)
+
+- `FoundationDILinkXmlGenerator`(`Editor/Linker/`)가 `IUnityLinkerProcessor`로 빌드마다
+  link.xml을 생성해 링커에 넘긴다. 어댑터 어셈블리와 **그 뒤의 SDK 어셈블리**(`Firebase.App`/`Firebase.Analytics`/`Firebase.TaskExtension`, `AdjustSdk.Scripts`)를
+  함께 보존한다.
+- 각 어댑터 폴더의 `AssemblyInfo.cs`에 `[assembly: AlwaysLinkAssembly]`가 붙어 있다.
+  생성 link.xml이 닿지 않는 빌드 경로에서도 어댑터 자신은 살아남게 하는 2차 방어선이다.
+
+> 어댑터만 보존해서는 부족하다. 링커는 어댑터가 실제로 건드리는 멤버만 남기는데,
+> Adjust는 네이티브가 `UnitySendMessage`로 이름을 찍어 관리 코드를 되부르기 때문에 링커가 그
+> 사용을 볼 수 없다. 실제로 이번 사고에서 `MaxSdk`가 통째로 사라졌다.
+
+
+> **link.xml 파일을 패키지에 그냥 넣어 두는 방법은 통하지 않는다.** 에디터가 사용자 link.xml을
+> 수집하는 곳은 `UnityEditorInternal.AssemblyStripper.GetUserBlacklistFiles` 하나뿐이고, 그
+> 구현은 `Directory.GetFiles("Assets", "link.xml", SearchOption.AllDirectories)`다. 즉 `Assets/`
+> 아래만 본다. UPM(git URL)으로 설치하면 패키지는 `Library/PackageCache/` 아래에 놓이므로
+> 거기 넣어 둔 link.xml은 영원히 읽히지 않는다.
+
+### 10.2 빌드에서 확인하는 방법
+
+빌드 산출물의 global-metadata에 타입 이름이 남아 있는지 본다.
+
+```bash
+# Android APK
+unzip -p app.apk assets/bin/Data/Managed/Metadata/global-metadata.dat \
+  | strings | grep -E 'FirebaseInstaller|FirebaseAnalyticsProvider|AdjustInstaller|AdjustAnalyticsProvider'
+```
+
+하나도 안 나오면 어셈블리가 통째로 스트리핑된 것이다. 런타임 증상은 이 에러 로그다.
+
+```
+[AnalyticsService] Firebase provider가 요청됐지만 등록된 creator가 없다. FOUNDATIONDI_FIREBASE
+심볼이 없어 어댑터가 컴파일되지 않았거나, IL2CPP 빌드에서 FoundationDI.Firebase 어셈블리가
+통째로 스트리핑된 것이다(에디터에서는 재현되지 않는다). 이 provider만 건너뛴다.
+```
+
+### 10.3 어댑터를 추가할 때
+
+`SdkDefineTable.Entries`(`Editor/SdkDefines/`)에 한 줄 넣는 것이 전부다 — 심볼, 판정용
+어셈블리, 어댑터 어셈블리, 보존할 SDK 어셈블리가 한 곳에 있다. 빠뜨리면
+`FoundationDILinkXmlTest`가 asmdef와 대조해 EditMode에서 잡는다(스트리핑 자체는 EditMode에서
+재현할 수 없지만, 표 누락은 잡을 수 있다).
+
+## 11. 알려진 범위 밖
 
 - **AppsFlyer / Singular / Airbridge 어댑터** — seam과 매핑표만 준비돼 있습니다.
 - **동의(GDPR/ATT) UI·판단·영속화** — `CollectionEnabled` 세터만 제공합니다(5절).
