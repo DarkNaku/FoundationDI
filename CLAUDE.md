@@ -79,6 +79,7 @@ NuGet 의존성은 **NuGetForUnity**(`Assets/NuGet/`)가 `Assets/packages.config
   - **어댑터 고유 설정은 `AnalyticsProviderSettings`(멤버 없는 마커 SO)를 상속해 어댑터가 직접 정의한다.** `AnalyticsServiceSettings`의 `Provider Settings` 목록에 넣으면 코어가 내용을 모른 채 실어 나르고, 어댑터가 `ctx.GetSettings<T>()`로 타입으로 골라 간다. 토큰 같은 SDK 고유 개념을 정책 계층이 알게 하지 않기 위한 seam이다.
   - **현재 Debug/Firebase/Adjust provider가 구현됨.** Firebase는 `FOUNDATIONDI_FIREBASE` 심볼이 걸린 `FoundationDI.Firebase` asmdef(precompiled DLL 참조), Adjust는 `FOUNDATIONDI_ADJUST` 심볼이 걸린 `FoundationDI.Adjust` asmdef(`AdjustSdk.Scripts` 참조)에 있다.
   - **Adjust는 이벤트를 이름이 아니라 대시보드 발급 토큰으로 받는다.** `AdjustAnalyticsSettings`가 이름→토큰 매핑표를 들고, 표에 없는 이름은 전송하지 않고 이름당 한 번만 경고한다. 런타임 `SetUserId`가 없어(`ExternalDeviceId`는 초기화 시점 전용) 전역 콜백 파라미터로 대신하며, 매출 중복 집계를 막으려면 `DeduplicationId`(=`TransactionId`)가 필수다.
+  - **Adjust는 첫 세션(=인스톨) 패키지를 `InitSdk` 시점에 만들어 보낸다.** 그래서 그 뒤에 붙는 전역 콜백 파라미터(A/B 그룹·설치 버전·유저 ID)가 인스톨 레코드에만 빠진다 — 두 번째 세션부터는 정상이라 늦게 발견된다. `AdjustAnalyticsSettings.Delay First Session`을 켜면 `IsFirstSessionDelayEnabled`로 첫 세션을 붙잡아 두고, 코어가 버퍼를 다 내보낸 뒤 `IAnalyticsFlushHook.OnBufferedStateFlushed`에서 `EndFirstSessionDelay`로 풀어 준다. **이 훅은 `IAnalyticsProvider`가 아니라 별도의 선택적 seam**이며, 그런 SDK가 Adjust 하나뿐이라 코어 인터페이스를 넓히지 않았다. 따라오는 규칙: **첫 세션에 실을 값은 `InitializeAsync` 전에** `SetUserId`/`SetUserProperty`로 넣어야 한다(코어가 버퍼한다).
   - **`google-services.json`이 없어 Firebase 실전송은 미검증이고, Adjust SDK는 에디터에서 아무것도 하지 않아(`InitSdk`가 즉시 반환) 실기 빌드로만 검증된다.**
   - 상세: `Assets/FoundationDI/Runtime/Services/AnalyticsService/README.md`.
 

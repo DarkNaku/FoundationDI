@@ -257,6 +257,10 @@ namespace DarkNaku.FoundationDI
             {
                 Fanout(_pendingEvents.Dequeue());
             }
+
+            // 반드시 마지막이다. Adjust 어댑터가 여기서 첫 세션 지연을 푸는데(IAnalyticsFlushHook),
+            // 이 줄이 위로 올라가면 아직 전달되지 않은 파라미터가 첫 세션에서 빠진다.
+            Fanout(p => (p as IAnalyticsFlushHook)?.OnBufferedStateFlushed());
         }
 
         private void ClearPending()

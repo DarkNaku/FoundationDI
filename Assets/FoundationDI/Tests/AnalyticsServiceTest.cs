@@ -293,4 +293,103 @@ public class AnalyticsServiceTest
         Assert.AreEqual(0, a.UserIds.Count, "해제 후 유저 ID가 전달됐다");
         Assert.IsFalse(await sut.InitializeAsync(), "해제 후 초기화가 성공으로 보고됐다");
     });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 초기화_flush가_끝나면_훅을_구현한_provider가_알림을_받는다() =>
+        AwaitableTest.Run(async () =>
+    {
+        var provider = new FakeFlushHookAnalyticsProvider();
+        var sut = new AnalyticsService(new IAnalyticsProvider[] { provider }, NewOptions());
+
+        await sut.InitializeAsync();
+
+        Assert.AreEqual(1, provider.FlushHookCount, "flush 완료 훅이 오지 않았다");
+    });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 훅은_유저_상태와_버퍼된_이벤트가_모두_전달된_뒤에_온다() =>
+        AwaitableTest.Run(async () =>
+    {
+        var provider = new FakeFlushHookAnalyticsProvider();
+        var sut = new AnalyticsService(new IAnalyticsProvider[] { provider }, NewOptions());
+
+        // Adjust가 첫 세션을 붙잡고 있는 동안 파라미터가 다 들어가야 하므로, 훅은 버퍼의
+        // 마지막 항목보다도 뒤여야 한다.
+        sut.LogEvent("tutorial_start");
+        sut.SetUserId("player-a");
+        sut.SetUserProperty("cohort", "2026-08");
+
+        await sut.InitializeAsync();
+
+        var calls = provider.Calls.Where(IsPayloadCall).ToList();
+
+        Assert.AreEqual("OnBufferedStateFlushed", calls.LastOrDefault(),
+            "훅이 버퍼된 상태·이벤트보다 먼저 왔다");
+    });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 훅을_구현하지_않은_provider가_섞여_있어도_팬아웃이_깨지지_않는다() =>
+        AwaitableTest.Run(async () =>
+    {
+        var plain = new FakeAnalyticsProvider("Plain");
+        var hooked = new FakeFlushHookAnalyticsProvider("Hooked");
+        var sut = new AnalyticsService(new IAnalyticsProvider[] { plain, hooked }, NewOptions());
+
+        sut.LogEvent("before_init");
+
+        await sut.InitializeAsync();
+
+        Assert.AreEqual(1, plain.Events.Count, "훅 없는 provider가 버퍼된 이벤트를 받지 못했다");
+        Assert.AreEqual(1, hooked.Events.Count, "훅 있는 provider가 버퍼된 이벤트를 받지 못했다");
+        Assert.AreEqual(1, hooked.FlushHookCount, "flush 완료 훅이 오지 않았다");
+    });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 초기화에_실패한_provider에는_훅이_가지_않는다() =>
+        AwaitableTest.Run(async () =>
+    {
+        // InitSdk가 불리지 않았으면 풀어 줄 지연도 없다.
+        var failing = new FakeFlushHookAnalyticsProvider("Failing") { InitializeResult = false };
+        var healthy = new FakeFlushHookAnalyticsProvider("Healthy");
+        var sut = new AnalyticsService(new IAnalyticsProvider[] { failing, healthy }, NewOptions());
+
+        LogAssert.Expect(LogType.Error, new Regex("Failing"));
+        await sut.InitializeAsync();
+
+        Assert.AreEqual(0, failing.FlushHookCount, "초기화에 실패한 provider에 훅이 갔다");
+        Assert.AreEqual(1, healthy.FlushHookCount, "살아 있는 provider에 훅이 오지 않았다");
+    });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 훅에서_예외가_나도_나머지_provider는_훅을_받는다() =>
+        AwaitableTest.Run(async () =>
+    {
+        var broken = new FakeFlushHookAnalyticsProvider("Broken") { ThrowOnFlushHook = true };
+        var healthy = new FakeFlushHookAnalyticsProvider("Healthy");
+        var sut = new AnalyticsService(new IAnalyticsProvider[] { broken, healthy }, NewOptions());
+
+        LogAssert.Expect(LogType.Error, new Regex("Broken"));
+        await sut.InitializeAsync();
+
+        Assert.AreEqual(1, healthy.FlushHookCount, "예외 뒤의 provider가 훅을 받지 못했다");
+    });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 초기화가_두_번_성공해도_훅은_한_번만_온다() =>
+        AwaitableTest.Run(async () =>
+    {
+        var provider = new FakeFlushHookAnalyticsProvider();
+        var sut = new AnalyticsService(new IAnalyticsProvider[] { provider }, NewOptions());
+
+        await sut.InitializeAsync();
+        await sut.InitializeAsync();
+
+        Assert.AreEqual(1, provider.FlushHookCount, "훅이 두 번 왔다 — 첫 세션 지연을 두 번 푼다");
+    });
 }

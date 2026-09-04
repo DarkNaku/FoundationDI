@@ -15,15 +15,24 @@ namespace DarkNaku.FoundationDI
     //    콜백 파라미터로 모든 이벤트에 실어 보낸다.
     // 3. 수집 게이트가 파라미터가 아니라 Enable()/Disable() 두 메서드다.
     //
+    // 그리고 이 어댑터만 IAnalyticsFlushHook을 구현한다. Adjust는 첫 세션(=인스톨) 패키지를
+    // InitSdk 시점에 만들어 보내므로 그 뒤에 붙는 전역 콜백 파라미터가 인스톨 레코드에만
+    // 빠지는데, 코어가 버퍼된 유저 상태를 flush하는 것은 InitializeAsync를 await한 뒤다.
+    // 그래서 첫 세션을 지연시켜 두고 flush가 끝났다는 훅에서 풀어 준다.
+    //
     // 스레드: Adjust의 정적 API는 내부에서 네이티브 브리지로 넘기고 콜백만 비동기로 돌려준다.
     // 우리는 콜백을 구독하지 않으므로 추가 마샬링이 필요 없다 — IAnalyticsProvider의 모든
     // 메서드는 AnalyticsService가 메인 스레드에서만 부른다.
-    public sealed class AdjustAnalyticsProvider : IAnalyticsProvider
+    public sealed class AdjustAnalyticsProvider : IAnalyticsProvider, IAnalyticsFlushHook
     {
         private readonly AdjustAnalyticsSettings _settings;
         private readonly AdjustEventTokenMap _tokens;
 
         private bool _warnedMissingPurchaseToken;
+
+        // 지연을 걸어 둔 첫 세션이 아직 묶여 있는지. 풀어 주는 쪽을 한 번으로 제한한다 —
+        // 이미 나간 세션에 대고 EndFirstSessionDelay를 다시 부를 이유가 없다.
+        private bool _firstSessionDelayed;
 
         public AdjustAnalyticsProvider(AdjustAnalyticsSettings settings)
         {
@@ -60,6 +69,14 @@ namespace DarkNaku.FoundationDI
                 LogLevel = _settings.LogLevel,
                 IsSendingInBackgroundEnabled = _settings.SendInBackground,
             };
+
+            if (_settings.DelayFirstSession)
+            {
+                // 이 플래그를 켜면 누군가 EndFirstSessionDelay를 부를 때까지 SDK가 첫 세션을
+                // 보내지 않는다. 우리 쪽 해제 지점은 OnBufferedStateFlushed 하나뿐이다.
+                config.IsFirstSessionDelayEnabled = true;
+                _firstSessionDelayed = true;
+            }
 
             Adjust.InitSdk(config);
 
@@ -172,9 +189,27 @@ namespace DarkNaku.FoundationDI
             SetGlobalCallbackParameter(name, value);
         }
 
-        // Adjust의 정적 API에는 해제할 인스턴스가 없다.
+        // 코어가 버퍼된 유저 상태와 이벤트를 모두 내보낸 직후. 여기서 첫 세션을 풀어 주면
+        // AddGlobalCallbackParameter로 붙인 파라미터가 전부 인스톨 레코드에 실린다.
+        public void OnBufferedStateFlushed()
+        {
+            EndFirstSessionDelayIfDelayed();
+        }
+
+        // Adjust의 정적 API에는 해제할 인스턴스가 없다. 다만 flush 전에 서비스가 해제되면
+        // 첫 세션이 묶인 채로 남으므로, 그 경우에는 여기서 풀어 준다.
         public void Dispose()
         {
+            EndFirstSessionDelayIfDelayed();
+        }
+
+        private void EndFirstSessionDelayIfDelayed()
+        {
+            if (!_firstSessionDelayed) return;
+
+            _firstSessionDelayed = false;
+
+            Adjust.EndFirstSessionDelay();
         }
 
         // 빈 값은 지운다. 빈 문자열로 덮어쓰면 이후 모든 이벤트에 빈 파라미터가 계속 붙는다.
