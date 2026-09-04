@@ -114,6 +114,28 @@ public class FakeAnalyticsProvider : IAnalyticsProvider
     }
 }
 
+// 초기화 flush 완료 훅을 구현한 provider. Adjust 어댑터가 EndFirstSessionDelay를 부를 자리를
+// 코어 쪽에서 고정하기 위한 것이다 — 실제 어댑터는 게이트된 옵셔널 어셈블리 안에 있어
+// 테스트에서 참조할 수 없다.
+public class FakeFlushHookAnalyticsProvider : FakeAnalyticsProvider, IAnalyticsFlushHook
+{
+    public FakeFlushHookAnalyticsProvider(string name = "FlushHook") : base(name)
+    {
+    }
+
+    public int FlushHookCount { get; private set; }
+
+    public bool ThrowOnFlushHook;
+
+    public void OnBufferedStateFlushed()
+    {
+        FlushHookCount++;
+        Calls.Add("OnBufferedStateFlushed");
+
+        if (ThrowOnFlushHook) throw new InvalidOperationException($"{Name} 훅 실패");
+    }
+}
+
 // 어댑터 고유 설정 seam 검증용. 실제 어댑터 설정(AdjustAnalyticsSettings 등)은 게이트된
 // 옵셔널 어셈블리 안에 있어 테스트에서 참조할 수 없으므로, 같은 모양의 가짜를 둘 세운다.
 public class FakeAnalyticsProviderSettings : AnalyticsProviderSettings

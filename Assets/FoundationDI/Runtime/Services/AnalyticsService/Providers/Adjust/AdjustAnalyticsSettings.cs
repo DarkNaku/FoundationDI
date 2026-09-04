@@ -40,6 +40,12 @@ namespace DarkNaku.FoundationDI
                  "Production인 채로 테스트해 실제 어트리뷰션 데이터를 오염시키는 사고를 막는다.")]
         [SerializeField] private bool _forceSandboxInDevelopmentBuild = true;
 
+        [Tooltip("첫 세션(=인스톨) 전송을 보류했다가 버퍼된 유저 상태를 다 붙인 뒤 보낸다. " +
+                 "Adjust는 첫 세션 패키지를 InitSdk 시점에 만들므로, 이걸 켜지 않으면 " +
+                 "A/B 그룹·설치 버전·유저 ID 같은 전역 콜백 파라미터가 인스톨 레코드에만 빠진다. " +
+                 "첫 세션에 실을 파라미터는 InitializeAsync 전에 SetUserProperty로 넣어야 한다.")]
+        [SerializeField] private bool _delayFirstSession;
+
         [SerializeField] private AdjustLogLevel _logLevel = AdjustLogLevel.Info;
 
         [Tooltip("백그라운드에서도 전송을 시도한다. Adjust 기본값은 꺼짐이다.")]
@@ -68,6 +74,7 @@ namespace DarkNaku.FoundationDI
                 ? AdjustEnvironment.Sandbox
                 : _environment;
 
+        public bool DelayFirstSession => _delayFirstSession;
         public AdjustLogLevel LogLevel => _logLevel;
         public bool SendInBackground => _sendInBackground;
         public string PurchaseEventToken => _purchaseEventToken;
