@@ -6,6 +6,31 @@
 
 ---
 
+## 완료: Adjust 첫 세션에 글로벌 콜백 파라미터 싣기
+
+Adjust는 첫 세션(=인스톨) 패키지를 `InitSdk` 시점에 만들어 보낸다. 그래서 그 뒤에 붙인
+`AddGlobalCallbackParameter`는 첫 세션에 실리지 않는다 — A/B 그룹, 설치 버전, 유저 ID 같은
+"유입 코호트" 파라미터가 정작 인스톨 레코드에만 빠진다. Adjust v5의 first session delay가 이걸
+위한 기능이고, 지연을 걸었으면 누군가 `EndFirstSessionDelay()`로 풀어 줘야 한다.
+
+문제는 그 "풀어 줄 시점"이 어댑터 혼자서는 알 수 없다는 것이다. 코어가 버퍼된 유저 상태를
+flush하는 것은 `provider.InitializeAsync()`를 await한 **뒤**라, 어댑터 입장에서는 InitSdk 직후에
+파라미터가 아직 오지 않았다는 사실만 안다. 프레임을 세어 짐작하는 대신(EditMode에서 검증도
+안 된다) 코어가 "버퍼를 다 내보냈다"를 알려 주는 선택적 seam을 둔다.
+
+- [x] 초기화 flush가 끝나면 훅을 구현한 provider에 알린다
+- [x] 훅은 유저 상태와 버퍼된 이벤트가 모두 전달된 뒤에 온다
+- [x] 훅을 구현하지 않은 provider가 섞여 있어도 팬아웃이 깨지지 않는다
+- [x] 초기화에 실패한 provider에는 훅이 가지 않는다
+- [x] 훅에서 예외가 나도 나머지 provider는 훅을 받는다
+- [x] 초기화가 두 번 성공해도 훅은 한 번만 온다
+
+Adjust 어댑터 쪽(설정 토글 → `IsFirstSessionDelayEnabled`, 훅 → `EndFirstSessionDelay`)은
+`FOUNDATIONDI_ADJUST`로 게이트된 옵셔널 어셈블리라 EditMode에서 참조할 수 없다. 코어 seam만
+테스트로 고정하고 어댑터는 실기 빌드로 확인한다.
+
+---
+
 ## 완료: IL2CPP 빌드에서 옵셔널 어댑터 어셈블리 보존
 
 코어가 어댑터를 참조할 수 없어(순환 참조) 어댑터는 참조 그래프상 섬이 되고, IL2CPP 링커가

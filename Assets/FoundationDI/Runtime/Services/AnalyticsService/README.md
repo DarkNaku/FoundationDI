@@ -211,6 +211,12 @@ _ads.Paid += _analytics.LogAdImpression;
   초기화 전에 같은 프로퍼티를 다섯 번 세팅해도 마지막 값 하나만 전달됩니다.
 - **flush 순서는 수집 상태 → 유저 상태 → 이벤트**입니다. 유저 귀속이 붙은 상태로 이벤트가 나가야
   하기 때문입니다 — 순서가 뒤집히면 첫 이벤트들이 익명으로 집계됩니다.
+- flush가 **전부 끝난 뒤**, `IAnalyticsFlushHook`을 구현한 provider에 `OnBufferedStateFlushed()`가
+  한 번 갑니다(6.2절). Adjust 어댑터가 여기서 첫 세션 지연을 풉니다(8.4절).
+
+> **첫 세션·인스톨에 실려야 하는 값은 `InitializeAsync`를 부르기 *전에* 넣으세요.**
+> `SetUserId`/`SetUserProperty`는 버퍼되므로 순서가 뒤바뀌지 않습니다. `await` 이후에 넣으면
+> Adjust의 인스톨 레코드에는 빠집니다 — 그 시점엔 이미 첫 세션이 나갔기 때문입니다.
 
 ---
 
@@ -320,6 +326,33 @@ AnalyticsProviderRegistry.Register(AnalyticsProviderType.AppsFlyer,
 
 ---
 
+### 6.2 flush가 끝난 시점이 필요하면
+
+SDK가 "초기화 직후에만 받는 값"을 갖고 있으면 `IAnalyticsProvider`만으로는 부족합니다. 코어가
+버퍼된 유저 상태를 내보내는 것은 `InitializeAsync`를 **await한 뒤**라, 어댑터는 InitSdk 직후에
+"파라미터가 아직 안 왔다"는 사실만 알 수 있습니다.
+
+그 시점을 알려 주는 선택적 seam이 `IAnalyticsFlushHook` 하나입니다. 필요한 어댑터만 함께
+구현하면 됩니다.
+
+```csharp
+public sealed class AdjustAnalyticsProvider : IAnalyticsProvider, IAnalyticsFlushHook
+{
+    public void OnBufferedStateFlushed()   // 버퍼된 유저 상태·이벤트가 모두 전달된 직후, 한 번
+    {
+        Adjust.EndFirstSessionDelay();
+    }
+}
+```
+
+초기화에 **실패한** provider에는 오지 않습니다(팬아웃 목록에 없으므로). 예외는 다른 호출과 같이
+격리되므로, 훅에서 던져도 나머지 provider는 훅을 받습니다.
+
+프레임을 세어 짐작하는 방식(`await Awaitable.NextFrameAsync()` 후 해제)을 쓰지 않은 이유는 둘입니다 —
+시점이 버퍼 flush와 무관하게 흔들리고, EditMode에서는 프레임이 돌지 않아 검증할 수 없습니다.
+
+---
+
 ## 7. Firebase 어댑터
 
 | 서비스 호출 | Firebase |
@@ -358,6 +391,7 @@ SDK에게 맡기고 개발자에게만 알립니다. Firebase가 규칙 위반 �
 | `Android App Token` / `iOS App Token` | 대시보드의 앱 토큰. **Adjust에서 Android와 iOS는 서로 다른 앱**이라 토큰도 다르다. 현재 빌드 타깃의 것이 쓰인다 |
 | `Environment` | `Sandbox`는 테스트 콘솔로만 흘러가고 어트리뷰션에 집계되지 않는다. 출시 빌드는 `Production` |
 | `Force Sandbox In Development Build` | 켜면 Development Build에서 위 설정과 무관하게 `Sandbox`로 강제한다. `Production`인 채로 테스트해 실데이터를 오염시키는 사고를 막는다 |
+| `Delay First Session` | 첫 세션(=인스톨) 전송을 버퍼 flush가 끝날 때까지 보류한다. **A/B 그룹·설치 버전·유저 ID를 인스톨 레코드에 실으려면 켠다**(8.4절) |
 | `Log Level` / `Send In Background` | SDK 로그 레벨, 백그라운드 전송 여부 |
 | `Event Tokens` | **이름 → 토큰** 매핑표. 게임 코드는 Firebase에 보내던 이름 그대로 `LogEvent`를 부른다 |
 | `Purchase Event Token` | `LogPurchase`가 쓸 토큰. 비우면 구매를 Adjust로 보내지 않는다 |
@@ -374,6 +408,7 @@ SDK에게 맡기고 개발자에게만 알립니다. Firebase가 규칙 위반 �
 | `LogAdImpression` | `Adjust.TrackAdRevenue`. 토큰이 필요 없는 전용 API다 |
 | `SetUserId` / `SetUserProperty` | `Adjust.AddGlobalCallbackParameter` (빈 값이면 `Remove~`) |
 | `SetCollectionEnabled` | `Adjust.Enable()` / `Adjust.Disable()` |
+| (버퍼 flush 완료) | `Delay First Session`이 켜져 있으면 `Adjust.EndFirstSessionDelay()`. `IAnalyticsFlushHook`으로 통보받는다(8.4절) |
 
 **이름이 아니라 토큰인 것이 이 어댑터의 전부입니다.** `Adjust.TrackEvent`는 대시보드가 발급한
 토큰만 받으므로 "이름을 그냥 보낸다"는 선택지가 없습니다. 표에 없는 이름은 **전송하지 않고
@@ -401,6 +436,41 @@ SDK에게 맡기고 개발자에게만 알립니다. Firebase가 규칙 위반 �
 
 ---
 
+### 8.4 첫 세션에 전역 콜백 파라미터를 싣기
+
+**Adjust는 첫 세션 패키지를 `InitSdk` 시점에 만들어 보냅니다.** 그래서 그 뒤에 붙인
+`AddGlobalCallbackParameter`는 첫 세션에 실리지 않습니다 — A/B 그룹, 설치 버전, 유저 ID처럼
+"유입 코호트"를 나누는 값이 정작 **인스톨 레코드에만 빠집니다.** 두 번째 세션부터는 정상이라
+대시보드를 보다가 늦게 발견하기 쉽습니다.
+
+`Delay First Session`을 켜면:
+
+1. `InitializeAsync`가 `AdjustConfig.IsFirstSessionDelayEnabled = true`로 `InitSdk`를 부릅니다.
+   SDK는 첫 세션을 보내지 않고 들고 있습니다.
+2. 코어가 버퍼된 유저 상태 → 이벤트를 flush합니다. 전역 콜백 파라미터가 이 사이에 다 붙습니다.
+3. flush가 끝나면 `OnBufferedStateFlushed()`에서 `Adjust.EndFirstSessionDelay()`를 부릅니다.
+   첫 세션이 파라미터를 달고 나갑니다.
+
+```csharp
+// 순서가 전부다. Initialize 앞에 넣은 값만 인스톨에 실린다.
+_analytics.SetUserId(SaveData.PlayerGuid);
+_analytics.SetUserProperty("ab_group", abTest.Group.ToString());
+_analytics.SetUserProperty("install_version", installVersion);
+
+await _analytics.InitializeAsync();
+```
+
+**주의할 점 둘.**
+
+- **지연은 모든 provider의 초기화가 끝날 때까지 이어집니다.** provider는 순차로 초기화되므로,
+  Firebase의 `CheckAndFixDependenciesAsync`가 오래 걸리는 콜드 스타트에서는 첫 세션이 그만큼
+  늦게 나갑니다(세션 자체가 유실되는 것은 아닙니다). 인스톨에 실을 파라미터가 없다면 켜지 마세요 —
+  기본값이 꺼짐인 이유입니다.
+- **SDK 콜백으로 늦게 오는 값은 이 창에 못 들어옵니다.** `Adjust.GetAdid`/`GetAttribution` 같은
+  비동기 식별자는 첫 세션이 나간 뒤에 도착합니다. 동기적으로 알 수 있는 값만 인스톨에 실립니다.
+
+---
+
 ## 9. 구조
 
 ```
@@ -411,6 +481,7 @@ AnalyticsService/
 ├── AnalyticsServiceRegistration.cs    builder.RegisterAnalyticsService(settings)
 ├── Providers/
 │   ├── IAnalyticsProvider.cs          SDK seam
+│   ├── IAnalyticsFlushHook.cs         버퍼 flush 완료 통보(선택적 seam, 6.2절)
 │   ├── IAnalyticsProviderFactory.cs / AnalyticsProviderFactory.cs
 │   ├── AnalyticsProviderRegistry.cs   옵셔널 어셈블리가 자신을 등록하는 진입점
 │   ├── Debug/                         콘솔에 찍는 provider (SDK 없이 흐름 확인용)
