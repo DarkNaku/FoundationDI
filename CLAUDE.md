@@ -181,7 +181,7 @@ DI 코어는 **Reflex 14.3.1**이다. `Assets/Scripts/Installers/RootInstaller.c
 런타임 코드는 `DarkNaku.FoundationDI` 단일 네임스페이스로 통일한다(UIManager 리뉴얼로 구 `FoundationDI` 네임스페이스는 제거됨). 새 코드를 추가할 때 같은 디렉터리의 기존 파일이 쓰는 네임스페이스를 따른다.
 
 ### 기타 의존성
-PrimeTween(트위닝, tgz로 로컬 설치), Director(DarkNaku의 씬/플로우 라이브러리), Input System, URP 2D가 구성되어 있다.
+Director(DarkNaku의 씬/플로우 라이브러리), Input System, URP 2D가 구성되어 있다. **트윈 라이브러리는 쓰지 않는다** — UINavigator의 트랜지션은 `Awaitable` 자체 보간이다.
 
 # SERVICE ARCHITECTURE (프로젝트 규약)
 
