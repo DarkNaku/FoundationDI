@@ -368,6 +368,15 @@ namespace DarkNaku.FoundationDI
 
             if (Random.value > _playProbability) return;
 
+            // 2D는 거리 감쇠도 패닝도 없어(spatialBlend = 0) 볼륨이 항상 1.0이다. 같은 프레임에
+            // 같은 클립이 겹치면 두 신호가 샘플 단위로 일치해 진폭이 정확히 2배가 되고, 믹서
+            // 출력 단계에서 [-1,1]로 클램프되며 왜곡된다. 3D는 위치별 감쇠·패닝이 달라 그대로
+            // 겹치지 않으므로 기존 동작을 유지한다.
+            //
+            // 루프는 제외한다 — 위에서 이미 이전 재생을 Stop()하고 교체하는 경로를 지났으므로
+            // 여기서 막으면 정지만 되고 새 재생이 시작되지 않아 소리가 통째로 사라진다.
+            if (!_spatialSound && !_loop && !_engine.TryReserveClipThisFrame(_clip)) return;
+
             _source = _engine.GetSource();
             _source
                 .SetVolume(_volume)

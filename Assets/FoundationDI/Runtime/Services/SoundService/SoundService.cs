@@ -14,6 +14,11 @@ namespace DarkNaku.FoundationDI
     {
         private readonly List<SoundSource> _sourcePool = new();
         private readonly ISoundVolumeStorage _volumeStorage;
+        private readonly ISoundFrameClock _frameClock;
+
+        // 이번 프레임에 재생을 시작한 클립. 프레임이 바뀌면 통째로 비우므로 무한히 자라지 않는다.
+        private readonly HashSet<AudioClip> _clipsPlayedThisFrame = new();
+        private int _reservedFrame = -1;
 
         private GameObject _poolParent;
         private AudioListener _cachedListener;
@@ -21,14 +26,22 @@ namespace DarkNaku.FoundationDI
 
         public SoundServiceSettings Settings { get; }
 
-        public SoundService(SoundServiceSettings settings) : this(settings, new PlayerPrefsVolumeStorage())
+        public SoundService(SoundServiceSettings settings)
+            : this(settings, new PlayerPrefsVolumeStorage(), new UnityFrameClock())
         {
         }
 
         public SoundService(SoundServiceSettings settings, ISoundVolumeStorage volumeStorage)
+            : this(settings, volumeStorage, new UnityFrameClock())
+        {
+        }
+
+        internal SoundService(SoundServiceSettings settings, ISoundVolumeStorage volumeStorage,
+            ISoundFrameClock frameClock)
         {
             Settings = settings;
             _volumeStorage = volumeStorage;
+            _frameClock = frameClock ?? new UnityFrameClock();
 
             if (Settings == null)
             {
@@ -183,6 +196,24 @@ namespace DarkNaku.FoundationDI
             }
 
             source.Resume(fadeInTime);
+        }
+
+        bool ISoundEngine.TryReserveClipThisFrame(AudioClip clip)
+        {
+            // 클립이 없으면 재생 자체가 실패하는 경로다. 여기서 막으면 그쪽 경고가 가려진다.
+            if (clip == null) return true;
+
+            int frame = _frameClock.FrameCount;
+
+            // '같은 프레임인가'만 보면 되므로 값이 달라지는 순간 비운다.
+            // 프레임 값이 되돌아가는 경우(테스트·시계 교체)도 같이 처리된다.
+            if (frame != _reservedFrame)
+            {
+                _reservedFrame = frame;
+                _clipsPlayedThisFrame.Clear();
+            }
+
+            return _clipsPlayedThisFrame.Add(clip);
         }
 
         SoundSource ISoundEngine.GetSource()
