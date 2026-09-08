@@ -5,7 +5,7 @@ namespace DarkNaku.FoundationDI
     //
     // 레지스트리가 Dictionary가 아니라 슬롯 하나인 이유: 검증기는 provider와 달리
     // "어느 SDK를 쓰는가"와 1:1이 아니다. 실제로 붙는 것은 언제나 하나뿐이다.
-    public static class IapReceiptValidatorRegistry
+    public static class IAPReceiptValidatorRegistry
     {
         public static IReceiptValidator Current { get; set; }
 

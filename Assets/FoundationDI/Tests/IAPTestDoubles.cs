@@ -5,9 +5,9 @@ using UnityEngine;
 
 // 정책 계층 테스트용 가짜 스토어. 이벤트는 테스트가 직접 쏜다 —
 // 실제 SDK의 타이밍을 흉내내지 않아야 어떤 순서든 재현할 수 있다.
-public class FakeIapProvider : IIapProvider
+public class FakeIAPProvider : IIAPProvider
 {
-    private readonly List<IapProduct> _products = new();
+    private readonly List<IAPProduct> _products = new();
     private int _sequence;
 
     public string Name => "Fake";
@@ -23,14 +23,14 @@ public class FakeIapProvider : IIapProvider
     public readonly List<string> ConfirmCalls = new();
 
     // InitializeAsync 도중(구독 이후) 발행할 미확정 구매. Unity IAP의 FetchPurchases 재전달을 흉내낸다.
-    public readonly List<IapPendingPurchase> PendingOnInitialize = new();
+    public readonly List<IAPPendingPurchase> PendingOnInitialize = new();
 
     // RestoreAsync 도중 발행할 복원 구매.
-    public readonly List<IapPendingPurchase> PendingOnRestore = new();
+    public readonly List<IAPPendingPurchase> PendingOnRestore = new();
 
-    public IReadOnlyList<IapProduct> Products => _products;
+    public IReadOnlyList<IAPProduct> Products => _products;
 
-    public Awaitable<bool> InitializeAsync(IapProviderContext context)
+    public Awaitable<bool> InitializeAsync(IAPProviderContext context)
     {
         InitializeCount++;
 
@@ -38,7 +38,7 @@ public class FakeIapProvider : IIapProvider
         {
             foreach (var definition in context.Products)
             {
-                _products.Add(new IapProduct(definition.Id, definition.StoreId, definition.Type,
+                _products.Add(new IAPProduct(definition.Id, definition.StoreId, definition.Type,
                     $"{definition.Id} (Fake)", "fake product", "$0.99", 0.99, "USD", true));
             }
         }
@@ -76,12 +76,12 @@ public class FakeIapProvider : IIapProvider
 
     public string NextTransactionId(string storeId) => $"fake-{storeId}-{_sequence++}";
 
-    public void RaisePending(IapPendingPurchase pending) => PurchasePending?.Invoke(pending);
-    public void RaiseFailed(IapPurchaseFailure failure) => PurchaseFailed?.Invoke(failure);
+    public void RaisePending(IAPPendingPurchase pending) => PurchasePending?.Invoke(pending);
+    public void RaiseFailed(IAPPurchaseFailure failure) => PurchaseFailed?.Invoke(failure);
     public void RaiseDeferred(string storeId) => PurchaseDeferred?.Invoke(storeId);
 
-    public event Action<IapPendingPurchase> PurchasePending;
-    public event Action<IapPurchaseFailure> PurchaseFailed;
+    public event Action<IAPPendingPurchase> PurchasePending;
+    public event Action<IAPPurchaseFailure> PurchaseFailed;
     public event Action<string> PurchaseDeferred;
 
     private static Awaitable<bool> Completed(bool value)
@@ -92,13 +92,13 @@ public class FakeIapProvider : IIapProvider
     }
 }
 
-public class FakeFulfillment : IIapFulfillment
+public class FakeFulfillment : IIAPFulfillment
 {
-    public readonly List<IapPurchase> Calls = new();
+    public readonly List<IAPPurchase> Calls = new();
     public bool Result = true;
     public bool Throw;
 
-    public Awaitable<bool> FulfillAsync(IapPurchase purchase)
+    public Awaitable<bool> FulfillAsync(IAPPurchase purchase)
     {
         Calls.Add(purchase);
 
@@ -115,10 +115,10 @@ public class FakeReceiptValidator : IReceiptValidator
     public bool Result = true;
     public int CallCount;
 
-    public bool Validate(IapPurchase purchase, out IapError error)
+    public bool Validate(IAPPurchase purchase, out IAPError error)
     {
         CallCount++;
-        error = Result ? default : new IapError(-1, "위조된 영수증");
+        error = Result ? default : new IAPError(-1, "위조된 영수증");
         return Result;
     }
 }

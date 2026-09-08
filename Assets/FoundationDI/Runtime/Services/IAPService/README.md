@@ -1,9 +1,9 @@
 # IAPService
 
-모바일 인앱 구매(Google Play / App Store) 서비스. 게임 코드는 `IIapService` 하나만 알면 된다.
+모바일 인앱 구매(Google Play / App Store) 서비스. 게임 코드는 `IIAPService` 하나만 알면 된다.
 
 ```csharp
-var result = await _iap.PurchaseAsync(IapProducts.RemoveAds);
+var result = await _iap.PurchaseAsync(IAPProducts.RemoveAds);
 
 if (result.IsSuccess) _ads.AdsRemoved = true;
 ```
@@ -18,24 +18,24 @@ if (result.IsSuccess) _ads.AdsRemoved = true;
 ## 1. API
 
 ```csharp
-public interface IIapService : IDisposable
+public interface IIAPService : IDisposable
 {
     bool IsInitialized { get; }
     Awaitable<bool> InitializeAsync();
 
-    IReadOnlyList<IapProduct> Products { get; }
-    bool TryGetProduct(string productId, out IapProduct product);
+    IReadOnlyList<IAPProduct> Products { get; }
+    bool TryGetProduct(string productId, out IAPProduct product);
     bool IsOwned(string productId);
 
-    Awaitable<IapPurchaseResult> PurchaseAsync(string productId);
-    Awaitable<IapRestoreResult> RestoreAsync();
+    Awaitable<IAPPurchaseResult> PurchaseAsync(string productId);
+    Awaitable<IAPRestoreResult> RestoreAsync();
 
-    event Action<IapPurchase> Purchased;
+    event Action<IAPPurchase> Purchased;
     event Action<string> OwnedChanged;
 }
 ```
 
-### `IapPurchaseResult.Outcome`
+### `IAPPurchaseResult.Outcome`
 
 | 값 | 의미 | 호출부가 할 일 |
 | --- | --- | --- |
@@ -50,7 +50,7 @@ public interface IIapService : IDisposable
 
 `IsSuccess`는 `Purchased | Restored | AlreadyOwned`일 때 참이다 — "줘도 되는가"만 알면 되는 대부분의 호출부는 이것만 보면 된다.
 
-`IapProduct`는 스토어가 현지화한 `Title` / `Description` / `LocalizedPrice`를 담는다.
+`IAPProduct`는 스토어가 현지화한 `Title` / `Description` / `LocalizedPrice`를 담는다.
 가격은 반드시 `LocalizedPrice`(예: `"₩5,500"`)를 그대로 찍는다 — 직접 포맷하면 스토어 정책 위반이 될 수 있다.
 `Price`(double)와 `CurrencyCode`는 분석 전송용이다.
 
@@ -63,26 +63,26 @@ Unity IAP 5의 정석은 **지급을 저장한 뒤에만 확정(`ConfirmPurchase
 이 규율을 게임이 매번 지키지 않아도 되도록 seam 하나로 접었다.
 
 ```csharp
-public interface IIapFulfillment
+public interface IIAPFulfillment
 {
     // true를 반환해야 확정된다. 저장에 실패했으면 false를 반환할 것.
-    Awaitable<bool> FulfillAsync(IapPurchase purchase);
+    Awaitable<bool> FulfillAsync(IAPPurchase purchase);
 }
 ```
 
 ```csharp
-public class MyFulfillment : IIapFulfillment
+public class MyFulfillment : IIAPFulfillment
 {
     private readonly IInventory _inventory;
 
     public MyFulfillment(IInventory inventory) => _inventory = inventory;
 
-    public async Awaitable<bool> FulfillAsync(IapPurchase purchase)
+    public async Awaitable<bool> FulfillAsync(IAPPurchase purchase)
     {
         switch (purchase.ProductId)
         {
-            case IapProducts.Gems100: _inventory.AddGems(100); break;
-            case IapProducts.RemoveAds: break;   // 소유 기록만으로 충분한 상품
+            case IAPProducts.Gems100: _inventory.AddGems(100); break;
+            case IAPProducts.RemoveAds: break;   // 소유 기록만으로 충분한 상품
             default:
                 Debug.LogWarning($"모르는 상품: {purchase.ProductId}");
                 return false;   // 확정하지 않는다 — 다음 버전이 지급할 수 있게 남긴다
@@ -106,7 +106,7 @@ public class MyFulfillment : IIapFulfillment
 
 ## 3. 설정
 
-`Create > FoundationDI > IAP Service Settings`로 `IapServiceSettings.asset`을 만든다.
+`Create > FoundationDI > IAP Service Settings`로 `IAPServiceSettings.asset`을 만든다.
 
 | 항목 | 설명 |
 | --- | --- |
@@ -122,10 +122,10 @@ public class MyFulfillment : IIapFulfillment
 
 `Tools > FoundationDI > IAP > Generate Product Constants`
 
-설정 SO 옆 `Generated/IapProducts.cs`에 상수 클래스를 만들고 `.asmref`로 `FoundationDI` 어셈블리에 합류시킨다.
+설정 SO 옆 `Generated/IAPProducts.cs`에 상수 클래스를 만들고 `.asmref`로 `FoundationDI` 어셈블리에 합류시킨다.
 
 ```csharp
-_iap.PurchaseAsync(IapProducts.RemoveAds);   // 오타가 컴파일 타임에 잡힌다
+_iap.PurchaseAsync(IAPProducts.RemoveAds);   // 오타가 컴파일 타임에 잡힌다
 ```
 
 ---
@@ -135,15 +135,15 @@ _iap.PurchaseAsync(IapProducts.RemoveAds);   // 오타가 컴파일 타임에 �
 ```csharp
 public void InstallBindings(ContainerBuilder builder)
 {
-    builder.RegisterIapService(_iapServiceSettings);
+    builder.RegisterIAPService(_iapServiceSettings);
 
     // 선택 — 등록 순서는 상관없다.
-    builder.RegisterType(typeof(MyFulfillment), new[] { typeof(IIapFulfillment) }, Lifetime.Singleton, Resolution.Lazy);
+    builder.RegisterType(typeof(MyFulfillment), new[] { typeof(IIAPFulfillment) }, Lifetime.Singleton, Resolution.Lazy);
     builder.RegisterType(typeof(CloudEntitlementStorage), new[] { typeof(IEntitlementStorage) }, Lifetime.Singleton, Resolution.Lazy);
 }
 ```
 
-`IIapFulfillment` / `IReceiptValidator` / `IEntitlementStorage`는 모두 선택 등록이다.
+`IIAPFulfillment` / `IReceiptValidator` / `IEntitlementStorage`는 모두 선택 등록이다.
 등록하지 않으면 각각 `AutoConfirmFulfillment` / 심볼에 맞는 기본 검증기 / `PlayerPrefsEntitlementStorage`가 쓰인다.
 
 초기화는 게임이 원하는 시점에 한 번 부른다(재진입해도 SDK를 두 번 초기화하지 않는다):
@@ -160,8 +160,8 @@ IAPService는 AdService/AnalyticsService를 모른다. 호스트가 붙인다.
 
 ```csharp
 // 광고 제거
-_ads.AdsRemoved = _iap.IsOwned(IapProducts.RemoveAds);
-_iap.OwnedChanged += id => { if (id == IapProducts.RemoveAds) _ads.AdsRemoved = true; };
+_ads.AdsRemoved = _iap.IsOwned(IAPProducts.RemoveAds);
+_iap.OwnedChanged += id => { if (id == IAPProducts.RemoveAds) _ads.AdsRemoved = true; };
 
 // 매출 분석
 _iap.Purchased += p => _analytics.LogPurchase(new PurchaseInfo(p.ProductId, p.Price, p.CurrencyCode));
@@ -213,7 +213,7 @@ Dummy가 기록한 소유는 `FoundationDI.IAP.Dummy.Owned.<storeId>` PlayerPref
 **어댑터 어셈블리(`FoundationDI.UnityIAP`)는 IL2CPP 빌드에서 보존되어야 한다.**
 
 코어(`FoundationDI`)는 어댑터를 참조하지 않는다 — 참조하면 순환이 된다. 대신 어댑터가
-`[RuntimeInitializeOnLoadMethod]`로 스스로를 `IapProviderRegistry`에 등록하고 코어는 조회만 한다.
+`[RuntimeInitializeOnLoadMethod]`로 스스로를 `IAPProviderRegistry`에 등록하고 코어는 조회만 한다.
 그 결과 어댑터는 참조 그래프상 어디에서도 닿지 않는 섬이 되고, IL2CPP 링커는 닿지 않는
 어셈블리를 통째로 걷어낸다. 등록이 일어나지 않으면 조회가 비어 서비스가 조용히 Dummy provider로 떨어진다. 즉 **실기에서 결제가
 가짜로 성공한다** — 스토어에 아무것도 청구되지 않은 채 지급만 일어난다.
@@ -242,7 +242,7 @@ Dummy가 기록한 소유는 `FoundationDI.IAP.Dummy.Owned.<storeId>` PlayerPref
 ```bash
 # Android APK
 unzip -p app.apk assets/bin/Data/Managed/Metadata/global-metadata.dat \
-  | strings | grep -E 'UnityIapInstaller|UnityIapProvider|CrossPlatformReceiptValidator'
+  | strings | grep -E 'UnityIAPInstaller|UnityIAPProvider|CrossPlatformReceiptValidator'
 ```
 
 하나도 안 나오면 어셈블리가 통째로 스트리핑된 것이다. 런타임 증상은 이 에러 로그다.

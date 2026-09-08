@@ -416,7 +416,7 @@ SDK에게 맡기고 개발자에게만 알립니다. Firebase가 규칙 위반 �
 
 **`DeduplicationId`를 반드시 채웁니다.** Adjust는 이 값이 같은 매출 이벤트를 한 번만 집계합니다.
 `IAPService`는 스토어 재전달·복원에서 같은 거래를 다시 지급 경로에 태우므로(IAPService README의
-`IIapFulfillment`), 이게 없으면 매출이 부풀어 오릅니다.
+`IIAPFulfillment`), 이게 없으면 매출이 부풀어 오릅니다.
 
 **광고 수익 소스**는 `AdImpression.AdPlatform`에서 옮깁니다 — `AppLovin` → `applovin_max_sdk`,
 `LevelPlay`/`IronSource` → `ironsource_sdk`, `AdMob` → `admob_sdk` 등. 모르는 값은 경고 후

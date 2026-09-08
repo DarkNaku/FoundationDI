@@ -93,14 +93,14 @@ DI 코어는 **Reflex 14.3.1**이다. `Assets/Scripts/Installers/RootInstaller.c
   - **`google-services.json`이 없어 Firebase 실전송은 미검증이고, Adjust SDK는 에디터에서 아무것도 하지 않아(`InitSdk`가 즉시 반환) 실기 빌드로만 검증된다.**
   - 상세: `Assets/FoundationDI/Runtime/Services/AnalyticsService/README.md`.
 
-- **IAPService** (`Services/IAPService/`): 모바일 인앱 구매 서비스. Google Play / App Store의 소모성·비소모성 상품을 `IIapService` 하나로 다룬다.
-  - **3계층**: `Providers/`(SDK seam, `IIapProvider`) → `IapService`(정책: 검증→지급→확정→소유 기록→이벤트) → `IIapService`(게임 표면). AdService와 같은 구조.
-  - **`IIapFulfillment`이 핵심 seam**: 지급이 `true`를 반환해야 `ConfirmPurchase`가 호출된다. 저장 실패 시 확정하지 않아 스토어가 다음 실행에 재전달한다. **신규 구매·재전달·복원이 전부 이 한 메서드로 들어온다.** 미등록 시 `AutoConfirmFulfillment`로 폴백.
-  - **`PurchaseAsync`는 `Awaitable<IapPurchaseResult>`**. 결과는 `Purchased/Restored/AlreadyOwned/UserCancelled/Deferred/NotReady/InvalidReceipt/Failed` 8종이며 `IsSuccess`가 앞 셋을 묶는다. 스토어 UI가 모달이라 동시 구매는 하나만 허용한다(두 번째는 `NotReady`).
+- **IAPService** (`Services/IAPService/`): 모바일 인앱 구매 서비스. Google Play / App Store의 소모성·비소모성 상품을 `IIAPService` 하나로 다룬다.
+  - **3계층**: `Providers/`(SDK seam, `IIAPProvider`) → `IAPService`(정책: 검증→지급→확정→소유 기록→이벤트) → `IIAPService`(게임 표면). AdService와 같은 구조.
+  - **`IIAPFulfillment`이 핵심 seam**: 지급이 `true`를 반환해야 `ConfirmPurchase`가 호출된다. 저장 실패 시 확정하지 않아 스토어가 다음 실행에 재전달한다. **신규 구매·재전달·복원이 전부 이 한 메서드로 들어온다.** 미등록 시 `AutoConfirmFulfillment`로 폴백.
+  - **`PurchaseAsync`는 `Awaitable<IAPPurchaseResult>`**. 결과는 `Purchased/Restored/AlreadyOwned/UserCancelled/Deferred/NotReady/InvalidReceipt/Failed` 8종이며 `IsSuccess`가 앞 셋을 묶는다. 스토어 UI가 모달이라 동시 구매는 하나만 허용한다(두 번째는 `NotReady`).
   - **iOS 로컬 검증은 불가능하다** — Unity IAP 5는 StoreKit 2를 쓰고 OS가 이미 검증한다. 로컬 검증은 Google Play 전용(`CrossPlatformValidator` + Tangle)이며 `GooglePlayTangle`은 Assembly-CSharp에 생성되므로 리플렉션으로 찾는다. Tangle이 없으면 경고 후 통과(개발 빌드가 막히지 않게).
   - **Unity IAP는 옵셔널 어셈블리**: `FOUNDATIONDI_UNITYIAP` 심볼이 걸린 `FoundationDI.UnityIAP`. 코어는 `com.unity.purchasing`를 참조하지 않는다. 에디터에서는 `ForceDummyInEditor`로 Dummy provider가 전체 플로우를 대신한다.
   - **AdService/AnalyticsService 연동은 수동 배선** — `_ads.AdsRemoved = _iap.IsOwned(...)`, `_iap.Purchased += p => _analytics.LogPurchase(...)`.
-  - 상품 상수는 `Tools/FoundationDI/IAP/Generate Product Constants`가 `IapProducts` 클래스로 생성한다(SoundService의 Generated/asmref 패턴).
+  - 상품 상수는 `Tools/FoundationDI/IAP/Generate Product Constants`가 `IAPProducts` 클래스로 생성한다(SoundService의 Generated/asmref 패턴).
   - 상세: `Assets/FoundationDI/Runtime/Services/IAPService/README.md`.
 
 - **PoolManager** (`Managers/PoolManager/`): 키 기반 GameObject 오브젝트 풀. **프리팹 로드는 `IResourceService`에 위임한다.** `ObjectPool<IPoolItem>` 기반이며 `PoolData`가 풀을, `PoolItem`(MonoBehaviour)이 풀 항목 생명주기 콜백(`OnGetItem`/`OnReleaseItem` 등)과 지연 반환(`Release(delay)`)을 담당. 풀 루트는 `DontDestroyOnLoad`가 아니라 씬 스코프에 귀속시켜 씬 언로드 시 함께 정리된다. 생성 시 계층 전체에 DI를 주입하며, **주입 실패는 인스턴스 단위로 격리**된다(격리가 없으면 생성 콜백이 반환하지 못해 인스턴스가 씬에 고아로 남는다).

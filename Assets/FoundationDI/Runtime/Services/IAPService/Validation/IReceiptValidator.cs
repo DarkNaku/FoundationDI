@@ -7,6 +7,6 @@ namespace DarkNaku.FoundationDI
     // 요구를 위해 모든 구현을 async로 만들 이유가 없다.
     public interface IReceiptValidator
     {
-        bool Validate(IapPurchase purchase, out IapError error);
+        bool Validate(IAPPurchase purchase, out IAPError error);
     }
 }

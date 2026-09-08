@@ -18,7 +18,7 @@ DI(의존성 주입) 기반 Unity 게임 개발 파운데이션 패키지입니�
 - **오브젝트 풀 / 사운드** — 키 기반 GameObject 풀링과 태그 기반 오디오. 사운드는 SFX/음악/플레이리스트/다이내믹 뮤직 빌더, AudioSource 풀링, 페이드·루프·콜백, AudioMixer Output 볼륨 영속화, 3D 오클루전, 전용 에디터 창(Audio Creator/Collection/Output Manager)을 제공
 - **햅틱** — iOS/Android 촉각 피드백. 시맨틱 프리셋(`Impact`/`Notification`/`Selection`, 옵트인 쿨다운) + `AnimationCurve` 커브·커스텀 패턴 재생(`Awaitable`, 단일 활성)과 플랫폼 케이퍼빌리티 폴백. 에디터/데스크톱은 Noop
 - **부트스트랩 초기화** — 초기화 단위를 SO(`InitializeItem`)로 정의하고 카탈로그 순서대로 순차 실행. 세션 내 중복 실행 방지, 실패 지점부터 재개
-- **수익화 3종** — 광고(`IAdService`)·분석(`IAnalyticsService`)·인앱결제(`IIapService`). 세 서비스 모두 SDK를 옵셔널 어셈블리로 격리해 **코어는 어떤 3사 SDK도 참조하지 않으며**, SDK가 없으면 Dummy/Debug provider로 에디터에서 전체 플로우가 돌아갑니다
+- **수익화 3종** — 광고(`IAdService`)·분석(`IAnalyticsService`)·인앱결제(`IIAPService`). 세 서비스 모두 SDK를 옵셔널 어셈블리로 격리해 **코어는 어떤 3사 SDK도 참조하지 않으며**, SDK가 없으면 Dummy/Debug provider로 에디터에서 전체 플로우가 돌아갑니다
 - **튜토리얼** — 게임 조건에 따라 나뉘어 발동하는 튜토리얼 진행 엔진(`ITutorialManager`). 시퀀스는 각자 `StartTrigger`로 발동하는 조건부 집합이고, 진행도는 시퀀스 ID로 영속화. 진행 규칙은 순수 C#이라 EditMode에서 전부 테스트됨
 - **UI 컴포넌트** — uGUI `Button`을 상속한 `UIButton`(클릭 SFX + 햅틱), 상태별 이미지/텍스트 스왑 `UIStateButton`, 호버 확대·누름 축소 `UIScaleButton`(스케일을 자식에만 걸어 히트 영역이 변하지 않는다). 사운드·햅틱 서비스는 선택적이라 등록하지 않으면 그 기능만 조용히 꺼진다
 - **씬 컴포넌트 DI** — 씬에 배치된 MonoBehaviour 주입은 Reflex의 `ContainerScope`가 직접 한다(실행 순서 `-1_000_000_000`, 어떤 `Awake`보다 먼저). `UIButton`/`MusicZone`/`OutputVolumeSlider`/`TutorialTarget` 등 패키지 컴포넌트는 서비스를 `[Inject]` 필드로 직접 받지 않고 `[Inject] Construct(IServiceResolver)` + `TryResolve`로 **선택 주입**한다 — 씬 주입에는 컴포넌트별 격리가 없어, 미등록 서비스를 요구하는 필드 하나가 그 뒤 순번 전체의 주입을 막기 때문이다
@@ -86,7 +86,7 @@ public class RootInstaller : MonoBehaviour, IInstaller
         // builder.RegisterHapticService();
         // builder.RegisterAdService(_adSettings);
         // builder.RegisterAnalyticsService(_analyticsSettings);
-        // builder.RegisterIapService(_iapSettings);
+        // builder.RegisterIAPService(_iapSettings);
     }
 }
 
@@ -169,7 +169,7 @@ DI 컨테이너가 **VContainer에서 Reflex 14.3.1로 바뀌었습니다.** 파
 | **InitializeService** | 게임 부트스트랩 순차 초기화. 초기화 단위를 `InitializeItem`(SO)로 정의하고 `InitializeCatalog`에 묶어 리스트 순서대로 직렬 실행. 세션 내 중복 실행 방지, 예외는 즉시 전파하고 실패 지점부터 재개. | [README](Assets/FoundationDI/Runtime/Services/InitializeService/README.md) |
 | **AdService** | 광고 네트워크 중립 서비스. `IAdService` 하나로 전면·보상·배너를 다루고, 정책 계층(재시도 백오프·보상 래치·자동 재로드·전면 쿨다운·광고제거 게이트)과 SDK 어댑터를 분리. `ShowAsync`는 `Awaitable<AdShowResult>`. 광고제거는 포맷별로 다르게 게이트한다(전면·배너 차단, 보상형은 계속 동작). | [README](Assets/FoundationDI/Runtime/Services/AdService/README.md) |
 | **AnalyticsService** | 다중 분석/MMP 팬아웃. 게임이 `IAnalyticsService` API를 한 번 호출하면 등록된 모든 provider로 브로드캐스트된다. 라우팅 규칙 없음(무엇을 무시할지는 어댑터가 결정), 초기화 전 이벤트는 순서 보존 버퍼링·유저 상태는 latest-wins, provider 예외는 격리. | [README](Assets/FoundationDI/Runtime/Services/AnalyticsService/README.md) |
-| **IAPService** | 모바일 인앱 구매(Google Play/App Store). 소모성·비소모성을 `IIapService` 하나로 구매·복원. **지급을 저장한 뒤에만 확정**하는 규율을 `IIapFulfillment` seam 하나로 접어, 신규 구매·재전달·복원이 전부 같은 메서드로 들어온다. 로컬 영수증 검증(Google Play)·상품 상수 생성기 포함. | [README](Assets/FoundationDI/Runtime/Services/IAPService/README.md) |
+| **IAPService** | 모바일 인앱 구매(Google Play/App Store). 소모성·비소모성을 `IIAPService` 하나로 구매·복원. **지급을 저장한 뒤에만 확정**하는 규율을 `IIAPFulfillment` seam 하나로 접어, 신규 구매·재전달·복원이 전부 같은 메서드로 들어온다. 로컬 영수증 검증(Google Play)·상품 상수 생성기 포함. | [README](Assets/FoundationDI/Runtime/Services/IAPService/README.md) |
 | **TutorialManager** | 조건 기반 튜토리얼 진행 엔진. 시퀀스는 순차 리스트가 아니라 각자 `StartTrigger`(Auto/Manual/ButtonClick/`MessageTrigger<T>`)로 발동하는 **조건부 후보 집합**이고, 진행도는 인덱스가 아닌 **시퀀스 ID**로 영속화해 시퀀스를 추가·삭제해도 기존 유저 진행도가 어긋나지 않는다. 진행 규칙은 순수 C#(EditMode 테스트 가능) + 얇은 씬 오써링 어댑터로 분리. 연출은 `ITutorialModule` seam + 기본 2종. | [README](Assets/FoundationDI/Runtime/Managers/TutorialManager/README.md) |
 
 > 상세 문서가 아직 없는 구성 요소는 소스(`Assets/FoundationDI/Runtime/Services/<이름>/`)와 인터페이스(`IXxxService`)를 참고하세요.

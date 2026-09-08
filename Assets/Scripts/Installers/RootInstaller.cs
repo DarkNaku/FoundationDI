@@ -16,8 +16,8 @@ public class RootInstaller : MonoBehaviour, IInstaller
     // 인스펙터에서 Assets/Settings/AnalyticsServiceSettings.asset 을 연결한다.
     [SerializeField] private AnalyticsServiceSettings _analyticsServiceSettings;
 
-    // 인스펙터에서 Assets/Settings/IapServiceSettings.asset 을 연결한다.
-    [SerializeField] private IapServiceSettings _iapServiceSettings;
+    // 인스펙터에서 Assets/Settings/IAPServiceSettings.asset 을 연결한다.
+    [SerializeField] private IAPServiceSettings _iapServiceSettings;
 
     public void InstallBindings(ContainerBuilder builder)
     {
@@ -37,7 +37,7 @@ public class RootInstaller : MonoBehaviour, IInstaller
         builder.RegisterInitializeService();
         builder.RegisterAdService(_adServiceSettings);
         builder.RegisterAnalyticsService(_analyticsServiceSettings);
-        builder.RegisterIapService(_iapServiceSettings);
+        builder.RegisterIAPService(_iapServiceSettings);
 
         // RegisterTutorialManager는 SceneInstaller로 내려갔다.
         // 루트에 붙들어 두던 이유(InjectorService가 정적 리졸버 하나를 공유한다)가 사라졌다.

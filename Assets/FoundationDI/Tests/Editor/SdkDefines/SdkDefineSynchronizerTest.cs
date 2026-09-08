@@ -5,14 +5,14 @@ using NUnit.Framework;
 public class SdkDefineSynchronizerTest
 {
     private const string Firebase = "FOUNDATIONDI_FIREBASE";
-    private const string UnityIap = "FOUNDATIONDI_UNITYIAP";
+    private const string UnityIAP = "FOUNDATIONDI_UNITYIAP";
     private const string AppLovin = "FOUNDATIONDI_APPLOVIN";
     private const string LevelPlay = "FOUNDATIONDI_LEVELPLAY";
     private const string Adjust = "FOUNDATIONDI_ADJUST";
 
-    private static Dictionary<string, bool> Present(bool firebase = false, bool unityIap = false,
+    private static Dictionary<string, bool> Present(bool firebase = false, bool unityIAP = false,
                                                     bool appLovin = false) =>
-        new() { { Firebase, firebase }, { UnityIap, unityIap }, { AppLovin, appLovin } };
+        new() { { Firebase, firebase }, { UnityIAP, unityIAP }, { AppLovin, appLovin } };
 
     [Test]
     public void SDK가_있으면_없던_심볼을_추가한다()
@@ -25,9 +25,9 @@ public class SdkDefineSynchronizerTest
     [Test]
     public void SDK가_없으면_있던_심볼을_제거한다()
     {
-        var result = SdkDefineSynchronizer.Resolve($"{Firebase};{UnityIap}", Present(unityIap: true));
+        var result = SdkDefineSynchronizer.Resolve($"{Firebase};{UnityIAP}", Present(unityIAP: true));
 
-        Assert.AreEqual(UnityIap, result);
+        Assert.AreEqual(UnityIAP, result);
     }
 
     [Test]
@@ -53,9 +53,9 @@ public class SdkDefineSynchronizerTest
     [Test]
     public void 변화가_없으면_입력과_같은_문자열을_돌려준다()
     {
-        var current = $"{Firebase};{UnityIap}";
+        var current = $"{Firebase};{UnityIAP}";
 
-        var result = SdkDefineSynchronizer.Resolve(current, Present(firebase: true, unityIap: true));
+        var result = SdkDefineSynchronizer.Resolve(current, Present(firebase: true, unityIAP: true));
 
         Assert.AreEqual(current, result, "변화가 없는데 문자열이 바뀌면 매번 재컴파일이 걸린다");
     }
@@ -64,17 +64,17 @@ public class SdkDefineSynchronizerTest
     public void 추가되는_심볼은_뒤에_붙고_기존_순서는_유지된다()
     {
         var result = SdkDefineSynchronizer.Resolve($"MY_GAME_CHEATS;{Firebase}",
-                                                   Present(firebase: true, unityIap: true));
+                                                   Present(firebase: true, unityIAP: true));
 
-        Assert.AreEqual($"MY_GAME_CHEATS;{Firebase};{UnityIap}", result);
+        Assert.AreEqual($"MY_GAME_CHEATS;{Firebase};{UnityIAP}", result);
     }
 
     [Test]
     public void 여러_SDK가_동시에_추가되면_표_순서대로_붙는다()
     {
-        var result = SdkDefineSynchronizer.Resolve("", Present(firebase: true, unityIap: true, appLovin: true));
+        var result = SdkDefineSynchronizer.Resolve("", Present(firebase: true, unityIAP: true, appLovin: true));
 
-        Assert.AreEqual($"{Firebase};{UnityIap};{AppLovin}", result);
+        Assert.AreEqual($"{Firebase};{UnityIAP};{AppLovin}", result);
     }
 
     [Test]
@@ -125,7 +125,7 @@ public class SdkDefineSynchronizerTest
             symbols.Add(entry.Symbol);
         }
 
-        CollectionAssert.AreEquivalent(new[] { Firebase, UnityIap, AppLovin, LevelPlay, Adjust }, symbols);
+        CollectionAssert.AreEquivalent(new[] { Firebase, UnityIAP, AppLovin, LevelPlay, Adjust }, symbols);
     }
 
     [Test]
@@ -157,7 +157,7 @@ public class SdkDefineSynchronizerTest
 
         var present = SdkDefineSynchronizer.DetectPresent(available);
 
-        Assert.IsTrue(present[UnityIap]);
+        Assert.IsTrue(present[UnityIAP]);
         Assert.IsFalse(present[Firebase]);
         Assert.IsFalse(present[AppLovin]);
         Assert.IsFalse(present[LevelPlay]);
@@ -174,7 +174,7 @@ public class SdkDefineSynchronizerTest
 
         Assert.IsTrue(present[Firebase]);
         Assert.IsTrue(present[AppLovin]);
-        Assert.IsFalse(present[UnityIap]);
+        Assert.IsFalse(present[UnityIAP]);
     }
 
     [Test]
@@ -200,8 +200,8 @@ public class SdkDefineSynchronizerTest
         // 회귀 방지: Firebase DLL을 지웠는데 심볼이 남아 컴파일이 깨지던 상황.
         var present = SdkDefineSynchronizer.DetectPresent(new[] { "Unity.Purchasing" });
 
-        var result = SdkDefineSynchronizer.Resolve($"{Firebase};{UnityIap}", present);
+        var result = SdkDefineSynchronizer.Resolve($"{Firebase};{UnityIAP}", present);
 
-        Assert.AreEqual(UnityIap, result);
+        Assert.AreEqual(UnityIAP, result);
     }
 }

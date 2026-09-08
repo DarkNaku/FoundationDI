@@ -5,30 +5,30 @@ using Resolution = Reflex.Enums.Resolution;
 
 namespace DarkNaku.FoundationDI
 {
-    public static class IapServiceRegistration
+    public static class IAPServiceRegistration
     {
         // 루트 IInstaller의 InstallBindings에서 호출한다.
-        //   builder.RegisterIapService(_iapServiceSettings);
+        //   builder.RegisterIAPService(_iapServiceSettings);
         //
         // 지급 핸들러를 쓰려면 같은 InstallBindings 어디서든(순서 무관) 함께 등록한다.
-        //   builder.RegisterType(typeof(MyFulfillment), new[] { typeof(IIapFulfillment) },
+        //   builder.RegisterType(typeof(MyFulfillment), new[] { typeof(IIAPFulfillment) },
         //                        Lifetime.Singleton, Resolution.Lazy);
-        public static ContainerBuilder RegisterIapService(this ContainerBuilder builder,
-                                                          IapServiceSettings settings)
+        public static ContainerBuilder RegisterIAPService(this ContainerBuilder builder,
+                                                          IAPServiceSettings settings)
         {
             if (settings == null)
             {
-                Debug.LogError("[IAPService] IapServiceSettings가 null이다. 서비스를 등록하지 않는다.");
+                Debug.LogError("[IAPService] IAPServiceSettings가 null이다. 서비스를 등록하지 않는다.");
                 return builder;
             }
 
             builder.RegisterValue(settings);
-            builder.RegisterType(typeof(IapProviderFactory), new[] { typeof(IIapProviderFactory) },
+            builder.RegisterType(typeof(IAPProviderFactory), new[] { typeof(IIAPProviderFactory) },
                                  Lifetime.Singleton, Resolution.Lazy);
 
-            return builder.RegisterFactory<IIapService>(container =>
+            return builder.RegisterFactory<IIAPService>(container =>
             {
-                var factory = container.Resolve<IIapProviderFactory>();
+                var factory = container.Resolve<IIAPProviderFactory>();
 
                 var forceDummy = settings.ForceDummyInEditor && Application.isEditor;
                 var provider = factory.Create(settings.Provider, settings.DummyOptions, forceDummy);
@@ -37,19 +37,19 @@ namespace DarkNaku.FoundationDI
                 // 등록 순서에 의존하지 않는다.
                 // Reflex에는 TryResolve가 없어 HasBinding으로 먼저 묻는다 -
                 // 미등록 계약에 Resolve를 부르면 UnknownContractException이 난다.
-                var fulfillment = container.HasBinding<IIapFulfillment>()
-                    ? container.Resolve<IIapFulfillment>()
+                var fulfillment = container.HasBinding<IIAPFulfillment>()
+                    ? container.Resolve<IIAPFulfillment>()
                     : new AutoConfirmFulfillment();
 
                 var validator = container.HasBinding<IReceiptValidator>()
                     ? container.Resolve<IReceiptValidator>()
-                    : IapReceiptValidatorRegistry.ResolveOrDefault();
+                    : IAPReceiptValidatorRegistry.ResolveOrDefault();
 
                 var entitlements = container.HasBinding<IEntitlementStorage>()
                     ? container.Resolve<IEntitlementStorage>()
                     : new PlayerPrefsEntitlementStorage();
 
-                return new IapService(provider, settings.ToOptions(), fulfillment, validator, entitlements);
+                return new IAPService(provider, settings.ToOptions(), fulfillment, validator, entitlements);
             }, Lifetime.Singleton, Resolution.Lazy);
         }
     }

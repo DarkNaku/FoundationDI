@@ -16,7 +16,7 @@
 - [x] 등록 확장 11개가 Reflex ContainerBuilder를 받는다
 - [x] WithParameter가 없으므로 RegisterPoolManager가 root를 팩토리로 넘긴다
 - [x] internal 생성자를 가진 UINavigator를 RegisterFactory로 등록한다
-- [x] IapService의 선택 등록 폴백이 HasBinding + Resolve로 동작한다
+- [x] IAPService의 선택 등록 폴백이 HasBinding + Resolve로 동작한다
 - [x] SoundService의 ISoundService/ISoundEngine이 같은 인스턴스를 돌려준다
 - [x] 씬 컴포넌트 4개가 [Inject] Construct(IServiceResolver) + TryResolve로 선택 주입받는다
 - [x] InjectorService/InjectableBehaviour가 삭제되고 씬 주입은 ContainerScope가 담당한다
@@ -367,13 +367,13 @@ Firebase 어댑터와 같은 모양으로 Adjust(MMP) 어댑터를 붙인다. Ad
 
 ## 완료: IAPService — 모바일 인앱 구매 서비스
 
-게임 코드가 `IIapService` 하나로 Google Play / App Store의 소모성·비소모성 상품을 구매·복원한다.
+게임 코드가 `IIAPService` 하나로 Google Play / App Store의 소모성·비소모성 상품을 구매·복원한다.
 Unity IAP 5.4.2는 `FOUNDATIONDI_UNITYIAP` 심볼이 걸린 옵셔널 어셈블리에 격리하고, 코어는 Dummy provider로 완전히 동작한다.
 
 세부: `docs/superpowers/specs/2026-08-23-iapservice-design.md`
 계획: `docs/superpowers/plans/2026-08-23-iap-service.md`
 
-- [x] IapProductId가 플랫폼 오버라이드를 고르고 비면 공용 ID로 폴백한다
+- [x] IAPProductId가 플랫폼 오버라이드를 고르고 비면 공용 ID로 폴백한다
 - [x] 구매결과의 IsSuccess가 성공 결과에서만 참이다
 - [x] 초기화하면 provider 상품이 노출된다
 - [x] 초기화 전 구매는 NotReady다
@@ -394,8 +394,8 @@ Unity IAP 5.4.2는 `FOUNDATIONDI_UNITYIAP` 심볼이 걸린 옵셔널 어셈블�
 - [x] 보류된 구매는 지급하지 않고 Deferred를 반환한다
 - [x] Dispose하면 provider가 해제되고 이후 구매는 NotReady다
 - [x] 저장한 소유 상태가 다시 읽힌다
-- [x] IapProviderFactory가 강제 더미·미가용 심볼·미등록 creator를 처리한다
-- [x] RegisterIapService로 IIapService가 싱글턴 등록된다
+- [x] IAPProviderFactory가 강제 더미·미가용 심볼·미등록 creator를 처리한다
+- [x] RegisterIAPService로 IIAPService가 싱글턴 등록된다
 
 구현만 있고 단위 테스트가 없는 항목(스모크로 검증): Unity IAP 어댑터. 상수 생성기는 순수 함수만 단위 테스트.
 

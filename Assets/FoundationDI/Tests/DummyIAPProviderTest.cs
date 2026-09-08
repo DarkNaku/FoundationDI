@@ -5,12 +5,12 @@ using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
 
-public class DummyIapProviderTest
+public class DummyIAPProviderTest
 {
-    private static readonly IapProductDefinition[] Catalog =
+    private static readonly IAPProductDefinition[] Catalog =
     {
-        new("gems", "gems_store", IapProductType.Consumable),
-        new("remove_ads", "remove_ads_store", IapProductType.NonConsumable),
+        new("gems", "gems_store", IAPProductType.Consumable),
+        new("remove_ads", "remove_ads_store", IAPProductType.NonConsumable),
     };
 
     [SetUp]
@@ -22,10 +22,10 @@ public class DummyIapProviderTest
     }
 
     // 지연 0으로 두면 이벤트가 동기적으로 발행돼 프레임을 기다릴 필요가 없다.
-    private static DummyIapProvider NewProvider(bool alwaysFail = false, bool alwaysCancel = false) =>
-        new(new DummyIapOptions(0f, alwaysFail, alwaysCancel, "$0.99"));
+    private static DummyIAPProvider NewProvider(bool alwaysFail = false, bool alwaysCancel = false) =>
+        new(new DummyIAPOptions(0f, alwaysFail, alwaysCancel, "$0.99"));
 
-    private static IapProviderContext Context() => new(Catalog, false);
+    private static IAPProviderContext Context() => new(Catalog, false);
 
     [UnityTest]
     [Timeout(5000)]
@@ -49,7 +49,7 @@ public class DummyIapProviderTest
         var provider = NewProvider();
         await provider.InitializeAsync(Context());
 
-        var pendings = new List<IapPendingPurchase>();
+        var pendings = new List<IAPPendingPurchase>();
         provider.PurchasePending += p => pendings.Add(p);
 
         Assert.IsTrue(provider.Purchase("gems_store"));
@@ -81,7 +81,7 @@ public class DummyIapProviderTest
         var cancelling = NewProvider(alwaysCancel: true);
         await cancelling.InitializeAsync(Context());
 
-        IapPurchaseFailure? cancelled = null;
+        IAPPurchaseFailure? cancelled = null;
         cancelling.PurchaseFailed += f => cancelled = f;
         cancelling.Purchase("gems_store");
 
@@ -92,7 +92,7 @@ public class DummyIapProviderTest
         var failing = NewProvider(alwaysFail: true);
         await failing.InitializeAsync(Context());
 
-        IapPurchaseFailure? failure = null;
+        IAPPurchaseFailure? failure = null;
         failing.PurchaseFailed += f => failure = f;
         failing.Purchase("gems_store");
 
@@ -126,7 +126,7 @@ public class DummyIapProviderTest
         var restored = NewProvider();
         await restored.InitializeAsync(Context());
 
-        var replayed = new List<IapPendingPurchase>();
+        var replayed = new List<IAPPendingPurchase>();
         restored.PurchasePending += p => replayed.Add(p);
 
         Assert.IsTrue(await restored.RestoreAsync());

@@ -3,32 +3,32 @@ using UnityEngine;
 
 namespace DarkNaku.FoundationDI
 {
-    [CreateAssetMenu(fileName = "IapServiceSettings", menuName = "FoundationDI/IAP Service Settings")]
-    public class IapServiceSettings : ScriptableObject
+    [CreateAssetMenu(fileName = "IAPServiceSettings", menuName = "FoundationDI/IAP Service Settings")]
+    public class IAPServiceSettings : ScriptableObject
     {
         [Header("Provider")]
-        [SerializeField] private IapProviderType _provider = IapProviderType.UnityIAP;
+        [SerializeField] private IAPProviderType _provider = IAPProviderType.UnityIAP;
 
         [Tooltip("에디터에서는 항상 Dummy provider를 쓴다. 실기 테스트가 필요할 때만 끈다.")]
         [SerializeField] private bool _forceDummyInEditor = true;
 
         [Header("Catalog")]
-        [SerializeField] private List<IapProductEntry> _products = new();
+        [SerializeField] private List<IAPProductEntry> _products = new();
 
         [Header("Debug")]
         [SerializeField] private bool _verboseLogging;
 
         [Header("Dummy Provider")]
-        [SerializeField] private DummyIapOptions _dummyOptions = DummyIapOptions.Default;
+        [SerializeField] private DummyIAPOptions _dummyOptions = DummyIAPOptions.Default;
 
-        public IapProviderType Provider => _provider;
+        public IAPProviderType Provider => _provider;
         public bool ForceDummyInEditor => _forceDummyInEditor;
-        public DummyIapOptions DummyOptions => _dummyOptions;
-        public IReadOnlyList<IapProductEntry> Products => _products;
+        public DummyIAPOptions DummyOptions => _dummyOptions;
+        public IReadOnlyList<IAPProductEntry> Products => _products;
 
-        public IapServiceOptions ToOptions()
+        public IAPServiceOptions ToOptions()
         {
-            var definitions = new List<IapProductDefinition>(_products.Count);
+            var definitions = new List<IAPProductDefinition>(_products.Count);
             var seen = new HashSet<string>();
 
             foreach (var entry in _products)
@@ -52,13 +52,13 @@ namespace DarkNaku.FoundationDI
                 definitions.Add(entry.ToDefinition());
             }
 
-            return new IapServiceOptions(definitions, _verboseLogging);
+            return new IAPServiceOptions(definitions, _verboseLogging);
         }
 
         // 테스트 전용. 인스펙터를 거치지 않고 카탈로그를 채운다.
-        internal void SetProductsForTest(IReadOnlyList<IapProductEntry> products)
+        internal void SetProductsForTest(IReadOnlyList<IAPProductEntry> products)
         {
-            _products = new List<IapProductEntry>(products);
+            _products = new List<IAPProductEntry>(products);
         }
     }
 }

@@ -4,7 +4,7 @@ using UnityEngine;
 namespace DarkNaku.FoundationDI
 {
     [Serializable]
-    public struct DummyIapOptions
+    public struct DummyIAPOptions
     {
         [Tooltip("가짜 스토어 시트가 떠 있는 시간(초). 0이면 즉시 결과가 나온다.")]
         [SerializeField, Min(0f)] private float _delaySeconds;
@@ -18,7 +18,7 @@ namespace DarkNaku.FoundationDI
         [Tooltip("가짜 상품에 표시할 가격 문자열.")]
         [SerializeField] private string _priceFormat;
 
-        public DummyIapOptions(float delaySeconds, bool alwaysFail, bool alwaysCancel, string priceFormat)
+        public DummyIAPOptions(float delaySeconds, bool alwaysFail, bool alwaysCancel, string priceFormat)
         {
             _delaySeconds = delaySeconds;
             _alwaysFail = alwaysFail;
@@ -31,6 +31,6 @@ namespace DarkNaku.FoundationDI
         public bool AlwaysCancel => _alwaysCancel;
         public string PriceFormat => string.IsNullOrEmpty(_priceFormat) ? "$0.99" : _priceFormat;
 
-        public static DummyIapOptions Default => new(0.5f, false, false, "$0.99");
+        public static DummyIAPOptions Default => new(0.5f, false, false, "$0.99");
     }
 }

@@ -24,7 +24,7 @@ namespace DarkNaku.FoundationDI
         private bool _initialized;
 #endif
 
-        public bool Validate(IapPurchase purchase, out IapError error)
+        public bool Validate(IAPPurchase purchase, out IAPError error)
         {
             error = default;
 
@@ -37,7 +37,7 @@ namespace DarkNaku.FoundationDI
 
             if (string.IsNullOrEmpty(purchase.Receipt))
             {
-                error = new IapError(-2001, "영수증이 비어 있다");
+                error = new IAPError(-2001, "영수증이 비어 있다");
                 return false;
             }
 
@@ -48,7 +48,7 @@ namespace DarkNaku.FoundationDI
             }
             catch (IAPSecurityException e)
             {
-                error = new IapError(-2002, $"영수증 검증에 실패했다: {e.Message}");
+                error = new IAPError(-2002, $"영수증 검증에 실패했다: {e.Message}");
                 return false;
             }
             catch (Exception e)

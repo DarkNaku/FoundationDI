@@ -6,12 +6,12 @@ using UnityEngine;
 
 namespace DarkNaku.FoundationDI.Editor
 {
-    // 설정 SO의 상품 목록으로 IapProducts 상수 클래스를 생성한다.
+    // 설정 SO의 상품 목록으로 IAPProducts 상수 클래스를 생성한다.
     // 문자열 리터럴로 상품을 부르면 오타가 런타임까지 살아남는다 — 컴파일 타임에 잡히게 한다.
-    public static class IapProductConstantsGenerator
+    public static class IAPProductConstantsGenerator
     {
         private const string RuntimeAssemblyName = "FoundationDI";
-        private const string GeneratedFileName = "IapProducts.cs";
+        private const string GeneratedFileName = "IAPProducts.cs";
         private const string GeneratedFolderName = "Generated";
 
         [MenuItem("Tools/FoundationDI/IAP/Generate Product Constants")]
@@ -21,7 +21,7 @@ namespace DarkNaku.FoundationDI.Editor
 
             if (settings == null)
             {
-                Debug.LogError("[IAPService] IapServiceSettings 에셋을 찾지 못했다. " +
+                Debug.LogError("[IAPService] IAPServiceSettings 에셋을 찾지 못했다. " +
                                "Create > FoundationDI > IAP Service Settings로 먼저 만들 것.");
                 return;
             }
@@ -41,7 +41,7 @@ namespace DarkNaku.FoundationDI.Editor
             Debug.Log($"[IAPService] 상품 상수를 생성했다: {filePath}");
         }
 
-        internal static string BuildSource(IReadOnlyList<IapProductEntry> entries)
+        internal static string BuildSource(IReadOnlyList<IAPProductEntry> entries)
         {
             const string indent = "    ";
 
@@ -49,7 +49,7 @@ namespace DarkNaku.FoundationDI.Editor
             builder.AppendLine("// 이 파일은 IAPService 에디터 도구가 자동 생성합니다. 직접 수정하지 마세요.");
             builder.AppendLine("namespace DarkNaku.FoundationDI");
             builder.AppendLine("{");
-            builder.AppendLine(indent + "public static class IapProducts");
+            builder.AppendLine(indent + "public static class IAPProducts");
             builder.AppendLine(indent + "{");
 
             if (entries != null)
@@ -114,21 +114,21 @@ namespace DarkNaku.FoundationDI.Editor
             return builder.ToString();
         }
 
-        private static IapServiceSettings FindSettings()
+        private static IAPServiceSettings FindSettings()
         {
-            if (Selection.activeObject is IapServiceSettings selected) return selected;
+            if (Selection.activeObject is IAPServiceSettings selected) return selected;
 
-            var guids = AssetDatabase.FindAssets("t:IapServiceSettings");
+            var guids = AssetDatabase.FindAssets("t:IAPServiceSettings");
 
             if (guids.Length == 0) return null;
 
             if (guids.Length > 1)
             {
-                Debug.LogWarning("[IAPService] IapServiceSettings가 여러 개다. 첫 번째를 쓴다. " +
+                Debug.LogWarning("[IAPService] IAPServiceSettings가 여러 개다. 첫 번째를 쓴다. " +
                                  "특정 에셋을 쓰려면 프로젝트 창에서 선택한 뒤 다시 실행할 것.");
             }
 
-            return AssetDatabase.LoadAssetAtPath<IapServiceSettings>(AssetDatabase.GUIDToAssetPath(guids[0]));
+            return AssetDatabase.LoadAssetAtPath<IAPServiceSettings>(AssetDatabase.GUIDToAssetPath(guids[0]));
         }
 
         private static void EnsureFolder(string folder)

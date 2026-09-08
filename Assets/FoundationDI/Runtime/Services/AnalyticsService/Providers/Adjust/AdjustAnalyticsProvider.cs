@@ -131,7 +131,7 @@ namespace DarkNaku.FoundationDI
             {
                 // Adjust는 DeduplicationId가 같은 매출 이벤트를 한 번만 집계한다.
                 // IAPService는 스토어 재전달·복원에서 같은 거래를 다시 지급 경로에 태우므로
-                // (IAPService README의 IIapFulfillment), 이게 없으면 매출이 부풀어 오른다.
+                // (IAPService README의 IIAPFulfillment), 이게 없으면 매출이 부풀어 오른다.
                 adjustEvent.DeduplicationId = purchase.TransactionId;
                 adjustEvent.AddCallbackParameter("transaction_id", purchase.TransactionId);
             }

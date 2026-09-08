@@ -12,10 +12,10 @@ namespace DarkNaku.FoundationDI
     // v5는 v4의 IStoreListener/ProcessPurchase를 버리고 Order 모델로 갔다. 확정이 명시적
     // 호출(ConfirmPurchase)로 분리된 덕분에 "지급을 저장한 뒤에만 확정한다"는 규율을
     // 정책 계층이 그대로 구현할 수 있다.
-    public sealed class UnityIapProvider : IIapProvider
+    public sealed class UnityIAPProvider : IIAPProvider
     {
         private readonly StoreController _controller;
-        private readonly List<IapProduct> _products = new();
+        private readonly List<IAPProduct> _products = new();
 
         // 스토어 ID → 조회된 Product. PurchaseProduct(Product)로 사는 편이
         // catalogListingId 규칙에 의존하지 않아 안전하다.
@@ -33,24 +33,24 @@ namespace DarkNaku.FoundationDI
         private bool _subscribed;
         private bool _disposed;
 
-        public UnityIapProvider() : this(UnityIAPServices.StoreController())
+        public UnityIAPProvider() : this(UnityIAPServices.StoreController())
         {
         }
 
-        internal UnityIapProvider(StoreController controller)
+        internal UnityIAPProvider(StoreController controller)
         {
             _controller = controller;
         }
 
         public string Name => "UnityIAP";
 
-        public IReadOnlyList<IapProduct> Products => _products;
+        public IReadOnlyList<IAPProduct> Products => _products;
 
-        public event Action<IapPendingPurchase> PurchasePending;
-        public event Action<IapPurchaseFailure> PurchaseFailed;
+        public event Action<IAPPendingPurchase> PurchasePending;
+        public event Action<IAPPurchaseFailure> PurchaseFailed;
         public event Action<string> PurchaseDeferred;
 
-        public async Awaitable<bool> InitializeAsync(IapProviderContext context)
+        public async Awaitable<bool> InitializeAsync(IAPProviderContext context)
         {
             _verboseLogging = context.VerboseLogging;
 
@@ -138,7 +138,7 @@ namespace DarkNaku.FoundationDI
             return _connecting.Awaitable;
         }
 
-        private Awaitable<bool> FetchProductsAsync(IapProviderContext context)
+        private Awaitable<bool> FetchProductsAsync(IAPProviderContext context)
         {
             var definitions = new List<ProductDefinition>();
 
@@ -173,7 +173,7 @@ namespace DarkNaku.FoundationDI
             return _fetchingPurchases.Awaitable;
         }
 
-        private IReadOnlyList<IapProductDefinition> _catalog;
+        private IReadOnlyList<IAPProductDefinition> _catalog;
 
         private void Subscribe()
         {
@@ -235,7 +235,7 @@ namespace DarkNaku.FoundationDI
                 if (string.IsNullOrEmpty(storeId)) continue;
 
                 _productsByStoreId[storeId] = product;
-                _products.Add(ToIapProduct(storeId, product));
+                _products.Add(ToIAPProduct(storeId, product));
             }
 
             if (_verboseLogging) Debug.Log($"[IAPService] 상품 {_products.Count}개를 조회했다.");
@@ -274,8 +274,8 @@ namespace DarkNaku.FoundationDI
 
             var cancelled = order.FailureReason == PurchaseFailureReason.UserCancelled;
 
-            PurchaseFailed?.Invoke(new IapPurchaseFailure(storeId, cancelled,
-                new IapError((int)order.FailureReason, order.Details ?? order.FailureReason.ToString())));
+            PurchaseFailed?.Invoke(new IAPPurchaseFailure(storeId, cancelled,
+                new IAPError((int)order.FailureReason, order.Details ?? order.FailureReason.ToString())));
         }
 
         private void HandlePurchaseDeferred(DeferredOrder order)
@@ -301,7 +301,7 @@ namespace DarkNaku.FoundationDI
 
             _unconfirmed[transactionId] = order;
 
-            PurchasePending?.Invoke(new IapPendingPurchase(storeId, transactionId, order.Info?.Receipt, isRestored));
+            PurchasePending?.Invoke(new IAPPendingPurchase(storeId, transactionId, order.Info?.Receipt, isRestored));
         }
 
         private static string StoreIdOf(Order order)
@@ -312,10 +312,10 @@ namespace DarkNaku.FoundationDI
             return items[0]?.Product?.definition?.id;
         }
 
-        private IapProduct ToIapProduct(string storeId, UnityProduct product)
+        private IAPProduct ToIAPProduct(string storeId, UnityProduct product)
         {
             var id = storeId;
-            var type = IapProductType.Consumable;
+            var type = IAPProductType.Consumable;
 
             // 공용 ID와 타입은 우리 카탈로그가 진실이다 — 스토어는 우리가 붙인 이름을 모른다.
             if (_catalog != null)
@@ -332,7 +332,7 @@ namespace DarkNaku.FoundationDI
 
             var metadata = product.metadata;
 
-            return new IapProduct(id, storeId, type,
+            return new IAPProduct(id, storeId, type,
                                   metadata?.localizedTitle,
                                   metadata?.localizedDescription,
                                   metadata?.localizedPriceString,
@@ -341,8 +341,8 @@ namespace DarkNaku.FoundationDI
                                   product.availableToPurchase);
         }
 
-        private static UnityProductType ToUnityType(IapProductType type) =>
-            type == IapProductType.NonConsumable ? UnityProductType.NonConsumable : UnityProductType.Consumable;
+        private static UnityProductType ToUnityType(IAPProductType type) =>
+            type == IAPProductType.NonConsumable ? UnityProductType.NonConsumable : UnityProductType.Consumable;
 
         private static Awaitable<bool> Completed(bool value)
         {

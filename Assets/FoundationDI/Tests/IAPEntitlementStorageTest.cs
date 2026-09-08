@@ -2,7 +2,7 @@ using DarkNaku.FoundationDI;
 using NUnit.Framework;
 using UnityEngine;
 
-public class IapEntitlementStorageTest
+public class IAPEntitlementStorageTest
 {
     private const string ProductId = "foundationdi_test_remove_ads";
 

@@ -5,9 +5,9 @@ using Reflex.Extensions;
 using Reflex.Injectors;
 
 // 스모크 확인용 임시 컴포넌트. 확인이 끝나면 지운다.
-public class IapServiceSmokeTest : MonoBehaviour
+public class IAPServiceSmokeTest : MonoBehaviour
 {
-    [Inject] private IIapService _iap;
+    [Inject] private IIAPService _iap;
 
     private string _lastResult = "-";
 

@@ -9,12 +9,12 @@ namespace DarkNaku.FoundationDI
     // AdUnitId와 다른 점은 폴백이다. 광고 단위 ID는 스토어별로 반드시 다르지만, 인앱 상품은
     // 대부분의 게임이 양 스토어에 같은 ID를 올린다 — 그래서 오버라이드가 비면 공용 ID를 쓴다.
     [Serializable]
-    public struct IapProductId
+    public struct IAPProductId
     {
         [SerializeField] private string _android;
         [SerializeField] private string _ios;
 
-        public IapProductId(string android, string ios)
+        public IAPProductId(string android, string ios)
         {
             _android = android;
             _ios = ios;

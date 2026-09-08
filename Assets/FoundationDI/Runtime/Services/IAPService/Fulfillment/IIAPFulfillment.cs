@@ -9,8 +9,8 @@ namespace DarkNaku.FoundationDI
     //
     // true를 반환해야 스토어에 확정(Confirm)이 전달된다. 저장에 실패했다면 false를 반환할 것.
     // 확정하지 않으면 스토어가 다음 실행에 같은 구매를 다시 내려주므로 재화가 유실되지 않는다.
-    public interface IIapFulfillment
+    public interface IIAPFulfillment
     {
-        Awaitable<bool> FulfillAsync(IapPurchase purchase);
+        Awaitable<bool> FulfillAsync(IAPPurchase purchase);
     }
 }
