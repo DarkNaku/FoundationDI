@@ -129,6 +129,10 @@ git commit -m "[STRUCTURAL] Reflex 14.3.1을 VContainer와 나란히 설치한�
   - `internal sealed class ReflexServiceResolver : IServiceResolver`, 생성자 `ReflexServiceResolver(Reflex.Core.Container container)`
   - `IServiceResolver`가 루트·씬 컨테이너 양쪽에 자동 등록된다 — 이후 모든 Task가 `[Inject] IServiceResolver`와 `c.Resolve<IServiceResolver>()`를 전제로 한다.
 
+> **선행조건(실행 중 발견):** `ContainerBuilder.Build()`는 `ReflexLogger`의 정적 초기화를 건드리고, 거기서 `ReflexSettings.Instance`를 `Assert.IsNotNull`로 단언한다. 즉 **Reflex 컨테이너를 만드는 모든 테스트가 `Assets/Resources/ReflexSettings.asset`을 요구한다.** 원래 Task 10에 있던 이 에셋 생성을 여기로 앞당긴다. `RootScopes`는 비워 두고 `LogLevel`은 `Warning`(=2)으로 둬서 테스트 로그를 오염시키지 않는다.
+>
+> 또한 NSubstitute 대역을 세울 인터페이스는 **`private` 중첩이면 프록시 생성이 실패한다**(`Can not create proxy for type ... because it is not accessible`). 테스트용 중첩 타입은 `public`으로 둔다.
+
 - [ ] **Step 1: 실패하는 테스트를 쓴다**
 
 `Assets/FoundationDI/Tests/ServiceResolverTest.cs`:
@@ -1560,7 +1564,7 @@ Reflex의 ContainerScope가 실행 순서 -1e9로 씬 전체를 어떤 Awake보�
 - Modify: `Assets/Scripts/AdServiceSmokeTest.cs`, `AnalyticsServiceSmokeTest.cs`, `IapServiceSmokeTest.cs`
 - Modify: `Assets/Scripts/UI/GamePagePresenter.cs`, `MenuPagePresenter.cs`, `TestHubPresenters.cs`(`TestHubBootstrap` → MonoBehaviour)
 - Modify: `Samples~/Common/SampleLifetimeScope.cs` → `SampleInstaller.cs`, 각 샘플 `*Scope.cs`(5) / `*Presenters.cs`(5), `05-Sound/Scripts/SoundSampleDemo.cs`
-- Create: `Assets/Resources/ReflexSettings.asset`, `Assets/Prefabs/RootScope.prefab`
+- Modify: `Assets/Resources/ReflexSettings.asset`(RootScopes 채우기) / Create: `Assets/Prefabs/RootScope.prefab`
 - Delete: `Assets/Settings/VContainerSettings.asset`(+meta), `Assets/Prefabs/RootLifetimeScope.prefab`(+meta)
 - Modify: 호스트 씬들(`ContainerScope` 배치)
 
@@ -1662,11 +1666,12 @@ public class SceneInstaller : MonoBehaviour, IInstaller
 
 - [ ] **Step 3: `ReflexSettings`와 `RootScope.prefab`을 만든다**
 
+`ReflexSettings.asset`은 **Task 2에서 이미 만들었다**(테스트가 요구했다). 여기서는 `RootScopes`를 채운다.
+
 Unity 에디터에서:
-1. `Assets/Resources/` 아래에 `Create > Reflex > Settings` → `ReflexSettings.asset`
-2. 빈 GameObject에 `ContainerScope` + `RootInstaller` 컴포넌트를 붙이고 `Assets/Prefabs/RootScope.prefab`으로 저장
-3. 구 `RootLifetimeScope.prefab`의 `[SerializeField]` 에셋 참조를 새 프리팹에 그대로 옮긴다
-4. `ReflexSettings.RootScopes`에 `RootScope.prefab`을 추가
+1. 빈 GameObject에 `ContainerScope` + `RootInstaller` 컴포넌트를 붙이고 `Assets/Prefabs/RootScope.prefab`으로 저장
+2. 구 `RootLifetimeScope.prefab`의 `[SerializeField]` 에셋 참조를 새 프리팹에 그대로 옮긴다
+3. `ReflexSettings.RootScopes`에 `RootScope.prefab`을 추가
 
 - [ ] **Step 4: 씬에 `ContainerScope`를 배치한다**
 
