@@ -13,7 +13,11 @@ namespace DarkNaku.FoundationDI
     /// </summary>
     internal static class ServiceResolverBootstrap
     {
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        // BeforeSceneLoad여야 한다. Reflex의 UnityInjector는 AfterAssembliesLoaded에서
+        // ResetStaticState()로 OnRootContainerBuilding/OnSceneContainerBuilding을 null로 지운다.
+        // Unity의 순서는 SubsystemRegistration -> AfterAssembliesLoaded -> BeforeSplashScreen
+        // -> BeforeSceneLoad 이므로, 그보다 앞선 단계에서 구독하면 구독이 지워진다.
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void Install()
         {
             ContainerScope.OnRootContainerBuilding += Register;

@@ -420,8 +420,13 @@ namespace DarkNaku.FoundationDI
             builder.RegisterValue(settings);
             builder.RegisterType(typeof(UIInstanceFactory), Lifetime.Singleton, Resolution.Lazy);
 
-            return builder.RegisterType(
-                typeof(UINavigator), new[] { typeof(IUINavigator) },
+            // RegisterType을 쓸 수 없다 - Reflex의 TypeConstructionInfoCache는
+            // type.GetConstructors()로 public 생성자만 보는데 UINavigator의 생성자는 internal이다.
+            // public이 하나도 없으면 폴백 활성자(Expression.Default)가 null을 돌려주고,
+            // 그 null이 AttributeInjector로 넘어가 NullReferenceException이 난다.
+            // 생성자를 열지 않고(패키지만 만들도록) 팩토리로 직접 호출한다.
+            return builder.RegisterFactory<IUINavigator>(
+                c => new UINavigator(settings, c.Resolve<UIInstanceFactory>(), c.Resolve<IResourceService>()),
                 Lifetime.Singleton, Resolution.Lazy);
         }
     }

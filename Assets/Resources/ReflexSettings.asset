@@ -13,4 +13,5 @@ MonoBehaviour:
   m_Name: ReflexSettings
   m_EditorClassIdentifier: 
   <LogLevel>k__BackingField: 2
-  <RootScopes>k__BackingField: []
+  <RootScopes>k__BackingField:
+  - {fileID: 7100000000000000003, guid: 8b3c5d7e9f1a24b6c8d0e2f4a6b8c0d2, type: 3}
