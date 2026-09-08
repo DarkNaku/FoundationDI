@@ -1,7 +1,7 @@
 {
   "name": "com.darknaku.foundationdi",
   "displayName": "FoundationDI",
-  "version": "0.10.1",
+  "version": "0.10.2",
   "unity": "6000.3",
   "author": "DarkNaku",
   "description": "DarkNaku's DI Foundation Package.",
