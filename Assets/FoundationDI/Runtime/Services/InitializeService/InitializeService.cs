@@ -45,7 +45,7 @@ namespace DarkNaku.FoundationDI
         }
     }
 
-    public static class InitializeServiceVContainerExtensions
+    public static class InitializeServiceRegistration
     {
         /// <summary>
         /// InitializeService를 컨테이너에 싱글턴으로 등록한다.

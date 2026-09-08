@@ -3,7 +3,7 @@ using Reflex.Enums;
 
 namespace DarkNaku.FoundationDI
 {
-    public static class SoundServiceVContainerExtensions
+    public static class SoundServiceRegistration
     {
         /// <summary>
         /// SoundService를 컨테이너에 등록한다. 볼륨 영속화는 PlayerPrefs 기본 구현을 사용한다.

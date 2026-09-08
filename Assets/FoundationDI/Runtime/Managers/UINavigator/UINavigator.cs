@@ -407,7 +407,7 @@ namespace DarkNaku.FoundationDI
 
     internal interface IOverlayPlacement { bool Above { get; } }
 
-    public static class UINavigatorVContainerExtensions
+    public static class UINavigatorRegistration
     {
         /// <summary>
         /// UINavigator를 컨테이너에 등록한다.

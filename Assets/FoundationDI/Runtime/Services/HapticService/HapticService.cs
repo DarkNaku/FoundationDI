@@ -126,7 +126,7 @@ namespace DarkNaku.FoundationDI
         public void Dispose() => Stop();
     }
 
-    public static class HapticServiceVContainerExtensions
+    public static class HapticServiceRegistration
     {
         /// <summary>HapticService를 컨테이너에 등록한다. 외부 리소스 의존이 없어 추가 인자는 불필요하다.</summary>
         public static ContainerBuilder RegisterHapticService(

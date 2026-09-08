@@ -248,7 +248,7 @@ namespace DarkNaku.FoundationDI
         }
     }
 
-    public static class PoolManagerVContainerExtensions
+    public static class PoolManagerRegistration
     {
         /// <summary>
         /// PoolManager를 컨테이너에 등록한다.
