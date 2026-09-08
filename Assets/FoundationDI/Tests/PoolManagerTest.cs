@@ -5,7 +5,7 @@ using NSubstitute;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
-using VContainer;
+using Reflex.Core;
 using Object = UnityEngine.Object;
 
 public class PoolManagerTest
@@ -142,13 +142,14 @@ public class PoolManagerTest
         var prefab = new GameObject("prefab");
         var resource = Substitute.For<IResourceService>();
         resource.Load<GameObject>("enemy").Returns(prefab);
-        var resolver = Substitute.For<IObjectResolver>();
+        var resolver = Substitute.For<IServiceResolver>();
         var sut = new PoolManager(resource, resolver);
 
         sut.Get("enemy");
 
-        // 프리팹에 MonoBehaviour(PoolItem) 1개뿐이라 Inject 호출도 1회
-        resolver.Received(1).Inject(Arg.Any<object>());
+        // IServiceResolver.InjectGameObject는 계층 전체를 한 번에 처리하므로 호출은 1회다.
+        // (VContainer에서는 InjectGameObject가 확장 메서드라 목이 내부 Inject를 기록했다.)
+        resolver.Received(1).InjectGameObject(Arg.Any<GameObject>());
 
         sut.Dispose();
         Object.DestroyImmediate(prefab);
@@ -186,14 +187,14 @@ public class PoolManagerTest
         var prefab = new GameObject("prefab");
         var resource = Substitute.For<IResourceService>();
         resource.Load<GameObject>("enemy").Returns(prefab);
-        var resolver = Substitute.For<IObjectResolver>();
+        var resolver = Substitute.For<IServiceResolver>();
         var sut = new PoolManager(resource, resolver);
 
         var first = sut.Get("enemy");
         sut.Release(first);       // 풀로 반환
         sut.Get("enemy");         // 같은 인스턴스 재사용
 
-        resolver.Received(1).Inject(Arg.Any<object>());
+        resolver.Received(1).InjectGameObject(Arg.Any<GameObject>());
 
         sut.Dispose();
         Object.DestroyImmediate(prefab);
@@ -205,8 +206,8 @@ public class PoolManagerTest
         var prefab = new GameObject("prefab");
         var resource = Substitute.For<IResourceService>();
         resource.Load<GameObject>("enemy").Returns(prefab);
-        var resolver = Substitute.For<IObjectResolver>();
-        resolver.When(r => r.Inject(Arg.Any<object>())).Do(_ => throw new Exception("boom"));
+        var resolver = Substitute.For<IServiceResolver>();
+        resolver.When(r => r.InjectGameObject(Arg.Any<GameObject>())).Do(_ => throw new Exception("boom"));
         var sut = new PoolManager(resource, resolver);
 
         LogAssert.Expect(LogType.Exception, new Regex(".*boom.*"));

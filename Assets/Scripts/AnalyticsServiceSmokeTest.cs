@@ -1,7 +1,8 @@
 using DarkNaku.FoundationDI;
 using UnityEngine;
-using VContainer;
-using VContainer.Unity;
+using Reflex.Attributes;
+using Reflex.Extensions;
+using Reflex.Injectors;
 
 // 스모크 확인용 임시 컴포넌트. 확인이 끝나면 지운다.
 //
@@ -18,7 +19,7 @@ public class AnalyticsServiceSmokeTest : MonoBehaviour
     private async void Start()
     {
         // AdServiceSmokeTest와 같은 이유로 자가 주입한다(임시 컴포넌트라 스코프에 등록하지 않는다).
-        LifetimeScope.Find<RootLifetimeScope>().Container.Inject(this);
+        AttributeInjector.Inject(this, gameObject.scene.GetSceneContainer());
 
         // 광고 수익 → 분석. 서비스가 자동으로 해주지 않는 한 줄짜리 배선이다.
         _ads.Paid += _analytics.LogAdImpression;

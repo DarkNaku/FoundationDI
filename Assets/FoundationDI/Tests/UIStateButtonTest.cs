@@ -4,7 +4,7 @@ using NSubstitute;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.UI;
-using VContainer;
+using Reflex.Core;
 
 public class UIStateButtonTest
 {
@@ -24,7 +24,6 @@ public class UIStateButtonTest
     [SetUp]
     public void SetUp()
     {
-        new InjectorService(Substitute.For<IObjectResolver>()).Dispose();
 
         _buttonGo = new GameObject("button");
         _targetGo = new GameObject("target");
@@ -38,7 +37,6 @@ public class UIStateButtonTest
     [TearDown]
     public void TearDown()
     {
-        new InjectorService(Substitute.For<IObjectResolver>()).Dispose();
         if (_buttonGo != null) Object.DestroyImmediate(_buttonGo);
         if (_targetGo != null) Object.DestroyImmediate(_targetGo);
         if (_normal != null) Object.DestroyImmediate(_normal);

@@ -1,7 +1,8 @@
 using DarkNaku.FoundationDI;
 using UnityEngine;
-using VContainer;
-using VContainer.Unity;
+using Reflex.Attributes;
+using Reflex.Extensions;
+using Reflex.Injectors;
 
 // 스모크 확인용 임시 컴포넌트. 확인이 끝나면 지운다.
 public class AdServiceSmokeTest : MonoBehaviour
@@ -10,11 +11,11 @@ public class AdServiceSmokeTest : MonoBehaviour
 
     private async void Start()
     {
-        // 이 오브젝트는 RootLifetimeScope.autoInjectGameObjects에도, 씬 내 스코프
-        // 계층에도 속하지 않는다(스코프는 VContainerSettings가 DontDestroyOnLoad로
+        // 이 오브젝트는 씬의 ContainerScope 계층 밖에 있을 수 있어
+        // 자동 주입을 못 받을 수 있다(루트 스코프는 ReflexSettings가 DontDestroyOnLoad로
         // 자동 생성한다) — 그래서 [Inject]가 자동 실행되지 않는다. 임시 컴포넌트라
         // 프리팹의 Auto Inject Game Objects에 등록하지 않고 자가 주입으로 해결한다.
-        LifetimeScope.Find<RootLifetimeScope>().Container.Inject(this);
+        AttributeInjector.Inject(this, gameObject.scene.GetSceneContainer());
 
         _ads.Paid += imp => Debug.Log(
             $"[Smoke] 임프레션: platform={imp.AdPlatform} source={imp.NetworkName} " +

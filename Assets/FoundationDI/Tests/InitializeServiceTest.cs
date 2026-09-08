@@ -7,7 +7,7 @@ using NSubstitute;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
-using VContainer;
+using Reflex.Core;
 
 public class InitializeServiceTest
 {
@@ -15,12 +15,12 @@ public class InitializeServiceTest
     private class FakeItem : InitializeItem
     {
         public int CallCount;
-        public IObjectResolver LastResolver;
+        public IServiceResolver LastResolver;
         public Exception ToThrow;
         public List<string> OrderLog;
         public string Id;
 
-        public override Awaitable InitializeAsync(IObjectResolver resolver)
+        public override Awaitable InitializeAsync(IServiceResolver resolver)
         {
             CallCount++;
             LastResolver = resolver;
@@ -58,7 +58,7 @@ public class InitializeServiceTest
         var a = NewItem("A", log);
         var b = NewItem("B", log);
         var catalog = NewCatalog(a, b);
-        var sut = new InitializeService(Substitute.For<IObjectResolver>());
+        var sut = new InitializeService(Substitute.For<IServiceResolver>());
 
         await sut.InitializeAsync(catalog);
 
@@ -68,7 +68,7 @@ public class InitializeServiceTest
     [UnityTest]
     public IEnumerator 각_아이템에_resolver를_전달한다() => AwaitableTest.Run(async () =>
     {
-        var resolver = Substitute.For<IObjectResolver>();
+        var resolver = Substitute.For<IServiceResolver>();
         var a = NewItem("A");
         var catalog = NewCatalog(a);
         var sut = new InitializeService(resolver);
@@ -83,7 +83,7 @@ public class InitializeServiceTest
     {
         var a = NewItem("A");
         var catalog = NewCatalog(a);
-        var sut = new InitializeService(Substitute.For<IObjectResolver>());
+        var sut = new InitializeService(Substitute.For<IServiceResolver>());
 
         await sut.InitializeAsync(catalog);
         await sut.InitializeAsync(catalog);
@@ -96,7 +96,7 @@ public class InitializeServiceTest
     {
         var a = NewItem("A");
         var catalog = NewCatalog(a);
-        var sut = new InitializeService(Substitute.For<IObjectResolver>());
+        var sut = new InitializeService(Substitute.For<IServiceResolver>());
         await sut.InitializeAsync(catalog);
 
         // 완료 후 카탈로그에 새 항목을 추가해도, 카탈로그가 완료로 표시되어 순회하지 않는다.
@@ -115,7 +115,7 @@ public class InitializeServiceTest
         var shared = NewItem("S");
         var catalog1 = NewCatalog(shared);
         var catalog2 = NewCatalog(shared);
-        var sut = new InitializeService(Substitute.For<IObjectResolver>());
+        var sut = new InitializeService(Substitute.For<IServiceResolver>());
 
         await sut.InitializeAsync(catalog1);
         await sut.InitializeAsync(catalog2);
@@ -130,7 +130,7 @@ public class InitializeServiceTest
         var a = NewItem("A", throwOn: boom);
         var b = NewItem("B");
         var catalog = NewCatalog(a, b);
-        var sut = new InitializeService(Substitute.For<IObjectResolver>());
+        var sut = new InitializeService(Substitute.For<IServiceResolver>());
 
         Exception caught = null;
         try { await sut.InitializeAsync(catalog); }
@@ -147,7 +147,7 @@ public class InitializeServiceTest
         var b = NewItem("B", throwOn: new InvalidOperationException("boom"));
         var c = NewItem("C");
         var catalog = NewCatalog(a, b, c);
-        var sut = new InitializeService(Substitute.For<IObjectResolver>());
+        var sut = new InitializeService(Substitute.For<IServiceResolver>());
 
         try { await sut.InitializeAsync(catalog); } catch { /* b에서 중단 */ }
 
@@ -168,7 +168,7 @@ public class InitializeServiceTest
     {
         var a = NewItem("A");
         var catalog = NewCatalog(a);
-        var sut = new InitializeService(Substitute.For<IObjectResolver>());
+        var sut = new InitializeService(Substitute.For<IServiceResolver>());
 
         await sut.InitializeAsync(catalog);
         sut.Dispose();
@@ -183,7 +183,7 @@ public class InitializeServiceTest
         var a = NewItem("A");
         var b = NewItem("B");
         var catalog = NewCatalog(a, null, b);
-        var sut = new InitializeService(Substitute.For<IObjectResolver>());
+        var sut = new InitializeService(Substitute.For<IServiceResolver>());
 
         await sut.InitializeAsync(catalog);
 

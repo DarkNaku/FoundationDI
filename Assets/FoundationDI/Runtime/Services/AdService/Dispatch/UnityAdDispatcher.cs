@@ -43,9 +43,11 @@ namespace DarkNaku.FoundationDI
         private bool _isDisposed;
         private int _pumpIndex;
 
-        // [Inject]가 없으면 VContainer가 파라미터가 더 많은 (bool) 생성자를 고르고
-        // bool을 해석하지 못해 등록이 실패한다. 반드시 붙인다.
+        // 표시가 없으면 컨테이너가 파라미터가 더 많은 (bool) 생성자를 고르고
+        // bool을 해석하지 못해 등록이 실패한다. VContainer는 [Inject], Reflex는
+        // [ReflexConstructor]로 같은 일을 한다 - 전환이 끝날 때까지 둘 다 둔다.
         [Inject]
+        [Reflex.Attributes.ReflexConstructor]
         public UnityAdDispatcher() : this(true) { }
 
         public UnityAdDispatcher(bool createRunner)

@@ -1,7 +1,7 @@
 using NSubstitute;
 using NUnit.Framework;
 using UnityEngine;
-using VContainer;
+using Reflex.Core;
 using DarkNaku.FoundationDI;
 
 public class UIInstanceFactoryTests
@@ -13,7 +13,7 @@ public class UIInstanceFactoryTests
     [Test]
     public void Host만_바인딩하고_View는_나중에_BindView로_설정된다()
     {
-        var resolver = Substitute.For<IObjectResolver>();
+        var resolver = Substitute.For<IServiceResolver>();
         var host = Substitute.For<IUIElementHost>();
         var factory = new UIInstanceFactory(resolver);
 

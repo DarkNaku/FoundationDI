@@ -1,4 +1,4 @@
-using VContainer;
+using Reflex.Attributes;
 using DarkNaku.FoundationDI;
 
 namespace FoundationDI.Host

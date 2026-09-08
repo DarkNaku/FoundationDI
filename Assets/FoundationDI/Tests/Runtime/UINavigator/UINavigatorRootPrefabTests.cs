@@ -6,7 +6,7 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 using UnityEngine.UI;
-using VContainer;
+using Reflex.Core;
 using DarkNaku.FoundationDI;
 
 public class UINavigatorRootPrefabTests
@@ -50,7 +50,7 @@ public class UINavigatorRootPrefabTests
     {
         var resource = Substitute.For<IResourceService>();
         resource.Load<GameObject>("UI/RootPrefabSample").Returns(_viewPrefab);
-        return new UINavigator(settings, new UIInstanceFactory(Substitute.For<IObjectResolver>()), resource);
+        return new UINavigator(settings, new UIInstanceFactory(Substitute.For<IServiceResolver>()), resource);
     }
 
     [UnityTest]

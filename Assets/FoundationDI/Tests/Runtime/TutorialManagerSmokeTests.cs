@@ -1,20 +1,19 @@
 using System.Collections;
 using System.Collections.Generic;
-using System.Reflection;
 using DarkNaku.FoundationDI;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
-using VContainer;
-using VContainer.Unity;
+using Reflex.Core;
+using Reflex.Injectors;
 
 /// <summary>
-/// 씬 오써링 → InjectorService 주입 → 등록 → 진행 → 영속화까지 실제 경로를 태우는 스모크.
+/// 씬 오써링 → 주입 → 등록 → 진행 → 영속화까지 실제 경로를 태우는 스모크.
 /// EditMode 단위 테스트가 닿지 않는 부분(MonoBehaviour 생명주기와 주입 타이밍)만 본다.
 ///
-/// InjectorService는 정적 컨테이너 참조 하나를 공유하는 단일 컨테이너 모델이다.
-/// 에디터에서 도메인 리로드 없이 플레이 모드를 반복하면 그 참조가 이전 실행의 컨테이너를
-/// 가리킨 채 남아 테스트가 엉뚱한 인스턴스를 주입받는다. 그래서 매 테스트마다 초기화한다.
+/// 실제 씬에서는 ContainerScope가 실행 순서 -1e9로 돌면서 SceneInjector가 씬 전체를
+/// 재귀 주입한다. 여기서는 씬을 띄우지 않으므로 GameObjectInjector.InjectRecursive로
+/// 같은 일을 직접 한다 - SceneInjector가 내부적으로 부르는 바로 그 메서드다.
 /// </summary>
 public class TutorialManagerSmokeTests
 {
@@ -23,12 +22,11 @@ public class TutorialManagerSmokeTests
 
     private readonly List<GameObject> _spawned = new();
 
-    private LifetimeScope _scope;
+    private Container _container;
 
     [SetUp]
     public void SetUp()
     {
-        ResetInjector();
         new PlayerPrefsTutorialProgressStorage(SaveKey).Clear();
     }
 
@@ -36,47 +34,31 @@ public class TutorialManagerSmokeTests
     public void TearDown()
     {
         DespawnAll();
-        DestroyScope();
-        ResetInjector();
+        DisposeContainer();
 
         new PlayerPrefsTutorialProgressStorage(SaveKey).Clear();
     }
 
-    private static void ResetInjector()
+    private ITutorialManager BuildContainer()
     {
-        const BindingFlags Flags = BindingFlags.Static | BindingFlags.NonPublic;
+        var builder = new ContainerBuilder();
 
-        var type = typeof(InjectorService);
+        ServiceResolverBootstrap.Register(builder);
+        builder.RegisterMessageService();
+        builder.RegisterTutorialManager(SaveKey);
 
-        type.GetField("_resolver", Flags)?.SetValue(null, null);
+        _container = builder.Build();
 
-        if (type.GetField("_pending", Flags)?.GetValue(null) is System.Collections.IList pending)
-        {
-            pending.Clear();
-        }
+        return _container.Resolve<ITutorialManager>();
     }
 
-    private ITutorialManager BuildScope()
+    private void DisposeContainer()
     {
-        _scope = LifetimeScope.Create(builder =>
-        {
-            builder.RegisterMessageService();
-            builder.RegisterInjector();
-            builder.RegisterTutorialManager(SaveKey);
-        });
+        if (_container == null) return;
 
-        return _scope.Container.Resolve<ITutorialManager>();
-    }
-
-    private void DestroyScope()
-    {
-        if (_scope == null) return;
-
-        var go = _scope.gameObject;
-
-        _scope = null;
-
-        if (go != null) Object.DestroyImmediate(go);
+        var container = _container;
+        _container = null;
+        container.Dispose();
     }
 
     private void DespawnAll()
@@ -98,19 +80,22 @@ public class TutorialManagerSmokeTests
 
         var step = new GameObject("Step 1", typeof(TutorialStepBehaviour));
         step.transform.SetParent(sequence.transform);
+
+        // 씬 로드 시 SceneInjector가 하는 일. Start가 돌기 전에 끝나야 한다.
+        GameObjectInjector.InjectRecursive(sequence, _container);
     }
 
     [UnityTest]
     public IEnumerator 씬에_배치한_시퀀스가_주입받아_스스로_등록되고_완료된다()
     {
-        var manager = BuildScope();
+        var manager = BuildContainer();
         var completed = new List<string>();
 
         manager.SequenceCompleted += id => completed.Add(id);
 
         SpawnSequence();
 
-        // InjectorService의 EntryPoint가 먼저 뜨고, 그 다음 Start/Update가 돌아야 등록된다.
+        // 주입은 끝났고, Start/Update가 돌아야 등록과 진행이 일어난다.
         for (var i = 0; i < 120 && completed.Count == 0; i++) yield return null;
 
         Assert.AreEqual(new[] { SequenceId }, completed.ToArray());
@@ -122,7 +107,7 @@ public class TutorialManagerSmokeTests
     [UnityTest]
     public IEnumerator 완료된_시퀀스는_앱을_다시_켜도_시작하지_않는다()
     {
-        var manager = BuildScope();
+        var manager = BuildContainer();
         var completed = new List<string>();
 
         manager.SequenceCompleted += id => completed.Add(id);
@@ -133,12 +118,11 @@ public class TutorialManagerSmokeTests
 
         Assert.AreEqual(1, completed.Count, "1회차에서 완료되지 않으면 2회차 검증이 무의미하다.");
 
-        // 앱을 껐다 켠 상황을 흉내낸다 — 씬 오브젝트와 스코프를 버리고 같은 저장 키로 다시 만든다.
+        // 앱을 껐다 켠 상황을 흉내낸다 - 씬 오브젝트와 컨테이너를 버리고 같은 저장 키로 다시 만든다.
         DespawnAll();
-        DestroyScope();
-        ResetInjector();
+        DisposeContainer();
 
-        var restarted = BuildScope();
+        var restarted = BuildContainer();
         var started = new List<string>();
 
         restarted.SequenceStarted += id => started.Add(id);

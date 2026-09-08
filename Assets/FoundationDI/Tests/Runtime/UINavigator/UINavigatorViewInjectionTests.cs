@@ -3,7 +3,7 @@ using NSubstitute;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
-using VContainer;
+using Reflex.Core;
 using DarkNaku.FoundationDI;
 
 public class UINavigatorViewInjectionTests
@@ -37,7 +37,7 @@ public class UINavigatorViewInjectionTests
     {
         var resource = Substitute.For<IResourceService>();
         resource.Load<GameObject>("UI/Inject").Returns(_prefab);
-        var resolver = Substitute.For<IObjectResolver>();
+        var resolver = Substitute.For<IServiceResolver>();
         var settings = ScriptableObject.CreateInstance<UINavigatorSettings>();
         var factory = new UIInstanceFactory(resolver);
 

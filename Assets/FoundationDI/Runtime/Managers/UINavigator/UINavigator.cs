@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using UnityEngine;
-using VContainer;
+using Reflex.Core;
+using Reflex.Enums;
+using Resolution = Reflex.Enums.Resolution;
 
 namespace DarkNaku.FoundationDI
 {
@@ -412,11 +414,15 @@ namespace DarkNaku.FoundationDI
         /// 전제: 호출 전에 <see cref="IResourceService"/>가 이미 등록되어 있어야 한다
         /// (UINavigator 전용 풀과 UIInstanceFactory가 이를 사용).
         /// </summary>
-        public static void RegisterUINavigator(this IContainerBuilder builder, UINavigatorSettings settings)
+        public static ContainerBuilder RegisterUINavigator(this ContainerBuilder builder,
+                                                           UINavigatorSettings settings)
         {
-            builder.RegisterInstance(settings);
-            builder.Register<UIInstanceFactory>(Lifetime.Singleton);
-            builder.Register<UINavigator>(Lifetime.Singleton).As<IUINavigator>();
+            builder.RegisterValue(settings);
+            builder.RegisterType(typeof(UIInstanceFactory), Lifetime.Singleton, Resolution.Lazy);
+
+            return builder.RegisterType(
+                typeof(UINavigator), new[] { typeof(IUINavigator) },
+                Lifetime.Singleton, Resolution.Lazy);
         }
     }
 }

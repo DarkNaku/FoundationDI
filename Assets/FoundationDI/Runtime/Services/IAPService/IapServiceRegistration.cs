@@ -1,17 +1,20 @@
+using Reflex.Core;
+using Reflex.Enums;
 using UnityEngine;
-using VContainer;
+using Resolution = Reflex.Enums.Resolution;
 
 namespace DarkNaku.FoundationDI
 {
     public static class IapServiceRegistration
     {
-        // 루트 LifetimeScope의 Configure에서 호출한다.
+        // 루트 IInstaller의 InstallBindings에서 호출한다.
         //   builder.RegisterIapService(_iapServiceSettings);
         //
-        // 지급 핸들러를 쓰려면 같은 Configure 어디서든(순서 무관) 함께 등록한다.
-        //   builder.Register<IIapFulfillment, MyFulfillment>(Lifetime.Singleton);
-        public static IContainerBuilder RegisterIapService(this IContainerBuilder builder,
-                                                           IapServiceSettings settings)
+        // 지급 핸들러를 쓰려면 같은 InstallBindings 어디서든(순서 무관) 함께 등록한다.
+        //   builder.RegisterType(typeof(MyFulfillment), new[] { typeof(IIapFulfillment) },
+        //                        Lifetime.Singleton, Resolution.Lazy);
+        public static ContainerBuilder RegisterIapService(this ContainerBuilder builder,
+                                                          IapServiceSettings settings)
         {
             if (settings == null)
             {
@@ -19,10 +22,11 @@ namespace DarkNaku.FoundationDI
                 return builder;
             }
 
-            builder.RegisterInstance(settings);
-            builder.Register<IIapProviderFactory, IapProviderFactory>(Lifetime.Singleton);
+            builder.RegisterValue(settings);
+            builder.RegisterType(typeof(IapProviderFactory), new[] { typeof(IIapProviderFactory) },
+                                 Lifetime.Singleton, Resolution.Lazy);
 
-            builder.Register<IIapService>(container =>
+            return builder.RegisterFactory<IIapService>(container =>
             {
                 var factory = container.Resolve<IIapProviderFactory>();
 
@@ -31,22 +35,22 @@ namespace DarkNaku.FoundationDI
 
                 // 셋 다 선택 등록이다. 게임이 등록하지 않았으면 기본 구현으로 폴백하므로
                 // 등록 순서에 의존하지 않는다.
-                var fulfillment = container.TryResolve<IIapFulfillment>(out var registeredFulfillment)
-                    ? registeredFulfillment
+                // Reflex에는 TryResolve가 없어 HasBinding으로 먼저 묻는다 -
+                // 미등록 계약에 Resolve를 부르면 UnknownContractException이 난다.
+                var fulfillment = container.HasBinding<IIapFulfillment>()
+                    ? container.Resolve<IIapFulfillment>()
                     : new AutoConfirmFulfillment();
 
-                var validator = container.TryResolve<IReceiptValidator>(out var registeredValidator)
-                    ? registeredValidator
+                var validator = container.HasBinding<IReceiptValidator>()
+                    ? container.Resolve<IReceiptValidator>()
                     : IapReceiptValidatorRegistry.ResolveOrDefault();
 
-                var entitlements = container.TryResolve<IEntitlementStorage>(out var registeredStorage)
-                    ? registeredStorage
+                var entitlements = container.HasBinding<IEntitlementStorage>()
+                    ? container.Resolve<IEntitlementStorage>()
                     : new PlayerPrefsEntitlementStorage();
 
                 return new IapService(provider, settings.ToOptions(), fulfillment, validator, entitlements);
-            }, Lifetime.Singleton);
-
-            return builder;
+            }, Lifetime.Singleton, Resolution.Lazy);
         }
     }
 }

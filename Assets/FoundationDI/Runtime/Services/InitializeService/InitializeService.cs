@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
-using VContainer;
 
 namespace DarkNaku.FoundationDI
 {
@@ -12,11 +11,11 @@ namespace DarkNaku.FoundationDI
 
     public sealed class InitializeService : IInitializeService
     {
-        private readonly IObjectResolver _resolver;
+        private readonly IServiceResolver _resolver;
         private readonly HashSet<InitializeItem> _initializedItems = new();
         private readonly HashSet<InitializeCatalog> _initializedCatalogs = new();
 
-        public InitializeService(IObjectResolver resolver)
+        public InitializeService(IServiceResolver resolver)
         {
             _resolver = resolver;
         }
@@ -47,11 +46,14 @@ namespace DarkNaku.FoundationDI
     {
         /// <summary>
         /// InitializeService를 컨테이너에 싱글턴으로 등록한다.
-        /// IObjectResolver는 VContainer가 자동 주입한다.
+        /// IServiceResolver는 ServiceResolverBootstrap이 자동 등록한다.
         /// </summary>
-        public static void RegisterInitializeService(this IContainerBuilder builder)
+        public static Reflex.Core.ContainerBuilder RegisterInitializeService(
+            this Reflex.Core.ContainerBuilder builder)
         {
-            builder.Register<IInitializeService, InitializeService>(Lifetime.Singleton);
+            return builder.RegisterType(
+                typeof(InitializeService), new[] { typeof(IInitializeService) },
+                Reflex.Enums.Lifetime.Singleton, Reflex.Enums.Resolution.Lazy);
         }
     }
 }

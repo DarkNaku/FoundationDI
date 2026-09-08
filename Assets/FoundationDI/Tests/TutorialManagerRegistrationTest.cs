@@ -1,6 +1,6 @@
 using DarkNaku.FoundationDI;
 using NUnit.Framework;
-using VContainer;
+using Reflex.Core;
 
 public class TutorialManagerRegistrationTest
 {

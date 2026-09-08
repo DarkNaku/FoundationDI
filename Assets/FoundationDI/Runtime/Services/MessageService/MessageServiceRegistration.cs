@@ -1,17 +1,18 @@
-using VContainer;
+using Reflex.Core;
+using Reflex.Enums;
 
 namespace DarkNaku.FoundationDI
 {
     public static class MessageServiceRegistration
     {
-        // 루트 LifetimeScope의 Configure에서 호출한다.
+        // 루트 IInstaller의 InstallBindings에서 호출한다.
         //   builder.RegisterMessageService();
-        // 컨테이너가 Dispose될 때 VContainer가 MessageService.Dispose를 호출해 구독을 정리한다.
-        public static IContainerBuilder RegisterMessageService(this IContainerBuilder builder)
+        // 컨테이너가 Dispose될 때 Reflex가 MessageService.Dispose를 호출해 구독을 정리한다.
+        public static ContainerBuilder RegisterMessageService(this ContainerBuilder builder)
         {
-            builder.Register<IMessageService, MessageService>(Lifetime.Singleton);
-
-            return builder;
+            return builder.RegisterType(
+                typeof(MessageService), new[] { typeof(IMessageService) },
+                Lifetime.Singleton, Resolution.Lazy);
         }
     }
 }

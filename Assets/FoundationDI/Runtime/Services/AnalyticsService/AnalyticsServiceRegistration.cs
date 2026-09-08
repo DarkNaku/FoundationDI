@@ -1,14 +1,16 @@
+using Reflex.Core;
+using Reflex.Enums;
 using UnityEngine;
-using VContainer;
+using Resolution = Reflex.Enums.Resolution;
 
 namespace DarkNaku.FoundationDI
 {
     public static class AnalyticsServiceRegistration
     {
-        // 루트 LifetimeScope의 Configure에서 호출한다.
+        // 루트 IInstaller의 InstallBindings에서 호출한다.
         //   builder.RegisterAnalyticsService(_analyticsServiceSettings);
-        public static IContainerBuilder RegisterAnalyticsService(this IContainerBuilder builder,
-                                                                 AnalyticsServiceSettings settings)
+        public static ContainerBuilder RegisterAnalyticsService(this ContainerBuilder builder,
+                                                                AnalyticsServiceSettings settings)
         {
             if (settings == null)
             {
@@ -16,10 +18,11 @@ namespace DarkNaku.FoundationDI
                 return builder;
             }
 
-            builder.RegisterInstance(settings);
-            builder.Register<IAnalyticsProviderFactory, AnalyticsProviderFactory>(Lifetime.Singleton);
+            builder.RegisterValue(settings);
+            builder.RegisterType(typeof(AnalyticsProviderFactory), new[] { typeof(IAnalyticsProviderFactory) },
+                                 Lifetime.Singleton, Resolution.Lazy);
 
-            builder.Register<IAnalyticsService>(container =>
+            return builder.RegisterFactory<IAnalyticsService>(container =>
             {
                 var factory = container.Resolve<IAnalyticsProviderFactory>();
                 var options = settings.ToOptions();
@@ -27,9 +30,7 @@ namespace DarkNaku.FoundationDI
                 var providers = factory.CreateAll(types, options, settings.ProviderSettings);
 
                 return new AnalyticsService(providers, options);
-            }, Lifetime.Singleton);
-
-            return builder;
+            }, Lifetime.Singleton, Resolution.Lazy);
         }
     }
 }

@@ -114,7 +114,7 @@ public class ServiceResolverTest
     [Test]
     public void 테스트에서_IServiceResolver를_대역으로_세울_수_있다()
     {
-        // 기존 테스트 38곳이 Substitute.For<IObjectResolver>()에서 넘어올 자리다.
+        // 기존 테스트 38곳이 Substitute.For<IServiceResolver>()에서 넘어올 자리다.
         // Reflex의 Container는 sealed라 이 대역이 불가능하다 - 그래서 seam이 필요하다.
         var resolver = Substitute.For<IServiceResolver>();
         var thing = new Thing();

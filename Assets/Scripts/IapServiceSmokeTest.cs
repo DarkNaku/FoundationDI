@@ -1,7 +1,8 @@
 using DarkNaku.FoundationDI;
 using UnityEngine;
-using VContainer;
-using VContainer.Unity;
+using Reflex.Attributes;
+using Reflex.Extensions;
+using Reflex.Injectors;
 
 // 스모크 확인용 임시 컴포넌트. 확인이 끝나면 지운다.
 public class IapServiceSmokeTest : MonoBehaviour
@@ -13,7 +14,7 @@ public class IapServiceSmokeTest : MonoBehaviour
     private async void Start()
     {
         // AdServiceSmokeTest와 같은 이유로 자가 주입한다 — 이 오브젝트는 스코프 계층에 속하지 않는다.
-        LifetimeScope.Find<RootLifetimeScope>().Container.Inject(this);
+        AttributeInjector.Inject(this, gameObject.scene.GetSceneContainer());
 
         _iap.Purchased += p => Debug.Log(
             $"[Smoke] 구매 확정: {p.ProductId} {p.Price:F2} {p.CurrencyCode} restored={p.IsRestored}");

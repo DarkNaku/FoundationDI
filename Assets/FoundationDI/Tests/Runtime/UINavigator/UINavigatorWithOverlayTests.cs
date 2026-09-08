@@ -3,7 +3,7 @@ using NSubstitute;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
-using VContainer;
+using Reflex.Core;
 using DarkNaku.FoundationDI;
 
 public class UINavigatorWithOverlayTests
@@ -53,7 +53,7 @@ public class UINavigatorWithOverlayTests
         var resource = Substitute.For<IResourceService>();
         resource.Load<GameObject>("UI/WithOvHost").Returns(_hostPrefab);
         resource.Load<GameObject>("UI/WithOvOverlay").Returns(_ovPrefab);
-        var resolver = Substitute.For<IObjectResolver>();
+        var resolver = Substitute.For<IServiceResolver>();
         var settings = ScriptableObject.CreateInstance<UINavigatorSettings>();
         var factory = new UIInstanceFactory(resolver);
         var manager = new UINavigator(settings, factory, resource);
@@ -87,7 +87,7 @@ public class UINavigatorWithOverlayTests
         var resource = Substitute.For<IResourceService>();
         resource.Load<GameObject>("UI/WithOvHost").Returns(_hostPrefab);
         resource.Load<GameObject>("UI/WithOvOverlay").Returns(_ovPrefab);
-        var resolver = Substitute.For<IObjectResolver>();
+        var resolver = Substitute.For<IServiceResolver>();
         var settings = ScriptableObject.CreateInstance<UINavigatorSettings>();
         var factory = new UIInstanceFactory(resolver);
         var manager = new UINavigator(settings, factory, resource);
@@ -115,7 +115,7 @@ public class UINavigatorWithOverlayTests
         var resource = Substitute.For<IResourceService>();
         resource.Load<GameObject>("UI/WithOvHost").Returns(_hostPrefab);
         resource.Load<GameObject>("UI/WithOvOverlay").Returns(_ovPrefab);
-        var resolver = Substitute.For<IObjectResolver>();
+        var resolver = Substitute.For<IServiceResolver>();
         var settings = ScriptableObject.CreateInstance<UINavigatorSettings>();
         var factory = new UIInstanceFactory(resolver);
         var manager = new UINavigator(settings, factory, resource);
