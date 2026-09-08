@@ -5,7 +5,7 @@ using DarkNaku.FoundationDI;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
-using VContainer;
+using Reflex.Core;
 
 public class MessageServiceTest
 {

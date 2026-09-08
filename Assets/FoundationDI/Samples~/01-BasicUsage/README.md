@@ -21,12 +21,12 @@ public class MainMenuPage : UIPagePresenter<MainMenuView>
     }
 }
 
-// 부트스트랩
-public class BasicUsageDemo : IStartable
+// 부트스트랩 — Reflex에는 엔트리포인트가 없어 씬에 배치하는 MonoBehaviour다.
+public class BasicUsageDemo : MonoBehaviour
 {
-    private readonly IUINavigator _ui;
-    public BasicUsageDemo(IUINavigator ui) => _ui = ui;
-    public void Start() => _ui.Page<MainMenuPage>();
+    [Inject] private IUINavigator _ui;
+
+    private void Start() => _ui.Page<MainMenuPage>();
 }
 ```
 

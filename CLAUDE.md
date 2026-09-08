@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 프로젝트 개요
 
-FoundationDI는 DarkNaku의 DI(의존성 주입) 기반 Unity 게임 개발 파운데이션 패키지입니다. VContainer를 코어로 Addressables와 Unity `Awaitable`을 조합한 공통 서비스 계층을 제공합니다. **R3와 UniTask 의존은 제거됐다** — 런타임·테스트 모두 `Awaitable`만 쓴다.
+FoundationDI는 DarkNaku의 DI(의존성 주입) 기반 Unity 게임 개발 파운데이션 패키지입니다. Reflex를 코어로 Addressables와 Unity `Awaitable`을 조합한 공통 서비스 계층을 제공합니다. **R3와 UniTask 의존은 제거됐다** — 런타임·테스트 모두 `Awaitable`만 쓴다.
 
 - **Unity 버전**: 6000.3.17f1 (`ProjectSettings/ProjectVersion.txt`)
 - **배포 형태**: UPM 패키지 (`Assets/FoundationDI/` = `com.darknaku.foundationdi`). 즉 이 리포지토리는 패키지 개발용 호스트 프로젝트이며, 재사용 코드는 모두 `Assets/FoundationDI/` 안에 있어야 한다. `Assets/Scripts/`는 패키지를 시험하는 호스트 프로젝트 전용 코드다.
@@ -35,14 +35,24 @@ Unity 프로젝트이므로 CLI 빌드 명령은 없다. **모든 컴파일·테
 - **async 테스트는 `AwaitableTest`(`Tests/Support/`, asmdef `FoundationDI.TestSupport`)를 쓴다.** `AwaitableTest.Run(async () => {...})`이 async 본문을 `[UnityTest]`의 `IEnumerator`로 잇고, 프레임 대기는 `NextFrame`/`Delay`/`WaitUntil`로 한다. **EditMode에서 `Awaitable.NextFrameAsync()`와 `WaitForSecondsAsync()`는 영원히 완료되지 않는다**(플레이어 루프가 돌지 않음) — 그래서 `AwaitableTest`가 EditMode에서는 `EditorApplication.update`로 완료 소스를 깨운다. 이 헬퍼를 우회해 `Awaitable`의 프레임 대기를 직접 쓰면 EditMode 테스트가 멈춘다.
 - 테스트는 `Assets/FoundationDI/Tests/`의 `FoundationDI.Tests`(EditMode) asmdef에 있다. `FoundationDI` 런타임 asmdef와 NSubstitute/NUnit을 참조한다.
 
-NuGet 의존성은 **NuGetForUnity**(`Assets/NuGet/`)가 `Assets/packages.config`로 관리하며, `Assets/Packages/`에 풀린다. UPM 의존성은 `Packages/manifest.json`에 있다 (VContainer, Director 등은 git URL로 참조).
+NuGet 의존성은 **NuGetForUnity**(`Assets/NuGet/`)가 `Assets/packages.config`로 관리하며, `Assets/Packages/`에 풀린다. UPM 의존성은 `Packages/manifest.json`에 있다 (Reflex, Director 등은 git URL로 참조).
 
 ## 아키텍처
 
 ### DI 컴포지션 루트
-`Assets/Scripts/LifetimeScopes/RootLifetimeScope.cs`가 VContainer의 `LifetimeScope`를 상속한 루트 스코프다. `RootLifetimeScope.prefab`으로 씬에 배치되며, `Configure(IContainerBuilder)`에서 앱 수명 서비스를 등록한다. 새 서비스는 인터페이스(`IXxxService`)로 등록하여 생성자 주입으로 소비한다.
+DI 코어는 **Reflex 14.3.1**이다. `Assets/Scripts/Installers/RootInstaller.cs`가 `MonoBehaviour, IInstaller`로 앱 수명 서비스를 등록한다. `Assets/Prefabs/RootScope.prefab`(= `ContainerScope` + `RootInstaller`)이 `Assets/Resources/ReflexSettings.asset`의 `RootScopes`에 등록돼 있어 Reflex가 루트 컨테이너를 만들 때 이 인스톨러를 부른다. 프리팹은 씬에 배치하지 않는다.
 
-씬 수명 컴포넌트는 별도로 `Assets/Scripts/LifetimeScopes/SceneLifetimeScope.cs`(자식 스코프)에 등록한다. `UINavigator`가 대표 사례다 — 씬에 배치되는 스코프에 등록해야 캔버스·풀·프리젠터가 그 씬의 수명을 갖는다. `IResourceService` 등 앱 수명 서비스는 부모(`RootLifetimeScope`)에서 해결된다.
+씬 수명 컴포넌트는 `Assets/Scripts/Installers/SceneInstaller.cs`에 등록한다. 씬의 GameObject 하나에 `ContainerScope` + `SceneInstaller`를 붙이면 그 씬의 자식 컨테이너가 생긴다. `UINavigator`가 대표 사례다 — 씬 컨테이너에 등록해야 캔버스·풀·프리젠터가 그 씬의 수명을 갖는다. `IResourceService` 등 앱 수명 서비스는 부모(루트 컨테이너)에서 해결된다.
+
+**리졸버는 패키지 자체 seam `IServiceResolver`로 감싼다**(`Runtime/DI/`). Reflex의 `Container`는 `sealed`라 모킹할 수 없고, 컨테이너 타입이 공개 시그니처에 새면 DI 교체가 곧 공개 API 파괴가 되기 때문이다. `ServiceResolverBootstrap`이 `[RuntimeInitializeOnLoadMethod(BeforeSceneLoad)]`에서 루트·씬 컨테이너 양쪽에 자동 등록한다 — **`BeforeSceneLoad`여야 한다.** Reflex의 `UnityInjector`가 `AfterAssembliesLoaded`에서 `ContainerScope.OnRootContainerBuilding`/`OnSceneContainerBuilding`을 null로 지우므로 그보다 이른 단계에서 구독하면 지워진다.
+
+**씬 배치 컴포넌트 주입은 Reflex가 직접 한다.** `ContainerScope`가 실행 순서 `-1_000_000_000`으로 돌면서 씬 전체를 어떤 `Awake`보다도 먼저 재귀 주입한다. 별도 주입 인프라는 없다.
+
+⚠️ **씬 주입에는 컴포넌트별 격리가 없다.** `GameObjectInjector.InjectRecursive`에 try/catch가 없고 `FieldInjector`는 해석 실패를 다시 던지므로, **미등록 서비스를 요구하는 `[Inject]` 필드 하나가 그 뒤 순번 전체의 씬 주입을 막는다.** 그래서 패키지의 씬 컴포넌트는 서비스를 `[Inject]` 필드로 직접 받지 않고 `[Inject] Construct(IServiceResolver)` + `TryResolve`로 선택 주입한다.
+
+⚠️ **자가 주입이 없다.** 씬 주입은 씬에 **미리 배치된** 오브젝트만 덮는다. 런타임에 `Instantiate`한 것은 생성한 쪽이 `InjectGameObject`를 불러야 한다 — `PoolManager`(`PoolManager.cs:157`)와 `UINavigator.CreateRoot`(`UINavigator.cs:86`)가 그렇게 한다. 새로 `Instantiate`하는 코드를 추가하면 같이 넣어야 하고, 빠뜨리면 `[Inject]` 대상이 **에러 없이 null로 남는다**.
+
+⚠️ **Reflex는 public 생성자만 본다.** `TypeConstructionInfoCache`가 `type.GetConstructors()`를 쓰므로 `internal` 생성자만 있는 타입은 `RegisterType`으로 등록하면 폴백 활성자가 **null을 돌려준다**(`UINavigator`가 그 경우다). 그런 타입은 `RegisterFactory`로 직접 생성한다. `WithParameter` 같은 파라미터 오버라이드도 없어 `RegisterPoolManager`도 팩토리다.
 
 ### 핵심 서비스 (`Assets/FoundationDI/Runtime/`)
 모든 런타임 코드는 단일 asmdef `FoundationDI`(`Runtime/FoundationDI.asmdef`)에 들어간다.
@@ -103,7 +113,7 @@ NuGet 의존성은 **NuGetForUnity**(`Assets/NuGet/`)가 `Assets/packages.config
   - **타깃은 `TutorialTargetRef`(직접 참조 | 키)** — UINavigator가 런타임 생성하는 View 내부 버튼도 `TutorialTarget` 컴포넌트가 키로 등록해 가리킬 수 있다. **모듈은 타깃을 리페어런팅하지 않고 스크린 rect만 추적**하므로 `UIRoot`가 씬과 함께 파괴돼도 타깃 소실/복귀를 `TutorialTargetHandle`이 흡수한다.
   - **시계는 `ITutorialClock` seam** — EditMode에서 `Awaitable.WaitForSecondsAsync`/`NextFrameAsync`가 완료되지 않아 지연 경로를 테스트할 수 없기 때문이다.
   - **연출은 인터페이스만 개방** — `ITutorialModule` + 기본 2종(`HighlightModule`, `HandPointerModule`). 나머지는 `TutorialModuleBehaviour`를 상속해 프로젝트가 만든다.
-  - ⚠️ **`RegisterTutorialManager`는 `RegisterInjector`와 같은 스코프에 등록한다.** `InjectorService`가 정적 컨테이너 참조 하나를 공유하는 단일 컨테이너 모델이라, 씬(자식) 스코프에 두면 루트 리졸버가 `ITutorialManager`를 해결하지 못해 주입이 **조용히 실패**한다. 씬 스코프에 두려면 그 스코프에서 `RegisterComponentInHierarchy<TutorialSequenceBehaviour>()`를 함께 부른다.
+  - `RegisterTutorialManager`는 **씬 `IInstaller`에 등록한다** — 씬 수명이 원래 자리다. (VContainer 시절에는 `InjectorService`가 정적 리졸버 하나를 공유해 루트에 붙들어 둬야 했지만, Reflex는 씬 컨테이너로 씬을 주입하므로 그 제약이 없다.)
   - 상세: `Assets/FoundationDI/Runtime/Managers/TutorialManager/README.md`.
 - **UINavigator** (`Managers/UINavigator/`): uGUI 기반 UI 시스템. 네임스페이스 `DarkNaku.FoundationDI`.
   - **빌더 API**: `_ui.Page<TPresenter>()` / `Popup<TPresenter>()` / `Overlay<TPresenter>()` → 인스턴스 즉시 반환 + Show 자동 enqueue (`.Show()` 별도 호출 불필요) → 같은 프레임 내 `.WithParams(params)` / `.OnAfterShow(...)` / `.WithTransition(...)` 동기 체인. 빌더는 `UIPresenterExtensions`의 확장 메서드라 수신자에서 타입이 추론되어 **콜백 파라미터와 체인 반환이 선언한 Presenter 타입 그대로**다. `.WithOverlay(...)`만 타입 인자 추론이 불가능해 인스턴스 메서드로 남았고 반환값 없이 문으로 쓴다.
@@ -111,9 +121,9 @@ NuGet 의존성은 **NuGetForUnity**(`Assets/NuGet/`)가 `Assets/packages.config
   - **`OperationQueue`**: 모든 Show/Hide 전환을 단일 큐로 순차 직렬화 → race 조건 제거.
   - **prefab 매핑**: `[UIPrefab("키")]` 속성을 Presenter 타입에 부착. 로딩은 `IResourceService`에 위임(Resources/Addressables 중 어느 쪽이든 등록된 `IResourceProvider`가 결정).
   - **Presenter는 매 표시마다 새로 생성**(인스턴스 캐시 없음, `OnInitialize` 재실행) — **View는 프리팹 키로 풀링**되어 재사용됨.
-  - **씬 수명**: 씬 `LifetimeScope`가 소유한다. 루트 캔버스는 활성 씬에 붙고 씬 언로드 시 캔버스·풀·프리젠터가 함께 파괴된다. 정리 경로는 `Dispose()` 하나뿐이다.
+  - **씬 수명**: 씬 `IInstaller`가 소유한다. 루트 캔버스는 활성 씬에 붙고 씬 언로드 시 캔버스·풀·프리젠터가 함께 파괴된다. 정리 경로는 `Dispose()` 하나뿐이다.
   - **트랜지션**: `IUITransition` 추상화 + 기본 3종 MonoBehaviour 컴포넌트(`FadeTransition`/`ScaleTransition`/`SlideTransition`, 공통 기반 `UITransitionBehaviour`). 트윈 라이브러리 비의존 — `Awaitable` 자체 보간(`AnimationCurve` 인스펙터 커스터마이즈). 폴백 `NoopTransition`(즉시). 해석 우선순위: 빌더 오버라이드 > View의 트랜지션 컴포넌트 > Noop.
-  - **DI 등록**: `builder.RegisterUINavigator(settings)` 확장 메서드(**씬** `LifetimeScope`에서, `IResourceService` 등록 이후에 호출). Presenter/View는 VContainer가 주입.
+  - **DI 등록**: `builder.RegisterUINavigator(settings)` 확장 메서드(**씬** `ContainerScope`에서, `IResourceService` 등록 이후에 호출). Presenter/View는 Reflex가 주입.
   - **에디터 도구**(`Assets/FoundationDI/Editor/UINavigator/`): `Tools/FoundationDI/UI/Create UI Root Prefab`(루트 프리팹 생성) · `Create UI Element...`(View/Presenter 스크립트 + 프리팹 생성 마법사).
   - 상세: `Assets/FoundationDI/Runtime/Managers/UINavigator/README.md`.
 
@@ -121,8 +131,8 @@ NuGet 의존성은 **NuGetForUnity**(`Assets/NuGet/`)가 `Assets/packages.config
 서비스를 소비하는 씬 저작용 위젯이 사는 자리다(서비스도 매니저도 아니다).
 
 - **UIButton** (`Components/UIButton.cs`): uGUI `Button` 상속. 클릭 시 SFX + 햅틱 `Impact`.
-  - **서비스는 선택적 주입**이다 — `[Inject]` 필드가 아니라 `IObjectResolver`를 받아 `TryResolve`한다. `[Inject]` 필드로 받으면 미등록 서비스 하나가 `PoolManager.cs:154`(`InjectGameObject`)나 `InjectorService.Start()`를 터뜨리는데 **둘 다 try/catch가 없어** View가 안 뜨거나 컨테이너 시작이 깨진다.
-  - `Button` 상속이라 `InjectableBehaviour`를 못 쓴다. `InjectorService.Request(this)`를 `Awake`에서 직접 부른다.
+  - **서비스는 선택적 주입**이다 — `[Inject]` 필드가 아니라 `[Inject] Construct(IServiceResolver)`로 리졸버를 받아 `TryResolve`한다. `[Inject]` 필드로 받으면 미등록 서비스 하나가 Reflex의 `FieldInjector`에서 예외를 내는데, 씬 주입 경로에는 컴포넌트별 try/catch가 없어 **그 뒤 순번 전체의 주입이 막힌다**. `MusicZone`/`OutputVolumeSlider`/`TutorialTarget`/`TutorialSequenceBehaviour`도 같은 이유로 같은 형태다.
+  - 주입은 Reflex가 담당한다 — 씬 배치분은 `ContainerScope`가, 런타임 생성분은 `PoolManager`/`UINavigator`가 `InjectGameObject`로 채운다. `PoolManager`는 자체 try/catch로 인스턴스 단위 격리를 유지한다.
   - 발동 지점은 `onClick` 리스너다. `Button.Press()`가 `OnPointerClick`/`OnSubmit` 양쪽을 지나므로 리스너 하나로 전부 커버된다.
 - **UIStateButton** (`Components/UIStateButton.cs`): `UIButton` 상속 + 상태별 이미지/텍스트 스왑.
   - **자체 `UIButtonState` enum을 쓴다** — uGUI의 `Selectable.SelectionState`는 `protected` 중첩 enum이라 공개 API·테스트에서 쓸 수 없다. 순서가 같아도 캐스팅하지 않고 명시적 `switch`로 번역한다.
@@ -173,7 +183,7 @@ NuGet 의존성은 **NuGetForUnity**(`Assets/NuGet/`)가 `Assets/packages.config
 런타임 코드는 `DarkNaku.FoundationDI` 단일 네임스페이스로 통일한다(UIManager 리뉴얼로 구 `FoundationDI` 네임스페이스는 제거됨). 새 코드를 추가할 때 같은 디렉터리의 기존 파일이 쓰는 네임스페이스를 따른다.
 
 ### 기타 의존성
-PrimeTween(트위닝, tgz로 로컬 설치), Director(DarkNaku의 씬/플로우 라이브러리), Input System, URP 2D가 구성되어 있다.
+Director(DarkNaku의 씬/플로우 라이브러리), Input System, URP 2D가 구성되어 있다. **트윈 라이브러리는 쓰지 않는다** — UINavigator의 트랜지션은 `Awaitable` 자체 보간이다.
 
 # SERVICE ARCHITECTURE (프로젝트 규약)
 
@@ -183,7 +193,7 @@ PrimeTween(트위닝, tgz로 로컬 설치), Director(DarkNaku의 씬/플로우 
 
 - 네임스페이스는 `DarkNaku.FoundationDI`.
 - `IXxxService : IDisposable` 인터페이스 + `XxxService` 구현 클래스 쌍으로 작성한다.
-- VContainer로 등록한다 (`RootLifetimeScope.Configure`에서 `builder.Register<IXxxService, XxxService>(Lifetime.Singleton)`).
+- Reflex로 등록한다 (`RootInstaller.InstallBindings`에서 `builder.RegisterType(typeof(XxxService), new[] { typeof(IXxxService) }, Lifetime.Singleton, Resolution.Lazy)`). `using Reflex.Enums;`와 `using UnityEngine;`을 함께 쓰면 `Resolution`이 모호해지므로 `using Resolution = Reflex.Enums.Resolution;` 별칭을 넣는다.
 - **테스트 가능성을 위한 seam 분리**: 외부 의존(Addressables, 파일 IO 등)은 `IXxxProvider` 같은 인터페이스로 추상화하고, 기본 생성자는 실제 구현을 주입하고 별도 생성자는 인터페이스를 주입받게 한다. EditMode 단위 테스트는 NSubstitute로 이 seam을 대체해 외부 의존 없이 검증한다.
 - 테스트 어셈블리는 `FoundationDI.Tests`(EditMode, `overrideReferences: true`, `nunit.framework.dll`/`NSubstitute.dll`/`Castle.Core.dll` precompiled 참조)를 사용한다.
 

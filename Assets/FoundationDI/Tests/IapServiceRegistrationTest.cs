@@ -3,7 +3,7 @@ using DarkNaku.FoundationDI;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
-using VContainer;
+using Reflex.Core;
 
 public class IapServiceRegistrationTest
 {
@@ -47,7 +47,7 @@ public class IapServiceRegistrationTest
             var fulfillment = new FakeFulfillment();
 
             var builder = new ContainerBuilder();
-            builder.RegisterInstance<IIapFulfillment>(fulfillment);
+            builder.RegisterValue(fulfillment, new[] { typeof(IIapFulfillment) });
             builder.RegisterIapService(settings);
 
             var container = builder.Build();
@@ -73,7 +73,8 @@ public class IapServiceRegistrationTest
 
         var container = builder.Build();
 
-        Assert.Throws<VContainerException>(() => container.Resolve<IIapService>());
+        Assert.Throws<Reflex.Exceptions.UnknownContractException>(
+            () => container.Resolve<IIapService>());
 
         container.Dispose();
     }

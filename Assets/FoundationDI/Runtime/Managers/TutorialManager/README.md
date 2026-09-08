@@ -30,19 +30,18 @@ TutorialManager (순수 C#)          조건부 후보 집합을 들고 하나씩
 
 ## 사용법
 
-### 1) DI 등록 (VContainer)
+### 1) DI 등록 (Reflex)
 
 ```csharp
-using VContainer;
-using VContainer.Unity;
+using Reflex;
+using Reflex.Unity;
 using DarkNaku.FoundationDI;
 
-public class RootLifetimeScope : LifetimeScope
+// MessageService는 앱 수명이라 루트에, TutorialManager는 씬 수명이라 씬 인스톨러에 둔다.
+public class SceneInstaller : MonoBehaviour, IInstaller
 {
-    protected override void Configure(IContainerBuilder builder)
+    public void InstallBindings(ContainerBuilder builder)
     {
-        builder.RegisterMessageService();   // MessageTrigger가 쓴다
-        builder.RegisterInjector();         // 씬 배치 컴포넌트 주입 경로
         builder.RegisterTutorialManager();  // 저장 키 "default"
     }
 }
@@ -50,16 +49,9 @@ public class RootLifetimeScope : LifetimeScope
 
 저장 키를 나누고 싶으면 `builder.RegisterTutorialManager("chapter1")`, 진행도를 서버와 동기화하려면 `ITutorialProgressStorage`를 구현해 `builder.RegisterTutorialManager(myStorage)`로 넘깁니다.
 
-> ### ⚠️ `RegisterInjector`와 같은 스코프에 등록하세요
+> ### 씬 인스톨러에 두세요
 >
-> `TutorialSequenceBehaviour`와 `TutorialTarget`은 씬에 배치되는 컴포넌트라 생성자 주입이 안 되고, [`InjectorService`](../../Services/InjectorService/README.md)를 통해 주입받습니다. **`InjectorService`는 정적 컨테이너 참조 하나를 공유하는 단일 컨테이너 모델**이라, 자식(씬) 스코프에 `RegisterTutorialManager`를 두고 루트에 `RegisterInjector`를 두면 루트 리졸버가 `ITutorialManager`를 해결하지 못합니다. 이 경우 주입이 **조용히 실패**해서 시퀀스가 영영 등록되지 않습니다(에러 로그도 없습니다).
->
-> 씬 스코프에 두고 싶다면 그 씬 스코프에서 컴포넌트를 직접 등록하세요:
-> ```csharp
-> builder.RegisterTutorialManager();
-> builder.RegisterComponentInHierarchy<TutorialSequenceBehaviour>();
-> builder.RegisterComponentInHierarchy<TutorialTarget>();
-> ```
+> `TutorialSequenceBehaviour`와 `TutorialTarget`은 씬에 배치되는 컴포넌트라 생성자 주입이 안 되고, `[Inject] Construct(IServiceResolver)`로 받습니다. Reflex는 **그 씬의 컨테이너로** 씬을 주입하므로, `RegisterTutorialManager`를 씬 인스톨러에 두면 그대로 해결됩니다. 전제는 부모(루트) 컨테이너에 `IMessageService`가 등록돼 있어야 한다는 것뿐입니다(`MessageTrigger`가 씁니다).
 
 ### 2) 씬 오써링
 

@@ -20,15 +20,15 @@ Android `Vibrator`/`VibrationEffect`, 그 외 `NoopHapticProvider`), 미지원 �
 
 ## 사용법
 
-### 1) DI 등록 (VContainer)
+### 1) DI 등록 (Reflex)
 
 ```csharp
-using VContainer.Unity;
+using Reflex.Unity;
 using DarkNaku.FoundationDI;
 
-public class RootLifetimeScope : LifetimeScope
+public class RootInstaller : MonoBehaviour, IInstaller
 {
-    protected override void Configure(IContainerBuilder builder)
+    public void InstallBindings(ContainerBuilder builder)
     {
         // 외부 리소스 의존이 없어 추가 인자는 불필요하다.
         builder.RegisterHapticService();

@@ -3,8 +3,9 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Pool;
 using Object = UnityEngine.Object;
-using VContainer;
-using VContainer.Unity;
+using Reflex.Core;
+using Reflex.Enums;
+using Resolution = Reflex.Enums.Resolution;
 
 namespace DarkNaku.FoundationDI
 {
@@ -17,19 +18,19 @@ namespace DarkNaku.FoundationDI
     public class PoolManager : IPoolManager
     {
         private readonly IResourceService _resourceService;
-        private readonly IObjectResolver _resolver;
+        private readonly IServiceResolver _resolver;
         private readonly Dictionary<string, PoolData> _table;
         private readonly Transform _root;
         private bool _disposed;
 
-        public PoolManager(IResourceService resourceService, IObjectResolver resolver, Transform parent = null)
+        public PoolManager(IResourceService resourceService, IServiceResolver resolver, Transform parent = null)
         {
             _resourceService = resourceService;
             _resolver = resolver;
             _table = new();
 
             // 풀 루트는 DontDestroyOnLoad로 두지 않는다.
-            // parent(보통 씬 LifetimeScope의 transform)가 주어지면 그 아래에 둬서
+            // parent(보통 ContainerScope의 transform)가 주어지면 그 아래에 둬서
             // 풀 루트가 활성 씬이 아니라 스코프가 속한 씬에 확실히 귀속되도록 한다.
             // 그러면 씬 언로드 시 풀도 함께 정리된다. parent가 없으면 활성 씬에 생성된다.
             var root = new GameObject("[PoolManager]");
@@ -247,25 +248,26 @@ namespace DarkNaku.FoundationDI
         }
     }
 
-    public static class PoolManagerVContainerExtensions
+    public static class PoolManagerRegistration
     {
         /// <summary>
         /// PoolManager를 컨테이너에 등록한다.
-        /// 씬 LifetimeScope에서 호출하면 풀이 씬과 수명을 함께하여, 씬 언로드 시
-        /// scope.Dispose()로 풀과 로드한 에셋(IResourceService.Release)이 자동 정리된다.
-        /// <paramref name="root"/>(보통 씬 LifetimeScope의 transform)를 넘기면 풀 루트가
+        /// 씬 IInstaller에서 호출하면 풀이 씬과 수명을 함께하여, 씬 언로드 시
+        /// 컨테이너 Dispose로 풀과 로드한 에셋(IResourceService.Release)이 자동 정리된다.
+        /// <paramref name="root"/>(보통 ContainerScope의 transform)를 넘기면 풀 루트가
         /// 활성 씬이 아니라 그 transform이 속한 씬에 확실히 귀속된다(additive 로드 안전).
-        /// 전제: 부모(루트) 스코프에 <see cref="IResourceService"/>가 이미 등록되어 있어야 한다
+        /// 전제: 부모(루트) 컨테이너에 <see cref="IResourceService"/>가 이미 등록되어 있어야 한다
         /// (PoolManager가 프리팹 로드를 IResourceService에 위임함).
         /// </summary>
-        public static void RegisterPoolManager(this IContainerBuilder builder, Transform root = null)
+        public static ContainerBuilder RegisterPoolManager(this ContainerBuilder builder,
+                                                           Transform root = null)
         {
-            var registration = builder.Register<IPoolManager, PoolManager>(Lifetime.Singleton);
-
-            if (root != null)
-            {
-                registration.WithParameter(root);
-            }
+            // Reflex에는 VContainer의 WithParameter(파라미터 오버라이드)가 없다.
+            // root를 넘기는 길은 팩토리뿐이다. root가 null이면 PoolManager 생성자가
+            // 이미 '부모 없이 생성'으로 처리하므로 분기가 필요 없다.
+            return builder.RegisterFactory<IPoolManager>(
+                c => new PoolManager(c.Resolve<IResourceService>(), c.Resolve<IServiceResolver>(), root),
+                Lifetime.Singleton, Resolution.Lazy);
         }
     }
 }

@@ -4,7 +4,7 @@ using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
 using UnityEngine.UI;
-using VContainer;
+using Reflex.Core;
 using DarkNaku.FoundationDI;
 
 public class UINavigatorFlowTests
@@ -109,7 +109,7 @@ public class UINavigatorFlowTests
     {
         var resource = Substitute.For<IResourceService>();
         resource.Load<GameObject>("UI/Sample").Returns(_prefab);
-        var resolver = Substitute.For<IObjectResolver>();
+        var resolver = Substitute.For<IServiceResolver>();
         var settings = ScriptableObject.CreateInstance<UINavigatorSettings>();
         var factory = new UIInstanceFactory(resolver);
 
@@ -127,7 +127,7 @@ public class UINavigatorFlowTests
     {
         var resource = Substitute.For<IResourceService>();
         resource.Load<GameObject>("UI/SamplePopup").Returns(_popupPrefab);
-        var resolver = Substitute.For<IObjectResolver>();
+        var resolver = Substitute.For<IServiceResolver>();
         var settings = ScriptableObject.CreateInstance<UINavigatorSettings>();
         var factory = new UIInstanceFactory(resolver);
 
@@ -145,7 +145,7 @@ public class UINavigatorFlowTests
     {
         var resource = Substitute.For<IResourceService>();
         resource.Load<GameObject>("UI/SampleOverlay").Returns(_overlayPrefab);
-        var resolver = Substitute.For<IObjectResolver>();
+        var resolver = Substitute.For<IServiceResolver>();
         var settings = ScriptableObject.CreateInstance<UINavigatorSettings>();
         var factory = new UIInstanceFactory(resolver);
 
@@ -163,7 +163,7 @@ public class UINavigatorFlowTests
     {
         var resource = Substitute.For<IResourceService>();
         resource.Load<GameObject>("UI/ReshowSample").Returns(_reshowPrefab);
-        var resolver = Substitute.For<IObjectResolver>();
+        var resolver = Substitute.For<IServiceResolver>();
         var settings = ScriptableObject.CreateInstance<UINavigatorSettings>();
         var factory = new UIInstanceFactory(resolver);
         var manager = new UINavigator(settings, factory, resource);
@@ -193,7 +193,7 @@ public class UINavigatorFlowTests
         var resource = Substitute.For<IResourceService>();
         resource.Load<GameObject>("UI/Sample").Returns(_prefab);
         resource.Load<GameObject>("UI/SamplePopup").Returns(_popupPrefab);
-        var resolver = Substitute.For<IObjectResolver>();
+        var resolver = Substitute.For<IServiceResolver>();
         var settings = ScriptableObject.CreateInstance<UINavigatorSettings>();
         var factory = new UIInstanceFactory(resolver);
         var manager = new UINavigator(settings, factory, resource);
@@ -216,7 +216,7 @@ public class UINavigatorFlowTests
         var resource = Substitute.For<IResourceService>();
         resource.Load<GameObject>("UI/SampleOverlay").Returns(_overlayPrefab);
         resource.Load<GameObject>("UI/SamplePopup").Returns(_popupPrefab);
-        var resolver = Substitute.For<IObjectResolver>();
+        var resolver = Substitute.For<IServiceResolver>();
         var settings = ScriptableObject.CreateInstance<UINavigatorSettings>();
         var factory = new UIInstanceFactory(resolver);
         var manager = new UINavigator(settings, factory, resource);
@@ -239,7 +239,7 @@ public class UINavigatorFlowTests
         var resource = Substitute.For<IResourceService>();
         resource.Load<GameObject>("UI/Sample").Returns(_prefab);
         resource.Load<GameObject>("UI/Sample2").Returns(_prefab2);
-        var resolver = Substitute.For<IObjectResolver>();
+        var resolver = Substitute.For<IServiceResolver>();
         var settings = ScriptableObject.CreateInstance<UINavigatorSettings>();
         var factory = new UIInstanceFactory(resolver);
         var manager = new UINavigator(settings, factory, resource);
@@ -268,7 +268,7 @@ public class UINavigatorFlowTests
     {
         var resource = Substitute.For<IResourceService>();
         resource.Load<GameObject>("UI/SamplePopup").Returns(_popupPrefab);
-        var resolver = Substitute.For<IObjectResolver>();
+        var resolver = Substitute.For<IServiceResolver>();
         var settings = ScriptableObject.CreateInstance<UINavigatorSettings>();
         var factory = new UIInstanceFactory(resolver);
         var manager = new UINavigator(settings, factory, resource);
@@ -290,7 +290,7 @@ public class UINavigatorFlowTests
     {
         var resource = Substitute.For<IResourceService>();
         resource.Load<GameObject>("UI/Sample").Returns(_prefab);
-        var resolver = Substitute.For<IObjectResolver>();
+        var resolver = Substitute.For<IServiceResolver>();
         var settings = ScriptableObject.CreateInstance<UINavigatorSettings>();
         var factory = new UIInstanceFactory(resolver);
         var manager = new UINavigator(settings, factory, resource);
@@ -314,7 +314,7 @@ public class UINavigatorFlowTests
         HideTrackV.DestroyCount = 0;
         var resource = Substitute.For<IResourceService>();
         resource.Load<GameObject>("UI/HideTrack").Returns(_hideTrackPrefab);
-        var resolver = Substitute.For<IObjectResolver>();
+        var resolver = Substitute.For<IServiceResolver>();
         var settings = ScriptableObject.CreateInstance<UINavigatorSettings>();
         var factory = new UIInstanceFactory(resolver);
         var manager = new UINavigator(settings, factory, resource);
@@ -335,7 +335,7 @@ public class UINavigatorFlowTests
         SubP.TickHandlerCalls = 0;
         var resource = Substitute.For<IResourceService>();
         resource.Load<GameObject>("UI/Sub").Returns(_subPrefab);
-        var resolver = Substitute.For<IObjectResolver>();
+        var resolver = Substitute.For<IServiceResolver>();
         var settings = ScriptableObject.CreateInstance<UINavigatorSettings>();
         var factory = new UIInstanceFactory(resolver);
         var manager = new UINavigator(settings, factory, resource);
@@ -365,7 +365,7 @@ public class UINavigatorFlowTests
         var resource = Substitute.For<IResourceService>();
         resource.Load<GameObject>("UI/Sample").Returns(_prefab);
         resource.Load<GameObject>("UI/Sample2").Returns(_prefab2);
-        var resolver = Substitute.For<IObjectResolver>();
+        var resolver = Substitute.For<IServiceResolver>();
         var settings = ScriptableObject.CreateInstance<UINavigatorSettings>();
         var factory = new UIInstanceFactory(resolver);
         var manager = new UINavigator(settings, factory, resource);
@@ -402,7 +402,7 @@ public class UINavigatorFlowTests
         var resource = Substitute.For<IResourceService>();
         resource.Load<GameObject>("UI/Sample").Returns(_prefab);
         resource.Load<GameObject>("UI/Sample2").Returns(_prefab2);
-        var resolver = Substitute.For<IObjectResolver>();
+        var resolver = Substitute.For<IServiceResolver>();
         var settings = ScriptableObject.CreateInstance<UINavigatorSettings>();
         var factory = new UIInstanceFactory(resolver);
         var manager = new UINavigator(settings, factory, resource);

@@ -30,14 +30,14 @@ Singular / Airbridge 어댑터는 각각 별도 계획으로 붙습니다.
 ```csharp
 using DarkNaku.FoundationDI;
 using UnityEngine;
-using VContainer;
-using VContainer.Unity;
+using Reflex;
+using Reflex.Unity;
 
-public class RootLifetimeScope : LifetimeScope
+public class RootInstaller : MonoBehaviour, IInstaller
 {
     [SerializeField] private AnalyticsServiceSettings _analyticsServiceSettings;
 
-    protected override void Configure(IContainerBuilder builder)
+    public void InstallBindings(ContainerBuilder builder)
     {
         builder.RegisterAnalyticsService(_analyticsServiceSettings);
     }
@@ -45,7 +45,7 @@ public class RootLifetimeScope : LifetimeScope
 ```
 
 `settings`가 `null`이면 에러 로그만 남기고 서비스를 등록하지 않습니다(등록 자체를 건너뛰므로,
-주입받는 쪽에서 VContainer 해석 에러로 드러납니다).
+주입받는 쪽에서 Reflex 해석 에러로 드러납니다).
 
 ### 1.3 사용
 
@@ -269,7 +269,7 @@ _analytics.CollectionEnabled = false;   // 게임이 판단해서 밀어 넣는�
      DLL 이름을 넣는다(**Firebase 어댑터가 그렇다** — `Assets/Firebase/Plugins/*.dll`).
 4. `IAnalyticsProvider`를 구현한다.
 5. `[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]`에서 자신을 등록한다.
-   **`BeforeSceneLoad`여야 합니다** — `LifetimeScope.Configure`보다 먼저 돌아야 팩토리가 찾을 수 있습니다.
+   **`BeforeSceneLoad`여야 합니다** — `ContainerScope.Configure`보다 먼저 돌아야 팩토리가 찾을 수 있습니다.
 
    ```csharp
    internal static class AppsFlyerInstaller

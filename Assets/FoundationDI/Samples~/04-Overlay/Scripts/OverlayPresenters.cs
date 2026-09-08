@@ -1,5 +1,5 @@
-using VContainer;
-using VContainer.Unity;
+using Reflex.Attributes;
+using UnityEngine;
 
 namespace DarkNaku.FoundationDI.Samples
 {
@@ -46,15 +46,5 @@ namespace DarkNaku.FoundationDI.Samples
         }
     }
 
-    public class OverlayDemo : IStartable
-    {
-        private readonly IUINavigator _ui;
-        public OverlayDemo(IUINavigator ui) => _ui = ui;
-
-        public void Start()
-        {
-            _ui.Overlay<BackgroundBelowOverlay>();   // Below 배경
-            _ui.Page<OverlayHostPage>();             // Page — OnBeforeShow에서 Above HUD 생성
-        }
     }
 }

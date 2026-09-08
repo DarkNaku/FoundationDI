@@ -7,7 +7,7 @@ using NSubstitute;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
-using VContainer;
+using Reflex.Core;
 
 public class HapticServiceTest
 {

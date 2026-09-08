@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using UnityEngine;
-using VContainer;
+using Reflex.Core;
+using Reflex.Enums;
+using Resolution = Reflex.Enums.Resolution;
 
 namespace DarkNaku.FoundationDI
 {
@@ -79,6 +81,11 @@ namespace DarkNaku.FoundationDI
             if (prefab != null)
             {
                 root = UnityEngine.Object.Instantiate(prefab);
+
+                // 런타임 생성물은 씬 주입(ContainerScope) 대상이 아니다. 소비자가 루트
+                // 프리팹에 붙인 컴포넌트도 주입받으려면 여기서 명시적으로 해야 한다.
+                // (InjectorService 시절에는 InjectableBehaviour가 스스로 요청했다.)
+                _factory?.Resolver?.InjectGameObject(root.GO);
             }
             else
             {
@@ -405,18 +412,27 @@ namespace DarkNaku.FoundationDI
 
     internal interface IOverlayPlacement { bool Above { get; } }
 
-    public static class UINavigatorVContainerExtensions
+    public static class UINavigatorRegistration
     {
         /// <summary>
         /// UINavigator를 컨테이너에 등록한다.
         /// 전제: 호출 전에 <see cref="IResourceService"/>가 이미 등록되어 있어야 한다
         /// (UINavigator 전용 풀과 UIInstanceFactory가 이를 사용).
         /// </summary>
-        public static void RegisterUINavigator(this IContainerBuilder builder, UINavigatorSettings settings)
+        public static ContainerBuilder RegisterUINavigator(this ContainerBuilder builder,
+                                                           UINavigatorSettings settings)
         {
-            builder.RegisterInstance(settings);
-            builder.Register<UIInstanceFactory>(Lifetime.Singleton);
-            builder.Register<UINavigator>(Lifetime.Singleton).As<IUINavigator>();
+            builder.RegisterValue(settings);
+            builder.RegisterType(typeof(UIInstanceFactory), Lifetime.Singleton, Resolution.Lazy);
+
+            // RegisterType을 쓸 수 없다 - Reflex의 TypeConstructionInfoCache는
+            // type.GetConstructors()로 public 생성자만 보는데 UINavigator의 생성자는 internal이다.
+            // public이 하나도 없으면 폴백 활성자(Expression.Default)가 null을 돌려주고,
+            // 그 null이 AttributeInjector로 넘어가 NullReferenceException이 난다.
+            // 생성자를 열지 않고(패키지만 만들도록) 팩토리로 직접 호출한다.
+            return builder.RegisterFactory<IUINavigator>(
+                c => new UINavigator(settings, c.Resolve<UIInstanceFactory>(), c.Resolve<IResourceService>()),
+                Lifetime.Singleton, Resolution.Lazy);
         }
     }
 }

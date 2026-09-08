@@ -3,7 +3,7 @@ using NSubstitute;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.EventSystems;
-using VContainer;
+using Reflex.Core;
 
 public class UIScaleButtonTest
 {
@@ -17,7 +17,6 @@ public class UIScaleButtonTest
     [SetUp]
     public void SetUp()
     {
-        new InjectorService(Substitute.For<IObjectResolver>()).Dispose();
 
         _buttonGo = new GameObject("button", typeof(RectTransform));
 
@@ -29,7 +28,6 @@ public class UIScaleButtonTest
     [TearDown]
     public void TearDown()
     {
-        new InjectorService(Substitute.For<IObjectResolver>()).Dispose();
         if (_buttonGo != null) Object.DestroyImmediate(_buttonGo);
     }
 

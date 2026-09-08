@@ -1,14 +1,16 @@
+using Reflex.Core;
+using Reflex.Enums;
 using UnityEngine;
-using VContainer;
+using Resolution = Reflex.Enums.Resolution;
 
 namespace DarkNaku.FoundationDI
 {
     public static class AdServiceRegistration
     {
-        // 루트 LifetimeScope의 Configure에서 호출한다.
+        // 루트 IInstaller의 InstallBindings에서 호출한다.
         //   builder.RegisterAdService(_adServiceSettings);
-        public static IContainerBuilder RegisterAdService(this IContainerBuilder builder,
-                                                          AdServiceSettings settings)
+        public static ContainerBuilder RegisterAdService(this ContainerBuilder builder,
+                                                         AdServiceSettings settings)
         {
             if (settings == null)
             {
@@ -16,12 +18,15 @@ namespace DarkNaku.FoundationDI
                 return builder;
             }
 
-            builder.RegisterInstance(settings);
-            builder.Register<IAdRemovalStorage, PlayerPrefsAdRemovalStorage>(Lifetime.Singleton);
-            builder.Register<IAdDispatcher, UnityAdDispatcher>(Lifetime.Singleton);
-            builder.Register<IAdProviderFactory, AdProviderFactory>(Lifetime.Singleton);
+            builder.RegisterValue(settings);
+            builder.RegisterType(typeof(PlayerPrefsAdRemovalStorage), new[] { typeof(IAdRemovalStorage) },
+                                 Lifetime.Singleton, Resolution.Lazy);
+            builder.RegisterType(typeof(UnityAdDispatcher), new[] { typeof(IAdDispatcher) },
+                                 Lifetime.Singleton, Resolution.Lazy);
+            builder.RegisterType(typeof(AdProviderFactory), new[] { typeof(IAdProviderFactory) },
+                                 Lifetime.Singleton, Resolution.Lazy);
 
-            builder.Register<IAdService>(container =>
+            return builder.RegisterFactory<IAdService>(container =>
             {
                 var factory = container.Resolve<IAdProviderFactory>();
                 var dispatcher = container.Resolve<IAdDispatcher>();
@@ -31,9 +36,7 @@ namespace DarkNaku.FoundationDI
                 var provider = factory.Create(settings.Provider, settings.DummyOptions, forceDummy);
 
                 return new AdService(provider, dispatcher, settings.ToOptions(), storage);
-            }, Lifetime.Singleton);
-
-            return builder;
+            }, Lifetime.Singleton, Resolution.Lazy);
         }
     }
 }

@@ -1,6 +1,6 @@
+using Reflex.Attributes;
 using UnityEngine;
 using UnityEngine.UI;
-using VContainer;
 
 namespace DarkNaku.FoundationDI
 {
@@ -25,7 +25,6 @@ namespace DarkNaku.FoundationDI
         private IHapticService _hapticService;
 
         private Sound _sound;
-        private bool _requested;
         private bool _warnedSound;
 
         // 인스턴스가 아니라 세션당 한 번만 경고한다: 이 경고는 전역 IHapticService 미등록을
@@ -35,12 +34,13 @@ namespace DarkNaku.FoundationDI
 
         /// <summary>
         /// 개별 서비스가 아니라 리졸버를 받는다. [Inject] 필드로 서비스를 직접 받으면
-        /// 미등록 시 VContainer가 예외를 던지는데, 이 프로젝트에는 그 예외를 흡수할 곳이
-        /// 거의 없다(PoolManager.cs:154 / InjectorService.Start 둘 다 try/catch가 없다).
-        /// IObjectResolver는 컨테이너가 항상 스스로 등록한다(ContainerBuilder.cs:161).
+        /// 미등록 시 Reflex의 FieldInjector가 예외를 던지는데, 씬 주입 경로
+        /// (GameObjectInjector.InjectRecursive)에는 컴포넌트별 try/catch가 없어
+        /// 그 뒤 순번 전체의 주입이 막힌다.
+        /// IServiceResolver는 ServiceResolverBootstrap이 루트·씬 양쪽에 항상 등록한다.
         /// </summary>
         [Inject]
-        public void Construct(IObjectResolver resolver)
+        public void Construct(IServiceResolver resolver)
         {
             if (resolver == null) return;
 
@@ -52,22 +52,12 @@ namespace DarkNaku.FoundationDI
         {
             base.Awake();
 
-            EnsureInjected();
+            // 주입은 Reflex가 담당한다 - 씬 배치분은 ContainerScope가 어떤 Awake보다도 먼저,
+            // 런타임 생성분은 PoolManager/UINavigator가 InjectGameObject로 채운다.
 
             // Button.Press()가 OnPointerClick/OnSubmit 양쪽에서 호출되므로
             // 리스너 하나로 마우스·터치·게임패드 Submit이 전부 커버된다.
             onClick.AddListener(PlayFeedback);
-        }
-
-        private void EnsureInjected()
-        {
-            // Selectable이 [ExecuteAlways]라 에디터에서도 Awake가 돈다. 에디터에서는 컨테이너가 없어
-            // InjectorService의 정적 _pending 목록에만 쌓이고 비워지지 않는다.
-            if (!Application.isPlaying) return;
-
-            if (_requested) return;
-            _requested = true;
-            InjectorService.Request(this);
         }
 
         /// <summary>

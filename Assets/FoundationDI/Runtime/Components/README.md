@@ -16,18 +16,18 @@
 
 ## 사용법
 
-### 1) DI 전제 (VContainer)
+### 1) DI 전제 (Reflex)
 
-`UIButton`은 `[Inject]` 필드가 아니라 `IObjectResolver`를 직접 받아 씬 배치 컴포넌트를 주입하는
-`InjectorService` 경로를 탄다. 루트 `LifetimeScope`에서 `RegisterInjector()`를 호출해야 한다.
+`UIButton`은 `[Inject]` 필드가 아니라 `[Inject] Construct(IServiceResolver)`로 리졸버를 받아
+`TryResolve`한다. 미등록 서비스를 `[Inject]` 필드로 요구하면 Reflex의 씬 주입이 그 지점에서
+끊겨 **뒤 순번 컴포넌트까지 주입되지 않기** 때문이다. 주입 자체는 씬의 `ContainerScope`가
+어떤 `Awake`보다도 먼저 수행하므로 별도 등록이 필요 없다.
 
 ```csharp
-public class RootLifetimeScope : LifetimeScope
+public class RootInstaller : MonoBehaviour, IInstaller
 {
-    protected override void Configure(IContainerBuilder builder)
+    public void InstallBindings(ContainerBuilder builder)
     {
-        builder.RegisterInjector();
-
         // 아래 둘은 선택적이다 — 등록하지 않으면 그 기능만 조용히 꺼진다.
         builder.RegisterSoundService(soundSettings);
         builder.RegisterHapticService();
@@ -35,7 +35,7 @@ public class RootLifetimeScope : LifetimeScope
 }
 ```
 
-`ISoundService`/`IHapticService`는 **선택적**이다. `UIButton`은 `IObjectResolver.TryResolve`로
+`ISoundService`/`IHapticService`는 **선택적**이다. `UIButton`은 `IServiceResolver.TryResolve`로
 두 서비스를 찾고, 못 찾으면 그 기능(사운드 또는 햅틱)만 꺼진 채로 나머지는 정상 동작한다. SFX를
 지정했는데 `ISoundService`가 없으면 **컴포넌트당** 한 번, 햅틱을 켰는데 `IHapticService`가 없으면
 **세션당** 한 번만 경고를 남긴다(햅틱 쪽은 전역 미등록 보고라 인스턴스 수만큼 찍을 이유가 없다).
@@ -168,7 +168,7 @@ Material Preset을 만들어 `Material` 필드로 교체한다.
 | 멤버 | 시그니처 | 설명 |
 | --- | --- | --- |
 | `PlayFeedback` | `public void PlayFeedback()` | SFX 재생 + 햅틱 `Impact`. `onClick`에 자동으로 걸린다. `RemoveAllListeners()` 후 재배선할 때 공개된다. |
-| `Construct` | `[Inject] public void Construct(IObjectResolver resolver)` | `ISoundService`/`IHapticService`를 각각 `TryResolve`. 둘 다 선택적. |
+| `Construct` | `[Inject] public void Construct(IServiceResolver resolver)` | `ISoundService`/`IHapticService`를 각각 `TryResolve`. 둘 다 선택적. |
 
 주요 직렬화 필드: `_sfx`(SFX), `_output`(Output), `_volume`(0~1, 기본 1), `_randomPitch`(bool),
 `_useHaptic`(bool, 기본 true), `_hapticImpact`(HapticImpact, 기본 Light).

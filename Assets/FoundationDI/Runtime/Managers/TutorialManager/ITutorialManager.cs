@@ -3,7 +3,7 @@ using System;
 namespace DarkNaku.FoundationDI
 {
     /// <summary>
-    /// 조건 기반 튜토리얼 진행. 씬 수명이므로 씬 LifetimeScope에 등록한다.
+    /// 조건 기반 튜토리얼 진행. 씬 수명이므로 씬 IInstaller에 등록한다.
     /// Register/Unregister는 오써링 어댑터가, 나머지는 게임 코드가 쓴다.
     /// </summary>
     public interface ITutorialManager : IDisposable

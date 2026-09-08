@@ -1,6 +1,5 @@
 using UnityEngine;
-using VContainer;
-using VContainer.Unity;
+using Reflex.Attributes;
 using DarkNaku.FoundationDI;
 
 namespace FoundationDI.Host
@@ -86,15 +85,5 @@ namespace FoundationDI.Host
                 View.statusLabel.text = message;
             }
         }
-    }
-
-    /// 앱 시작 시 메인 테스트 페이지를 띄우는 부트스트랩.
-    public class TestHubBootstrap : IStartable
-    {
-        private readonly IUINavigator _ui;
-
-        public TestHubBootstrap(IUINavigator ui) => _ui = ui;
-
-        public void Start() => _ui.Page<MenuPage>();
     }
 }

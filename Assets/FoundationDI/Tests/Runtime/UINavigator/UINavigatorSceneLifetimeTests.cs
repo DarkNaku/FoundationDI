@@ -5,7 +5,7 @@ using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
-using VContainer;
+using Reflex.Core;
 using DarkNaku.FoundationDI;
 
 public class UINavigatorSceneLifetimeTests
@@ -44,7 +44,7 @@ public class UINavigatorSceneLifetimeTests
         var resource = Substitute.For<IResourceService>();
         resource.Load<GameObject>("UI/SceneLifetime").Returns(_viewPrefab);
         var settings = ScriptableObject.CreateInstance<UINavigatorSettings>();
-        return new UINavigator(settings, new UIInstanceFactory(Substitute.For<IObjectResolver>()), resource);
+        return new UINavigator(settings, new UIInstanceFactory(Substitute.For<IServiceResolver>()), resource);
     }
 
     [UnityTest]

@@ -291,8 +291,10 @@ GameObject:
   m_Component:
   - component: {fileID: 2085995966}
   - component: {fileID: 2085995965}
+  - component: {fileID: 2085995967001}
+  - component: {fileID: 2085995967002}
   m_Layer: 0
-  m_Name: SceneLifetimeScope
+  m_Name: SceneScope
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -307,14 +309,34 @@ MonoBehaviour:
   m_GameObject: {fileID: 2085995964}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4c3fac579340b4661be3d45df6e435a6, type: 3}
+  m_Script: {fileID: 11500000, guid: c2970bd5552c14fd6b84f67d878d8037, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SceneLifetimeScope
-  parentReference:
-    TypeName: 
-  autoRun: 1
-  autoInjectGameObjects: []
+  m_EditorClassIdentifier: 
   _uiNavigatorSettings: {fileID: 11400000, guid: d055982776c8c43039cccbed24fdc6bb, type: 2}
+--- !u!114 &2085995967001
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2085995964}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5312032623c34414a54ea00e35a7eb8e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!114 &2085995967002
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2085995964}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 696dbf1754aab409abae0bdaf63957c6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!4 &2085995966
 Transform:
   m_ObjectHideFlags: 0

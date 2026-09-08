@@ -39,14 +39,13 @@ Assets/FoundationDI.Data/SoundService/
 ### 1.2 DI 등록
 
 ```csharp
-public class RootLifetimeScope : LifetimeScope
+public class RootInstaller : MonoBehaviour, IInstaller
 {
     public SoundServiceSettings soundSettings;
 
-    protected override void Configure(IContainerBuilder builder)
+    public void InstallBindings(ContainerBuilder builder)
     {
         builder.RegisterSoundService(soundSettings);
-        builder.RegisterInjector();   // 씬 배치 컴포넌트(MusicZone 등) 주입용
     }
 }
 ```
@@ -229,8 +228,8 @@ float saved = _sound.GetSavedOutputVolume("BGM");
 저장 백엔드를 바꾸려면 `RegisterSoundService` 대신 직접 등록한다.
 
 ```csharp
-builder.RegisterInstance(settings);
-builder.Register<ISoundVolumeStorage, MyCloudSaveStorage>(Lifetime.Singleton);
+builder.RegisterValue(settings);
+builder.RegisterType(typeof(MyCloudSaveStorage), new[] { typeof(ISoundVolumeStorage) }, Lifetime.Singleton, Resolution.Lazy);
 builder.Register<SoundService>(Lifetime.Singleton).As<ISoundService>();
 ```
 
@@ -262,7 +261,7 @@ builder.Register<SoundService>(Lifetime.Singleton).As<ISoundService>();
 ## 6. 씬 컴포넌트
 
 `GameObject > FoundationDI > Sound >` 메뉴로 배치한다.
-모두 `InjectableBehaviour`라 `builder.RegisterInjector()`가 필요하다.
+모두 `[Inject] Construct(IServiceResolver)`로 `ISoundService`를 선택 주입받는다. 주입은 씬의 `ContainerScope`가 자동으로 하므로 별도 등록이 필요 없고, `SoundService`가 등록돼 있지 않으면 그 컴포넌트만 조용히 꺼진다.
 
 | 컴포넌트 | 하는 일 |
 | --- | --- |

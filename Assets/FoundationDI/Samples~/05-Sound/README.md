@@ -47,14 +47,15 @@ UI 프리팹을 두지 않고 `OnGUI`로 그린 이유는, 샘플의 초점을 U
 
 ```csharp
 // 컴포지션 루트 — 샘플 전용 설정 에셋을 주입한다.
-public class SoundSampleScope : LifetimeScope
+// 씬의 ContainerScope와 같은 GameObject에 붙인다.
+public class SoundSampleInstaller : MonoBehaviour, IInstaller
 {
     [SerializeField] private SoundServiceSettings _soundSettings;
 
-    protected override void Configure(IContainerBuilder builder)
+    public void InstallBindings(ContainerBuilder builder)
     {
         builder.RegisterSoundService(_soundSettings);
-        builder.RegisterInjector();   // 씬 배치 컴포넌트 주입
+        // 씬 배치 컴포넌트의 주입은 ContainerScope가 직접 한다.
     }
 }
 

@@ -5,15 +5,15 @@
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Author](https://img.shields.io/badge/author-DarkNaku-orange)
 
-> **0.9.0 BREAKING** — `UIService`가 `UINavigator`로 개명·이동되고, 캔버스가 앱 전역 상주(`DontDestroyOnLoad`)에서 **씬 수명**으로 바뀌었습니다. 등록 위치도 루트 `LifetimeScope`에서 씬 `LifetimeScope`로 옮겨야 합니다. 업그레이드 절차는 [UINavigator 마이그레이션](Runtime/Managers/UINavigator/README.md#08x--090-마이그레이션)을 참고하세요.
+> **0.9.0 BREAKING** — `UIService`가 `UINavigator`로 개명·이동되고, 캔버스가 앱 전역 상주(`DontDestroyOnLoad`)에서 **씬 수명**으로 바뀌었습니다. 등록 위치도 루트 `IInstaller`에서 씬 `IInstaller`로 옮겨야 합니다. 업그레이드 절차는 [UINavigator 마이그레이션](Runtime/Managers/UINavigator/README.md#08x--090-마이그레이션)을 참고하세요.
 
 > **0.4.0 BREAKING** — `UINavigatorSettings.ReferenceResolution`이 제거되고 루트 캔버스 프리팹 참조(`RootPrefab`)로 대체되었습니다. 업그레이드 절차는 [UINavigator 마이그레이션](Runtime/Managers/UINavigator/README.md#마이그레이션-030--040)을 참고하세요. 조치하지 않으면 기준 해상도가 코드 기본값(1920x1080)으로 폴백합니다.
 
-DI(의존성 주입) 기반 Unity 게임 개발 파운데이션 패키지입니다. [VContainer](https://github.com/hadashiA/VContainer)를 코어로 Addressables와 Unity `Awaitable`을 조합한 공통 서비스 계층(메시징·리소스·UI·풀·사운드·햅틱·초기화·광고·분석·인앱결제·튜토리얼)을 제공합니다. 각 서비스는 인터페이스(`IXxxService`)로 등록되어 생성자 주입으로 소비되며, 외부 의존(Addressables 등)은 seam으로 분리되어 EditMode 단위 테스트가 가능합니다.
+DI(의존성 주입) 기반 Unity 게임 개발 파운데이션 패키지입니다. [Reflex](https://github.com/hadashiA/Reflex)를 코어로 Addressables와 Unity `Awaitable`을 조합한 공통 서비스 계층(메시징·리소스·UI·풀·사운드·햅틱·초기화·광고·분석·인앱결제·튜토리얼)을 제공합니다. 각 서비스는 인터페이스(`IXxxService`)로 등록되어 생성자 주입으로 소비되며, 외부 의존(Addressables 등)은 seam으로 분리되어 EditMode 단위 테스트가 가능합니다.
 
 ## 주요 기능
 
-- **DI 컴포지션** — VContainer `LifetimeScope`에서 서비스를 인터페이스로 등록하고 생성자 주입으로 소비
+- **DI 컴포지션** — Reflex `ContainerScope`에서 서비스를 인터페이스로 등록하고 생성자 주입으로 소비
 - **메시징** — 외부 라이브러리 없는 타입 기반 pub-sub. `IDisposable` 구독 토큰(R3를 쓴다면 `AddTo`와도 호환), 발행 스냅샷, 핸들러 예외 격리
 - **리소스 로딩** — Addressables 추상화. 키 단위 캐싱 + 참조 카운팅으로 핸들 생명주기를 한 곳에서 관리
 - **UI 시스템** — 씬 수명 Canvas(자신을 만든 씬에 속하며 씬 언로드 시 캔버스·풀·프리젠터가 함께 파괴, 렌더 모드/CanvasScaler는 루트 프리팹이 결정·미지정 시 ScreenSpaceOverlay 폴백) 위에 Page/Popup/Overlay 표시·전환, 모달 입력 차단, `Awaitable` 트랜지션 추상화. Page/Popup에 오버레이를 함께 노출하는 `WithOverlay`(동시 전환·`persistent` 연속 유지 옵션) 제공
@@ -23,7 +23,7 @@ DI(의존성 주입) 기반 Unity 게임 개발 파운데이션 패키지입니�
 - **수익화 3종** — 광고(`IAdService`)·분석(`IAnalyticsService`)·인앱결제(`IIapService`). 세 서비스 모두 SDK를 옵셔널 어셈블리로 격리해 **코어는 어떤 3사 SDK도 참조하지 않으며**, SDK가 없으면 Dummy/Debug provider로 에디터에서 전체 플로우가 돌아갑니다
 - **튜토리얼** — 게임 조건에 따라 나뉘어 발동하는 튜토리얼 진행 엔진(`ITutorialManager`). 시퀀스는 순차 리스트가 아니라 각자 `StartTrigger`로 발동하는 조건부 집합이고, 진행도는 인덱스가 아니라 시퀀스 ID로 영속화. 진행 규칙은 순수 C#이라 EditMode에서 전부 테스트되고 씬 오써링은 얇은 MonoBehaviour 어댑터가 담당
 - **UI 컴포넌트** — uGUI `Button`을 상속한 `UIButton`(클릭 SFX + 햅틱), 상태별 이미지/텍스트 스왑 `UIStateButton`, 호버 확대·누름 축소 `UIScaleButton`(스케일을 자식에만 걸어 히트 영역이 변하지 않는다). 사운드·햅틱 서비스는 선택적이라 등록하지 않으면 그 기능만 조용히 꺼진다
-- **씬 컴포넌트 DI** — 씬에 배치된 MonoBehaviour에 의존성을 주입하는 인프라(`InjectableBehaviour` + `InjectorService`). `UIButton`/`UIStateButton`/`MusicZone`/`OutputVolumeSlider` 등이 이를 사용. **주입 실패는 대상 하나에 격리**되어 미등록 서비스 하나가 나머지 컴포넌트나 컨테이너 시작을 깨뜨리지 않는다
+- **씬 컴포넌트 DI** — 씬에 배치된 MonoBehaviour 주입은 Reflex의 `ContainerScope`가 직접 한다(실행 순서 `-1_000_000_000`, 어떤 `Awake`보다 먼저). `UIButton`/`MusicZone`/`OutputVolumeSlider`/`TutorialTarget` 등 패키지 컴포넌트는 서비스를 `[Inject]` 필드로 직접 받지 않고 `[Inject] Construct(IServiceResolver)` + `TryResolve`로 **선택 주입**한다 — 씬 주입에는 컴포넌트별 격리가 없어, 미등록 서비스를 요구하는 필드 하나가 그 뒤 순번 전체의 주입을 막기 때문이다
 
 ## 설치 방법
 
@@ -39,7 +39,7 @@ FoundationDI는 다음 패키지를 전제로 합니다. 먼저 설치되어 있
 
 | 패키지 | Git URL |
 | --- | --- |
-| VContainer | `https://github.com/hadashiA/VContainer.git?path=VContainer/Assets/VContainer` |
+| Reflex | `https://github.com/hadashiA/Reflex.git?path=Reflex/Assets/Reflex` |
 | Addressables | Unity Package Manager (`com.unity.addressables`) |
 
 비동기는 Unity 6의 `Awaitable`만 씁니다 — R3나 UniTask를 설치할 필요가 없습니다.
@@ -66,21 +66,21 @@ FoundationDI는 다음 패키지를 전제로 합니다. 먼저 설치되어 있
 
 ## 빠른 시작
 
-앱 수명 서비스는 프로젝트 루트 `LifetimeScope`에서 등록합니다. **UINavigator는 씬 수명이므로 씬 `LifetimeScope`에 따로 등록합니다** — 등록한 스코프가 그대로 캔버스·풀·프리젠터의 수명이 되기 때문입니다(씬이 언로드되면 함께 파괴). 등록 순서에도 주의합니다 — UINavigator는 프리팹 로드를 `IResourceService`에 위임하므로, `RegisterUINavigator`가 호출되는 시점에는 `IResourceService`가 (부모 스코프에서라도) 이미 등록되어 있어야 합니다.
+앱 수명 서비스는 프로젝트 루트 `IInstaller`에서 등록합니다. **UINavigator는 씬 수명이므로 씬 `IInstaller`에 따로 등록합니다** — 등록한 스코프가 그대로 캔버스·풀·프리젠터의 수명이 되기 때문입니다(씬이 언로드되면 함께 파괴). 등록 순서에도 주의합니다 — UINavigator는 프리팹 로드를 `IResourceService`에 위임하므로, `RegisterUINavigator`가 호출되는 시점에는 `IResourceService`가 (부모 스코프에서라도) 이미 등록되어 있어야 합니다.
 
 ```csharp
 using UnityEngine;
-using VContainer;
-using VContainer.Unity;
+using Reflex;
+using Reflex.Unity;
 using DarkNaku.FoundationDI;
 
-public class RootLifetimeScope : LifetimeScope
+// ContainerScope와 함께 프리팹에 붙이고 Resources/ReflexSettings.asset 의 RootScopes 에 넣는다.
+public class RootInstaller : MonoBehaviour, IInstaller
 {
-    protected override void Configure(IContainerBuilder builder)
+    public void InstallBindings(ContainerBuilder builder)
     {
-        builder.Register<IResourceProvider, ResourcesProvider>(Lifetime.Singleton);
-        builder.Register<IResourceService, ResourceService>(Lifetime.Singleton);
-        builder.RegisterInjector();   // 씬 배치 컴포넌트 주입(UIButton 등)
+        builder.RegisterType(typeof(ResourcesProvider), new[] { typeof(IResourceProvider) }, Lifetime.Singleton, Resolution.Lazy);
+        builder.RegisterType(typeof(ResourceService), new[] { typeof(IResourceService) }, Lifetime.Singleton, Resolution.Lazy);
         builder.RegisterInitializeService();
 
         // 필요한 서비스를 같은 방식으로 추가 등록한다.
@@ -94,13 +94,13 @@ public class RootLifetimeScope : LifetimeScope
 }
 
 // 씬에 배치되는 스코프. UINavigator는 여기서 등록해 씬 수명을 갖게 한다.
-public class SceneLifetimeScope : LifetimeScope
+public class SceneInstaller : MonoBehaviour, IInstaller
 {
     [SerializeField] private UINavigatorSettings _uiSettings;
 
-    protected override void Configure(IContainerBuilder builder)
+    public void InstallBindings(ContainerBuilder builder)
     {
-        // IResourceService는 부모(RootLifetimeScope)에서 해결된다.
+        // IResourceService는 부모(루트 컨테이너)에서 해결된다.
         builder.RegisterUINavigator(_uiSettings);
     }
 }
@@ -118,13 +118,51 @@ public class TitleFlow
 }
 ```
 
+## 마이그레이션 (0.9.x → 0.10.x)
+
+DI 컨테이너가 **VContainer에서 Reflex 14.3.1로 바뀌었습니다.** 파괴적 변경입니다.
+
+1. `Packages/manifest.json`에서 VContainer를 빼고 Reflex를 넣습니다.
+   ```
+   "com.gustavopsantos.reflex": "https://github.com/gustavopsantos/reflex.git?path=/Assets/Reflex/#14.3.1"
+   ```
+2. `Assets/Resources/ReflexSettings.asset`을 만듭니다(`Create > Reflex > Settings`). 루트 스코프 프리팹(`ContainerScope` + 인스톨러)을 만들어 `RootScopes`에 넣습니다.
+3. `LifetimeScope` 서브클래스를 `MonoBehaviour, IInstaller`로 바꾸고 `Configure(IContainerBuilder)` → `InstallBindings(ContainerBuilder)`.
+4. 씬 스코프가 있던 GameObject에 `ContainerScope` 컴포넌트를 붙입니다. 부모 연결은 자동입니다(씬 컨테이너는 항상 루트의 자식).
+5. **`InjectableBehaviour`와 `InjectorService`가 삭제됐습니다.** 상속을 `MonoBehaviour`로 내리고 `builder.RegisterInjector()` 호출을 지웁니다. 씬 주입은 `ContainerScope`가 어떤 `Awake`보다도 먼저 자동으로 합니다.
+
+   ⚠️ **자가 주입은 사라졌습니다.** `InjectableBehaviour`는 런타임에 `Instantiate`된 오브젝트도 스스로 주입을 요청했습니다. Reflex에는 그 경로가 없으므로 **씬에 미리 배치되지 않은 오브젝트는 생성한 쪽이 직접 주입해야 합니다.**
+
+   ```csharp
+   var go = Instantiate(prefab);
+   GameObjectInjector.InjectRecursive(go, gameObject.scene.GetSceneContainer());
+   ```
+
+   패키지 안에서는 `PoolManager`와 `UINavigator`가 이 일을 대신하므로, 그 경로로 만들어지는 View·풀 오브젝트는 그대로 동작합니다. 직접 `Instantiate` 하는 코드만 확인하세요 — 빠뜨리면 `[Inject]` 대상이 **에러 없이 null로 남습니다**. `DontDestroyOnLoad`로 옮긴 오브젝트는 소속 씬에 컨테이너가 없어 `GetSceneContainer()`가 예외를 던지므로, 필요한 참조는 이동 전에 주입받아 두세요.
+6. **`[Inject]` 필드로 서비스를 직접 받던 씬 컴포넌트는 리졸버 주입으로 바꾸는 것을 권합니다.**
+   ```csharp
+   private ISoundService _sound;
+
+   [Inject]
+   public void Construct(IServiceResolver resolver) => resolver?.TryResolve(out _sound);
+   ```
+   Reflex의 씬 주입에는 **컴포넌트별 격리가 없어**, 미등록 서비스를 요구하는 `[Inject]` 필드 하나가 그 뒤 순번 전체의 주입을 막습니다. `IServiceResolver`는 패키지가 항상 등록하므로 이 경로는 던지지 않습니다.
+7. `InitializeItem` 서브클래스의 `InitializeAsync(IObjectResolver)` → `InitializeAsync(IServiceResolver)`.
+8. `IStartable` 엔트리포인트는 Reflex에 없습니다. `MonoBehaviour`로 바꿔 씬에 배치하고 `Start()`를 쓰세요. (MonoBehaviour는 **클래스명과 파일명이 같아야** 합니다.)
+9. `using VContainer;` → 속성은 `using Reflex.Attributes;`, 빌더는 `using Reflex.Core;` + `using Reflex.Enums;`. `UnityEngine`과 함께 쓰면 `Resolution`이 모호하므로 `using Resolution = Reflex.Enums.Resolution;` 별칭을 넣으세요.
+
+**알아 둘 Reflex의 성질 둘:**
+
+- **public 생성자만 봅니다.** `internal` 생성자만 있는 타입을 `RegisterType`으로 등록하면 폴백 활성자가 `null`을 돌려주고, 그 `null`이 주입기로 넘어가 `NullReferenceException`이 납니다. `RegisterFactory`로 직접 생성하세요.
+- **파라미터 오버라이드(`WithParameter`)가 없습니다.** 생성자 인자 일부만 넘기려면 `RegisterFactory`를 쓰세요.
+
 ## 구성 요소
 
 각 구성 요소의 개요와, 상세 문서가 있는 경우 해당 README 링크입니다.
 
 | 구성 요소 | 설명 | 상세 문서 |
 | --- | --- | --- |
-| **UINavigator** | uGUI 기반 UI 표시/전환 시스템. Presenter 타입으로 Page(단일 교체)/Popup(LIFO·모달)/Overlay(상주 Above/Below) 모드를 고정. **씬 수명 Canvas**(씬 `LifetimeScope`가 소유, 렌더 모드/CanvasScaler는 `UINavigatorSettings.RootPrefab`이 결정·미지정 시 ScreenSpaceOverlay/1920x1080 폴백, 씬 언로드 시 캔버스·풀·프리젠터가 함께 파괴), Presenter 매 표시 재생성 + **View 풀링**, `Awaitable` 트랜지션, 모달 입력 차단(`CanvasGroup.interactable`). Page/Popup에 `WithOverlay`(오버레이 동시 노출·`persistent` 연속 유지)와 자동-show 빌더 API 제공(빌더는 확장 메서드라 콜백·체인이 구체 Presenter 타입 유지). 프리팹 로딩은 `IResourceService`(Resources/Addressables)에 위임. | [README](Runtime/Managers/UINavigator/README.md) |
+| **UINavigator** | uGUI 기반 UI 표시/전환 시스템. Presenter 타입으로 Page(단일 교체)/Popup(LIFO·모달)/Overlay(상주 Above/Below) 모드를 고정. **씬 수명 Canvas**(씬 `IInstaller`가 소유, 렌더 모드/CanvasScaler는 `UINavigatorSettings.RootPrefab`이 결정·미지정 시 ScreenSpaceOverlay/1920x1080 폴백, 씬 언로드 시 캔버스·풀·프리젠터가 함께 파괴), Presenter 매 표시 재생성 + **View 풀링**, `Awaitable` 트랜지션, 모달 입력 차단(`CanvasGroup.interactable`). Page/Popup에 `WithOverlay`(오버레이 동시 노출·`persistent` 연속 유지)와 자동-show 빌더 API 제공(빌더는 확장 메서드라 콜백·체인이 구체 Presenter 타입 유지). 프리팹 로딩은 `IResourceService`(Resources/Addressables)에 위임. | [README](Runtime/Managers/UINavigator/README.md) |
 | **Components** | 씬 저작용 uGUI 위젯. `UIButton`(클릭 시 SFX 재생 + 햅틱 `Impact`, 두 서비스 모두 선택적)과, 상태(Normal/Highlighted/Pressed/Selected/Disabled)별로 여러 `Image`/텍스트를 동시에 스왑하는 `UIStateButton`. 스왑은 `그 상태 → Normal → 기준값 → 안 씀` 4단으로 해석되어 상태를 벗어나면 원래 값으로 돌아온다. 여기에 호버하면 커지고 누르면 작아지는 `UIScaleButton`이 더해진다 — 스케일은 지정한 **자식**에만 걸려 버튼의 레이캐스트 영역이 변하지 않으므로, 축소될 때 커서가 영역을 벗어난 것으로 판정되어 확대/축소가 반복되는 진동이 생기지 않는다. `SoundButton`을 대체한다. | [README](Runtime/Components/README.md) |
 | **ResourceService** | Addressables 추상화. `LoadAsync`/`Load`/`Release`/`Dispose` API로 키 단위 캐싱 + 참조 카운팅. 에셋 로딩이 필요한 모든 서비스의 위임 대상. | [README](Runtime/Services/ResourceService/README.md) |
 | **MessageService** | 외부 라이브러리 없는 인-메모리 pub-sub. 타입을 채널로 삼아 `Publish<T>`/`Subscribe<T>`만 제공하며, 구독 토큰은 `IDisposable`(R3를 쓴다면 `AddTo`로 MonoBehaviour 수명에 바인딩 가능). 발행은 스냅샷으로 완주하고 핸들러 예외는 격리한다. 메인 스레드 전제. | [README](Runtime/Services/MessageService/README.md) |
@@ -135,7 +173,6 @@ public class TitleFlow
 | **AdService** | 광고 네트워크 중립 서비스. `IAdService` 하나로 전면·보상·배너를 다루고, 정책 계층(재시도 백오프·보상 래치·자동 재로드·전면 쿨다운·광고제거 게이트)과 SDK 어댑터를 분리. `ShowAsync`는 `Awaitable<AdShowResult>`. 광고제거는 포맷별로 다르게 게이트한다(전면·배너 차단, 보상형은 계속 동작). | [README](Runtime/Services/AdService/README.md) |
 | **AnalyticsService** | 다중 분석/MMP 팬아웃. 게임이 `IAnalyticsService` API를 한 번 호출하면 등록된 모든 provider로 브로드캐스트된다. 라우팅 규칙 없음(무엇을 무시할지는 어댑터가 결정), 초기화 전 이벤트는 순서 보존 버퍼링·유저 상태는 latest-wins, provider 예외는 격리. | [README](Runtime/Services/AnalyticsService/README.md) |
 | **IAPService** | 모바일 인앱 구매(Google Play/App Store). 소모성·비소모성을 `IIapService` 하나로 구매·복원. **지급을 저장한 뒤에만 확정**하는 규율을 `IIapFulfillment` seam 하나로 접어, 신규 구매·재전달·복원이 전부 같은 메서드로 들어온다. 로컬 영수증 검증(Google Play)·상품 상수 생성기 포함. | [README](Runtime/Services/IAPService/README.md) |
-| **InjectorService** | 씬에 배치된 MonoBehaviour에 의존성을 주입하는 인프라. 정적 요청 큐 + EntryPoint로 위치·계층·순서에 무관하게 주입. `InjectableBehaviour` 베이스 상속으로 사용. | [README](Runtime/Services/InjectorService/README.md) |
 | **TutorialManager** | 조건 기반 튜토리얼 진행 엔진. 시퀀스는 순차 리스트가 아니라 각자 `StartTrigger`(Auto/Manual/ButtonClick/`MessageTrigger<T>`)로 발동하는 **조건부 후보 집합**이고, 진행도는 인덱스가 아닌 **시퀀스 ID**로 영속화해 시퀀스를 추가·삭제해도 기존 유저 진행도가 어긋나지 않는다. 진행 규칙은 순수 C#(EditMode 테스트 가능) + 얇은 씬 오써링 어댑터로 분리. 타깃은 씬 오브젝트 직접 참조 또는 키(`TutorialTarget`)로 지정해 **UINavigator가 런타임 생성한 UI도 하이라이트**할 수 있다. 연출은 `ITutorialModule` seam + 기본 2종. | [README](Runtime/Managers/TutorialManager/README.md) |
 
 > 상세 문서가 아직 없는 구성 요소는 소스(`Runtime/Services/<이름>/`)와 인터페이스(`IXxxService`)를 참고하세요.

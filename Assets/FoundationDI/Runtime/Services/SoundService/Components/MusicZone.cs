@@ -1,15 +1,16 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
-using VContainer;
+using Reflex.Attributes;
 
 namespace DarkNaku.FoundationDI
 {
     /// <summary>
     /// 구/박스 영역 안에서만 들리는 음악 존. 영역 밖 페이드 구간에서 거리에 비례해 볼륨이 줄어든다.
-    /// 씬에 배치하는 컴포넌트이므로 <see cref="InjectableBehaviour"/>로 <see cref="ISoundService"/>를 주입받는다.
+    /// 씬에 배치하는 컴포넌트이므로 <see cref="IServiceResolver"/>로 <see cref="ISoundService"/>를
+    /// 선택 주입받는다 - 미등록 시 던지면 같은 씬의 다른 컴포넌트 주입까지 막힌다.
     /// </summary>
-    public class MusicZone : InjectableBehaviour
+    public class MusicZone : MonoBehaviour
     {
         public enum Shape
         {
@@ -31,7 +32,15 @@ namespace DarkNaku.FoundationDI
             public float volume = 1f;
         }
 
-        [Inject] private ISoundService _soundService;
+        private ISoundService _soundService;
+        [Inject]
+        public void Construct(IServiceResolver resolver)
+        {
+            if (resolver == null) return;
+
+            resolver.TryResolve(out _soundService);
+        }
+
 
         [Header("Shape")]
         public Shape zoneShape;
@@ -77,9 +86,8 @@ namespace DarkNaku.FoundationDI
         private bool _playerJustExitFadeZone;
         private bool _playerJustEnterMusicZone;
 
-        protected override void Awake()
+        private void Awake()
         {
-            base.Awake();
 
             var mainCamera = Camera.main;
 
@@ -93,8 +101,6 @@ namespace DarkNaku.FoundationDI
 
         private void Start()
         {
-            EnsureInjected();
-
             if (_soundService == null)
             {
                 Debug.LogError("[MusicZone] ISoundService가 주입되지 않았습니다.");

@@ -2,7 +2,7 @@ using DarkNaku.FoundationDI;
 using NSubstitute;
 using NUnit.Framework;
 using UnityEngine;
-using VContainer;
+using Reflex.Core;
 
 public class UIButtonTest
 {
@@ -11,15 +11,12 @@ public class UIButtonTest
     [SetUp]
     public void SetUp()
     {
-        // 정적 상태 초기화(이전 테스트 잔재 제거)
-        new InjectorService(Substitute.For<IObjectResolver>()).Dispose();
         _go = new GameObject("button");
     }
 
     [TearDown]
     public void TearDown()
     {
-        new InjectorService(Substitute.For<IObjectResolver>()).Dispose();
         if (_go != null) Object.DestroyImmediate(_go);
     }
 
@@ -35,11 +32,11 @@ public class UIButtonTest
     public void 햅틱서비스가_등록되지_않아도_주입이_예외를_내지_않는다()
     {
         var builder = new ContainerBuilder();
-        builder.RegisterInstance(Substitute.For<ISoundService>()).As<ISoundService>();
+        builder.RegisterValue(Substitute.For<ISoundService>(), new[] { typeof(ISoundService) });
         using var container = builder.Build();
         var button = _go.AddComponent<UIButton>();
 
-        Assert.DoesNotThrow(() => button.Construct(container));
+        Assert.DoesNotThrow(() => button.Construct(new ReflexServiceResolver(container)));
     }
 
     [Test]

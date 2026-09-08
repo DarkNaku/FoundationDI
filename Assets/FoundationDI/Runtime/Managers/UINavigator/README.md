@@ -14,40 +14,40 @@ uGUI 기반 UI 표시/전환 시스템입니다. Presenter 타입으로 표시 �
 
 ## 사용법
 
-### 1) DI 등록 (VContainer)
+### 1) DI 등록 (Reflex)
 
-`RegisterUINavigator` 호출 **전에 `IResourceService`가 등록**되어 있어야 합니다(프리팹 로드를 위임). **`RegisterUINavigator`는 씬 `LifetimeScope`에서 호출합니다** — UINavigator는 씬 수명(루트 캔버스가 자신을 만든 씬에 속하고, 씬이 언로드되면 캔버스·풀·프리젠터가 함께 파괴됨)이기 때문입니다. `IResourceService`는 프로젝트 루트 `LifetimeScope`에 남겨도 됩니다(자식인 씬 스코프가 부모에서 해결합니다).
+`RegisterUINavigator` 호출 **전에 `IResourceService`가 등록**되어 있어야 합니다(프리팹 로드를 위임). **`RegisterUINavigator`는 씬 `IInstaller`에서 호출합니다** — UINavigator는 씬 수명(루트 캔버스가 자신을 만든 씬에 속하고, 씬이 언로드되면 캔버스·풀·프리젠터가 함께 파괴됨)이기 때문입니다. `IResourceService`는 프로젝트 루트 `IInstaller`에 남겨도 됩니다(자식인 씬 스코프가 부모에서 해결합니다).
 
 ```csharp
-using VContainer;
-using VContainer.Unity;
+using Reflex;
+using Reflex.Unity;
 using DarkNaku.FoundationDI;
 
-public class RootLifetimeScope : LifetimeScope
+public class RootInstaller : MonoBehaviour, IInstaller
 {
-    protected override void Configure(IContainerBuilder builder)
+    public void InstallBindings(ContainerBuilder builder)
     {
         // 프리팹 로드 백엔드는 provider 등록 한 줄로 교체한다(Resources → Addressables 등).
-        builder.Register<IResourceProvider, ResourcesProvider>(Lifetime.Singleton);
-        builder.Register<IResourceService, ResourceService>(Lifetime.Singleton);
+        builder.RegisterType(typeof(ResourcesProvider), new[] { typeof(IResourceProvider) }, Lifetime.Singleton, Resolution.Lazy);
+        builder.RegisterType(typeof(ResourceService), new[] { typeof(IResourceService) }, Lifetime.Singleton, Resolution.Lazy);
     }
 }
 
 // 씬에 배치되는 스코프. UINavigator를 여기서 등록하면 씬 수명을 갖는다.
-public class SceneLifetimeScope : LifetimeScope
+public class SceneInstaller : MonoBehaviour, IInstaller
 {
     // 인스펙터에서 Assets/Settings/UINavigatorSettings.asset 을 연결한다.
     public UINavigatorSettings settings;
 
-    protected override void Configure(IContainerBuilder builder)
+    public void InstallBindings(ContainerBuilder builder)
     {
-        // IResourceService는 부모(RootLifetimeScope)에서 해결된다.
+        // IResourceService는 부모(루트 컨테이너)에서 해결된다.
         builder.RegisterUINavigator(settings);
     }
 }
 ```
 
-> `IResourceService`가 부모(`RootLifetimeScope`)에서 해결되려면 `SceneLifetimeScope`가 실제로 그 부모를 갖고 있어야 합니다. VContainer가 부모를 찾는 경로는 셋뿐입니다: (1) `VContainerSettings.RootLifetimeScope`에 `RootLifetimeScope`가 지정되어 있거나, (2) 씬의 `LifetimeScope` 인스펙터에서 `parentReference`에 직접 연결하거나, (3) `SceneLifetimeScope`의 GameObject를 `RootLifetimeScope` 계층 아래에 중첩합니다. `parentReference`를 비워둔 채 아무 설정도 하지 않으면 부모 없는 자식 스코프가 되어 `IResourceService` 해석이 실패합니다 — 조용히가 아니라 즉시 예외로 실패하므로, 셋 중 하나를 반드시 갖추는 것을 등록 절차의 일부로 여기세요(이 리포지토리의 호스트 프로젝트는 `Assets/Settings/VContainerSettings.asset`이 (1)을 담당합니다).
+> `IResourceService`가 부모(루트 컨테이너)에서 해결되려면 루트 컨테이너에 그것이 등록돼 있어야 합니다. Reflex는 씬 컨테이너를 **항상** 루트 컨테이너의 자식으로 만들고(`Container.RootContainer.Scope(...)`), 루트 컨테이너는 `Resources/ReflexSettings.asset`의 `RootScopes`에 등록된 프리팹들의 `IInstaller`로 구성됩니다. 부모 연결을 손으로 지정할 일은 없습니다 — 루트 인스톨러에 `IResourceService`를 등록했는지만 확인하세요.
 
 > 백엔드는 `IResourceProvider` 구현체 선택으로 결정됩니다. 호스트 샘플은 `ResourcesProvider`(Resources)를 쓰며, Addressables는 선택입니다.
 
@@ -168,12 +168,12 @@ Page와 Overlay는 전면 배경이 없으므로 빈 영역의 입력이 자연�
 ## Canvas 수명
 
 - 루트 Canvas는 **최초 표시 시 지연 생성**됩니다. `UINavigatorSettings`의 **Root Prefab**을 인스턴스화하며(렌더 모드·`CanvasScaler`·레이어 구성은 그 프리팹이 결정), 미지정 시 코드 기본값(`UIRoot.CreateDefault()` — ScreenSpaceOverlay / ScaleWithScreenSize / Expand / 1920x1080)으로 폴백합니다. 어느 경로든 상주화는 하지 않습니다 — 루트는 부모 없이 인스턴스화되어 **활성 씬에 붙고, 그 씬과 함께 파괴**됩니다. 레이어 렌더 순서(아래→위)는 `Page → BelowOverlay → Popup → AboveOverlay`.
-- **정리 경로는 `UINavigator.Dispose()`(= 소유 스코프 dispose) 하나뿐입니다.** 진행 중인 큐를 취소하고, 활성 Presenter를 전부 teardown(`OnBeforeHide`/`OnAfterHide` 발화)하고, View 풀을 dispose한 뒤 캔버스 GameObject를 파괴합니다. 씬 전환 자체는 이 정리를 촉발하지 않습니다 — 보통 씬이 언로드되면 UINavigator를 소유한 씬 `LifetimeScope`도 함께 dispose되므로 결과적으로 같은 타이밍에 정리됩니다.
+- **정리 경로는 `UINavigator.Dispose()`(= 소유 스코프 dispose) 하나뿐입니다.** 진행 중인 큐를 취소하고, 활성 Presenter를 전부 teardown(`OnBeforeHide`/`OnAfterHide` 발화)하고, View 풀을 dispose한 뒤 캔버스 GameObject를 파괴합니다. 씬 전환 자체는 이 정리를 촉발하지 않습니다 — 보통 씬이 언로드되면 UINavigator를 소유한 씬 `IInstaller`도 함께 dispose되므로 결과적으로 같은 타이밍에 정리됩니다.
 - 캔버스 GameObject가 (씬 언로드 등으로) **`Dispose()`보다 먼저 외부에서 파괴되면**(fake-null), 그 뒤의 `Page/Popup/Overlay<T>()` 호출은 **재구성되지 않습니다.** 이미 한 번이라도 표시가 있었다면 View 풀이 캔버스보다 오래 살아남아 `Root` getter의 fake-null 복구 분기가 실행되기 전에 실패합니다(예외가 로그로 남고 화면에는 아무것도 나타나지 않습니다). `Dispose()`가 이미 끝난 뒤라면 대신 `ObjectDisposedException`을 던집니다(자세한 내용은 아래 [알려진 한계](#알려진-한계) 참고).
 
 ### additive 씬
 
-씬 둘이 각자 `LifetimeScope`를 가지면 `UINavigator`도 둘, 캔버스도 둘입니다. 각 씬이 자기 UI를 갖는다는 뜻이며 막지 않습니다. 겹침 정렬은 각 `RootPrefab`의 `Canvas.sortingOrder`로 정하세요 — 코어는 관여하지 않습니다.
+씬 둘이 각자 `ContainerScope`를 가지면 `UINavigator`도 둘, 캔버스도 둘입니다. 각 씬이 자기 UI를 갖는다는 뜻이며 막지 않습니다. 겹침 정렬은 각 `RootPrefab`의 `Canvas.sortingOrder`로 정하세요 — 코어는 관여하지 않습니다.
 
 ### 알려진 한계
 
@@ -307,11 +307,11 @@ page.WithOverlay<TouchGuardOverlay>();     // 기본(per-host) 오버레이
 
 ### DI / 설정
 
-- `void RegisterUINavigator(this IContainerBuilder builder, UINavigatorSettings settings)` — UINavigator 등록 확장(`UINavigatorSettings`/`UIInstanceFactory`/`UINavigator as IUINavigator` 등록).
+- `void RegisterUINavigator(this ContainerBuilder builder, UINavigatorSettings settings)` — UINavigator 등록 확장(`UINavigatorSettings`/`UIInstanceFactory`/`UINavigator as IUINavigator` 등록).
   **전제: 호출 전에 `IResourceService`가 등록되어 있어야 합니다.**
 - **주입 대상**: Presenter는 생성 시(`UIInstanceFactory`), View는 프리팹 인스턴스 생성 시 계층 전체의 MonoBehaviour가 주입됩니다(`InjectGameObject`). 둘 다 `[Inject]` 필드를 쓸 수 있습니다.
   - View 주입은 **풀 인스턴스당 1회**입니다. 풀에서 재사용될 때는 다시 주입되지 않습니다(UINavigator가 dispose되면 풀도 함께 dispose되므로, 다음 씬에서는 새로 생성·주입됩니다).
-  - Presenter/View는 UINavigator를 **등록한 스코프**의 리졸버로 주입됩니다. 씬 `LifetimeScope`에 등록했다면 그 씬 스코프(및 부모인 루트 스코프) 의존까지 해석되고, 형제 씬 스코프나 자식 스코프의 의존은 해석되지 않습니다.
+  - Presenter/View는 UINavigator를 **등록한 스코프**의 리졸버로 주입됩니다. 씬 `IInstaller`에 등록했다면 그 씬 스코프(및 부모인 루트 스코프) 의존까지 해석되고, 형제 씬 스코프나 자식 스코프의 의존은 해석되지 않습니다.
 - `UINavigatorSettings`(ScriptableObject) — `RootPrefab`(`UIRoot`) **하나만** 제공합니다. 캔버스 렌더 모드, `CanvasScaler`(스케일 모드/기준 해상도), 레이어 구성은 전부 이 프리팹이 결정합니다. `Tools/FoundationDI/UI/Create UI Root Prefab`으로 만듭니다(자세한 절차는 위 [에디터 워크플로](#에디터-워크플로-디자이너용) 참고). 비워두면 `UIRoot.CreateDefault()`가 조립한 코드 기본값(ScreenSpaceOverlay / Scale With Screen Size + Expand / 1920×1080)으로 폴백합니다.
 
 ---
@@ -346,7 +346,7 @@ page.WithOverlay<TouchGuardOverlay>();     // 기본(per-host) 오버레이
 
 ### 정리(Dispose)
 
-- `UINavigator.Dispose()`는 진행 중 큐를 취소하고, 활성 Presenter를 전부 teardown하고, View 풀을 dispose한 뒤 캔버스를 파괴합니다. 정리 경로는 이것 하나뿐입니다(씬 전환 이벤트를 별도로 듣지 않습니다). 보통 DI 컨테이너(UINavigator를 등록한 스코프)가 수명을 관리하며, 씬 `LifetimeScope`에 등록했다면 씬 언로드 시 함께 dispose됩니다.
+- `UINavigator.Dispose()`는 진행 중 큐를 취소하고, 활성 Presenter를 전부 teardown하고, View 풀을 dispose한 뒤 캔버스를 파괴합니다. 정리 경로는 이것 하나뿐입니다(씬 전환 이벤트를 별도로 듣지 않습니다). 보통 DI 컨테이너(UINavigator를 등록한 스코프)가 수명을 관리하며, 씬 `IInstaller`에 등록했다면 씬 언로드 시 함께 dispose됩니다.
 
 ### 테스트
 
@@ -400,11 +400,13 @@ _ui.Popup<ConfirmDialog>()
 | `UIServiceSettings` | `UINavigatorSettings` |
 | `builder.RegisterUIService(settings)` | `builder.RegisterUINavigator(settings)` |
 
-**등록 위치가 바뀝니다**: 루트 `LifetimeScope` → 씬 `LifetimeScope`. `IResourceService`는 루트에 남겨도 됩니다(자식 스코프가 부모에서 해결).
+**등록 위치가 바뀝니다**: 루트 `IInstaller` → 씬 `IInstaller`. `IResourceService`는 루트에 남겨도 됩니다(자식 스코프가 부모에서 해결).
 
 **동작이 바뀝니다**: 씬이 언로드되면 캔버스·풀·프리젠터가 모두 파괴됩니다. 씬을 가로질러 살아남아야 하는 UI(로딩 화면·페이드)는 이 컴포넌트 밖에서 별도 캔버스로 만드세요.
 
-**`InjectorService`로 주입되는 씬 배치 컴포넌트는 `IUINavigator`를 해결하지 못합니다.** `InjectorService`는 정적 리졸버 하나를 들고 있어, `RegisterInjector`가 루트에 있으면 씬 배치 MonoBehaviour가 루트 컨테이너로 주입됩니다. `IUINavigator`가 필요하면 `RegisterInjector`도 같은 씬 스코프에 두거나(권장하지 않음 — `InjectorService`는 정적 필드 하나(`_resolver`)를 공유하므로, 씬 스코프에 두면 그 씬이 언로드될 때 `InjectorService.Dispose()`가 이 정적 참조를 null로 만듭니다. 상주 씬(DontDestroyOnLoad)에서 더 먼저 주입받은 컴포넌트는 이미 죽은 컨테이너를 가리키는 참조를 들고 있다가, 이후 재주입·재해석 시도에서 조용히 실패합니다), UI를 `UIPresenter`/`View` 계층에서만 다루세요 — 이 경로는 `UIInstanceFactory`가 씬 스코프 리졸버를 쓰므로 정상 동작합니다.
+**루트 프리팹과 View는 UINavigator가 주입합니다.** 둘 다 런타임 생성물이라 씬 주입(`ContainerScope`) 대상이 아닙니다 — `CreateRoot()`가 루트 프리팹을, 전용 풀이 View 계층을 각각 `InjectGameObject`로 채웁니다. 루트 프리팹이나 View 프리팹에 `[Inject]`를 쓰는 컴포넌트를 붙여도 동작합니다.
+
+**씬 배치 컴포넌트도 `IUINavigator`를 해결할 수 있습니다.** Reflex는 씬을 그 씬의 컨테이너로 주입하므로, `RegisterUINavigator`를 씬 인스톨러에 두면 같은 씬의 MonoBehaviour가 `[Inject] Construct(IServiceResolver)`로 받아 `TryResolve<IUINavigator>()` 할 수 있습니다. (VContainer 시절에는 `InjectorService`가 정적 리졸버 하나를 공유해 이것이 불가능했습니다.)
 
 `UIPresenter`/`UIView`/`UIRoot`/`[UIPrefab]`은 이름이 그대로이므로 **프리젠터·뷰 선언부는 손댈 필요가 없습니다.**
 

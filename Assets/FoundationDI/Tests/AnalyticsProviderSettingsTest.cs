@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using DarkNaku.FoundationDI;
 using NUnit.Framework;
 using UnityEngine;
-using VContainer;
+using Reflex.Core;
 
 // 어댑터 고유 설정을 코어가 "내용을 모른 채" 어댑터까지 실어 나르는 경로를 검증한다.
 // Adjust처럼 이름→토큰 매핑표가 필요한 SDK가 이 경로를 탄다(AnalyticsService README 2.3).

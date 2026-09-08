@@ -1,6 +1,6 @@
 using UnityEngine;
-using VContainer;
-using VContainer.Unity;
+using Reflex.Attributes;
+using UnityEngine;
 
 namespace DarkNaku.FoundationDI.Samples
 {
@@ -68,10 +68,4 @@ namespace DarkNaku.FoundationDI.Samples
             => View.backButton.onClick.RemoveAllListeners();
     }
 
-    public class PageNavigationDemo : IStartable
-    {
-        private readonly IUINavigator _ui;
-        public PageNavigationDemo(IUINavigator ui) => _ui = ui;
-        public void Start() => _ui.Page<TitlePage>();
-    }
 }

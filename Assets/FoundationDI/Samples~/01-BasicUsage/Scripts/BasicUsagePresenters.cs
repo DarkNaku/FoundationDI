@@ -1,5 +1,5 @@
-using VContainer;
-using VContainer.Unity;
+using Reflex.Attributes;
+using UnityEngine;
 
 namespace DarkNaku.FoundationDI.Samples
 {
@@ -56,10 +56,4 @@ namespace DarkNaku.FoundationDI.Samples
         protected override void OnInitialize() => View.label.text = "HUD (Above)";
     }
 
-    public class BasicUsageDemo : IStartable
-    {
-        private readonly IUINavigator _ui;
-        public BasicUsageDemo(IUINavigator ui) => _ui = ui;
-        public void Start() => _ui.Page<MainMenuPage>();
-    }
 }

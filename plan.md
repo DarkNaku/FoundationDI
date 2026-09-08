@@ -6,6 +6,25 @@
 
 ---
 
+## 완료: VContainer → Reflex 마이그레이션
+
+설계: `docs/superpowers/specs/2026-09-08-vcontainer-to-reflex-design.md`
+계획: `docs/superpowers/plans/2026-09-08-vcontainer-to-reflex.md`
+
+- [x] IServiceResolver seam과 ReflexServiceResolver 어댑터가 Resolve/TryResolve/Inject/InjectGameObject를 위임한다
+- [x] IServiceResolver가 루트·씬 컨테이너 양쪽에 자동 등록되고 씬 컨테이너의 것은 씬 스코프 바인딩을 본다
+- [x] 등록 확장 11개가 Reflex ContainerBuilder를 받는다
+- [x] WithParameter가 없으므로 RegisterPoolManager가 root를 팩토리로 넘긴다
+- [x] internal 생성자를 가진 UINavigator를 RegisterFactory로 등록한다
+- [x] IapService의 선택 등록 폴백이 HasBinding + Resolve로 동작한다
+- [x] SoundService의 ISoundService/ISoundEngine이 같은 인스턴스를 돌려준다
+- [x] 씬 컴포넌트 4개가 [Inject] Construct(IServiceResolver) + TryResolve로 선택 주입받는다
+- [x] InjectorService/InjectableBehaviour가 삭제되고 씬 주입은 ContainerScope가 담당한다
+- [x] 호스트 루트/씬 인스톨러와 ReflexSettings로 Play 모드에서 UI가 표시된다
+- [x] VContainer 의존이 코드·asmdef·manifest에서 사라진다
+
+---
+
 ## 완료: Adjust 첫 세션에 글로벌 콜백 파라미터 싣기
 
 Adjust는 첫 세션(=인스톨) 패키지를 `InitSdk` 시점에 만들어 보낸다. 그래서 그 뒤에 붙인

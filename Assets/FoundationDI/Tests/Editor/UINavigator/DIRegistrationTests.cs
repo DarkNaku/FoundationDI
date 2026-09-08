@@ -1,6 +1,8 @@
 using NUnit.Framework;
 using UnityEngine;
-using VContainer;
+using Reflex.Core;
+using Reflex.Enums;
+using Resolution = Reflex.Enums.Resolution;
 using DarkNaku.FoundationDI;
 
 public class DIRegistrationTests
@@ -9,8 +11,9 @@ public class DIRegistrationTests
     public void 컨테이너에서_IUINavigator를_해석할_수_있다()
     {
         var builder = new ContainerBuilder();
-        builder.Register<IResourceProvider, AddressablesProvider>(Lifetime.Singleton);
-        builder.Register<IResourceService, ResourceService>(Lifetime.Singleton);
+        builder.RegisterType(typeof(AddressablesProvider), new[] { typeof(IResourceProvider) }, Lifetime.Singleton, Resolution.Lazy);
+        builder.RegisterType(typeof(ResourceService), new[] { typeof(IResourceService) }, Lifetime.Singleton, Resolution.Lazy);
+        ServiceResolverBootstrap.Register(builder);
         builder.RegisterUINavigator(ScriptableObject.CreateInstance<UINavigatorSettings>());
 
         var container = builder.Build();
@@ -21,8 +24,8 @@ public class DIRegistrationTests
     public void AddressablesProvider를_등록하면_IResourceService를_해석한다()
     {
         var builder = new ContainerBuilder();
-        builder.Register<IResourceProvider, AddressablesProvider>(Lifetime.Singleton);
-        builder.Register<IResourceService, ResourceService>(Lifetime.Singleton);
+        builder.RegisterType(typeof(AddressablesProvider), new[] { typeof(IResourceProvider) }, Lifetime.Singleton, Resolution.Lazy);
+        builder.RegisterType(typeof(ResourceService), new[] { typeof(IResourceService) }, Lifetime.Singleton, Resolution.Lazy);
 
         var container = builder.Build();
         Assert.IsNotNull(container.Resolve<IResourceService>());
@@ -32,8 +35,8 @@ public class DIRegistrationTests
     public void ResourcesProvider를_등록하면_IResourceService를_해석한다()
     {
         var builder = new ContainerBuilder();
-        builder.Register<IResourceProvider, ResourcesProvider>(Lifetime.Singleton);
-        builder.Register<IResourceService, ResourceService>(Lifetime.Singleton);
+        builder.RegisterType(typeof(ResourcesProvider), new[] { typeof(IResourceProvider) }, Lifetime.Singleton, Resolution.Lazy);
+        builder.RegisterType(typeof(ResourceService), new[] { typeof(IResourceService) }, Lifetime.Singleton, Resolution.Lazy);
 
         var container = builder.Build();
         Assert.IsNotNull(container.Resolve<IResourceService>());
