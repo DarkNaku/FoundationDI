@@ -3,7 +3,7 @@
 DI 기반 오디오 서비스. 태그 하나로 SFX·음악·플레이리스트·다이내믹 뮤직을 재생하고,
 AudioMixer Output 볼륨과 3D 오클루전까지 한곳에서 다룬다.
 
-진입점은 VContainer로 주입되는 `ISoundService` 하나이며, 런타임에 `Resources`를 쓰지 않는다.
+진입점은 Reflex로 주입되는 `ISoundService` 하나이며, 런타임에 `Resources`를 쓰지 않는다.
 
 ---
 
@@ -17,6 +17,7 @@ AudioMixer Output 볼륨과 3D 오클루전까지 한곳에서 다룬다.
 ```
 Assets/FoundationDI.Data/SoundService/
 ├── SoundServiceSettings.asset
+├── SoundMixer.mixer             ← Master / BGM / SFX, 볼륨 노출까지 완료된 상태
 ├── Collections/
 │   ├── SoundCollection.asset
 │   ├── MusicCollection.asset
@@ -27,6 +28,11 @@ Assets/FoundationDI.Data/SoundService/
     ├── Track_Generated.cs
     └── Output_Generated.cs
 ```
+
+**믹서까지 만들어져 바로 쓸 수 있는 상태로 시작한다.** `Master`/`BGM`/`SFX` 그룹의 Volume이
+노출돼 있고 `Default Output`이 `SFX`로 지정돼 있어, 아무 설정을 더 하지 않아도 볼륨 조절이
+동작한다. 믹서는 **설정을 새로 만들 때만** 생성된다 — 이미 `Master Audio Mixer`가 지정된
+설정에는 손대지 않는다.
 
 `Data Root Path`를 바꾸면 다음 저장부터 그 경로를 쓴다.
 
@@ -203,10 +209,23 @@ _sound.StopAll();        // 씬 전환
 
 `Tools > FoundationDI > Sound > Output Manager`
 
-1. Master AudioMixer를 지정한다.
-2. 믹서에서 그룹을 만들고, 그룹의 **Volume을 우클릭 → Expose to script** 한 뒤
-   Exposed Parameter 이름을 **그룹 이름과 똑같이**(공백 제거) 바꾼다.
-3. **Reload Outputs**를 누르면 `Output` 상수가 생성된다.
+Output을 추가하려면 **믹서에 그룹만 만들고 `Reload Outputs`를 누른다.**
+
+1. Master AudioMixer를 지정한다(설정을 새로 만들었다면 이미 지정돼 있다).
+2. 믹서 Groups 패널에서 그룹을 추가하고 이름을 원하는 Output 이름으로 바꾼다.
+3. **Reload Outputs**를 누른다.
+
+`Reload Outputs`가 네 가지를 한 번에 한다 — 그룹 스캔, **미노출 Volume 자동 노출**,
+**노출 파라미터 이름을 그룹 이름과 일치시키기**(공백 제거), `Output` 상수 재생성.
+
+> 손으로 `Volume 우클릭 → Expose to script`를 하고 Exposed Parameter 이름을 그룹명과 맞출
+> 필요가 없다. 이름이 한 글자라도 다르면 `AudioMixer.SetFloat`이 조용히 실패해 볼륨만 안
+> 먹는 자리였다. 이미 올바르게 노출된 그룹은 건드리지 않고, 바꾼 내용은 콘솔에 남으며
+> `Ctrl+Z`로 되돌릴 수 있다.
+>
+> 이 자동화는 유니티가 공개 API를 주지 않는 영역이라 `UnityEditor.Audio` 내부 타입을
+> 리플렉션으로 쓴다(`MixerExposureTool`). 유니티 버전이 올라가 바인딩이 깨지면 명확한 에러를
+> 남기고 `How to add an Output`의 수동 절차로 폴백한다.
 
 볼륨은 `PlayerPrefs`에 Output 이름을 키로 저장되고, 다음 실행에서 자동 복원된다.
 
@@ -214,10 +233,11 @@ _sound.StopAll();        // 씬 전환
 
 `SoundServiceSettings`의 **Default Output**을 지정하면, `SetOutput`을 부르지 않았거나 빈 `Output`을
 넘긴 재생이 모두 그 Output으로 간다. `Sound`/`Music`/`Playlist`/`DynamicMusic` 전부에 적용된다.
+설정을 새로 만들면 `SFX`로 채워진다.
 
 기본 Output도 비어 있으면 `outputAudioMixerGroup`이 `null`로 남아 **믹서를 통째로 우회한다.**
 그 소리는 어떤 Output 볼륨 설정에도 영향을 받지 않는다 — 조용히 잘못되기 쉬운 조합이라,
-UI 클릭음처럼 볼륨 설정을 따라야 하는 소리가 있다면 기본 Output을 지정해 두는 편이 안전하다.
+비워 두지 않는 편이 안전하다.
 명시적으로 지정한 `Output`은 언제나 기본값보다 우선한다.
 
 ```csharp
@@ -241,7 +261,9 @@ builder.Register<SoundService>(Lifetime.Singleton).As<ISoundService>();
 `AudioLowPassFilter` 컷오프와 볼륨을 그 값으로 보간한다. 직선 레이가 대부분 막히면
 리스너 주위에 링을 만들어 회절(모서리로 돌아 들어오는 소리)을 근사한다.
 
-파라미터는 Settings 창의 **Occlusion** 섹션에서 조절한다.
+파라미터는 Settings 창의 **Occlusion** 섹션에서 조절한다. 이 섹션은 기본으로 접혀 있고,
+`EnableOcclusion`이 꺼져 있으면 헤더에 `(Disabled)`가 붙는다 — 2D 프로젝트에서는 펼칠 일이
+없다. 접힘 상태는 프로젝트별로 기억된다.
 
 | 항목 | 뜻 |
 | --- | --- |

@@ -15,6 +15,10 @@ namespace DarkNaku.FoundationDI.Editor
         private Vector2 _scroll;
         private string _dataRootPathInput;
         private string _pathError = string.Empty;
+        private bool _occlusionExpanded;
+
+        private static string OcclusionExpandedPrefKey =>
+            $"DarkNaku.FoundationDI.SoundService.OcclusionExpanded.{Application.dataPath.GetHashCode():X}";
 
         [MenuItem("Tools/FoundationDI/Sound/Settings", false, 53)]
         public static void ShowWindow()
@@ -26,6 +30,8 @@ namespace DarkNaku.FoundationDI.Editor
 
         private void OnEnable()
         {
+            _occlusionExpanded = EditorPrefs.GetBool(OcclusionExpandedPrefKey, false);
+
             Reload();
         }
 
@@ -144,9 +150,26 @@ namespace DarkNaku.FoundationDI.Editor
             }
         }
 
+        /// <summary>
+        /// 오클루전은 파라미터가 11개인데 3D 프로젝트에만 쓸모가 있다(3D Physics 레이캐스트 기반).
+        /// 2D 프로젝트에서는 통째로 노이즈라 접어 둔다. 접힘 상태는 프로젝트별로 기억한다.
+        /// </summary>
         private void DrawOcclusionSection()
         {
-            EditorGUILayout.LabelField("Occlusion", EditorStyles.boldLabel);
+            bool enabled = _settings.EnableOcclusion;
+
+            string header = enabled ? "Occlusion" : "Occlusion  (Disabled)";
+
+            _occlusionExpanded = EditorGUILayout.Foldout(_occlusionExpanded, header, true, EditorStyles.foldoutHeader);
+
+            if (_occlusionExpanded != EditorPrefs.GetBool(OcclusionExpandedPrefKey, false))
+            {
+                EditorPrefs.SetBool(OcclusionExpandedPrefKey, _occlusionExpanded);
+            }
+
+            if (!_occlusionExpanded) return;
+
+            EditorGUI.indentLevel++;
 
             DrawProperty("<EnableOcclusion>k__BackingField", "Enable Occlusion");
 
@@ -163,6 +186,8 @@ namespace DarkNaku.FoundationDI.Editor
                 DrawProperty("<CheckInterval>k__BackingField", "Check Interval");
                 DrawProperty("<LerpSpeed>k__BackingField", "Lerp Speed");
             }
+
+            EditorGUI.indentLevel--;
         }
 
         private void DrawProperty(string propertyPath, string label)

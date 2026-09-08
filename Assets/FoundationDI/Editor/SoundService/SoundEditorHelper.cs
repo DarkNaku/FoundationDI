@@ -34,7 +34,10 @@ namespace DarkNaku.FoundationDI.Editor
             AssetDatabase.Refresh();
         }
 
-        /// <summary>믹서에서 Output 목록을 다시 읽고 Output 유사 enum을 재생성한다.</summary>
+        /// <summary>
+        /// 믹서 그룹의 Volume 노출을 보장하고, Output 목록을 다시 읽어 Output 유사 enum을 재생성한다.
+        /// 노출 파라미터가 없거나 이름이 그룹명과 다르면 볼륨 설정이 조용히 안 먹으므로 여기서 함께 고친다.
+        /// </summary>
         internal static void ReloadOutputsDatabase(bool saveAssets = true)
         {
             var settings = SoundServiceAssetLocator.GetOrCreateSettings();
@@ -43,6 +46,17 @@ namespace DarkNaku.FoundationDI.Editor
             {
                 Debug.LogError("[SoundService] SoundServiceSettings에 Master AudioMixer가 지정되지 않았습니다.");
                 return;
+            }
+
+            // 사용자 에셋을 확인 없이 고치므로 되돌릴 수 있게 하고, 무엇을 바꿨는지 남긴다.
+            Undo.RecordObject(settings.MasterAudioMixer, "Expose Audio Mixer Volumes");
+
+            var report = MixerExposureTool.ExposeAllGroupVolumes(settings.MasterAudioMixer);
+
+            if (report.HasChanges)
+            {
+                Debug.Log($"[SoundService] '{settings.MasterAudioMixer.name}' 믹서의 노출 파라미터를 " +
+                          $"정리했습니다 — {report.Describe()}");
             }
 
             settings.OutputDataCollection.LoadOutputs(settings.MasterAudioMixer);

@@ -66,7 +66,8 @@ DI 코어는 **Reflex 14.3.1**이다. `Assets/Scripts/Installers/RootInstaller.c
   - 공개 API는 `ISoundService` 하나. `CreateSound/CreateMusic/CreatePlaylist/CreateDynamicMusic` 팩토리로 빌더를 만들고 체이닝 후 `Play()`. 빌더가 쓰는 내부 seam은 `ISoundEngine`(internal).
   - `SoundSource`(MonoBehaviour)를 `[SoundService] Sources Pool` 아래에 풀링. 페이드·루프·플레이리스트 진행·오클루전을 담당.
   - 데이터는 `SoundServiceSettings`(SO) 하나가 `SoundDataCollection`/`MusicDataCollection`/`OutputDataCollection`/`AudioMixer`/`DefaultOutput`을 들고 있고 DI로 주입된다.
-  - **`Output`을 지정하지 않으면 `DefaultOutput`으로 해석된다**(`SoundService.ResolveOutput`). 둘 다 비면 `outputAudioMixerGroup`이 `null`로 남아 믹서를 통째로 우회하므로 볼륨 설정이 안 먹는다 — 조용히 잘못되기 쉬운 조합이다. **런타임 Resources 의존 없음** — 에디터 도구만 `AssetDatabase`로 이 에셋을 찾는다.
+  - **`Output`을 지정하지 않으면 `DefaultOutput`으로 해석된다**(`SoundService.ResolveOutput`). 둘 다 비면 `outputAudioMixerGroup`이 `null`로 남아 믹서를 통째로 우회하므로 볼륨 설정이 안 먹는다 — 조용히 잘못되기 쉬운 조합이라, **Create Settings가 `Master`/`BGM`/`SFX` 믹서를 만들고 `DefaultOutput`을 `SFX`로 채워** 처음부터 그 상태가 안 되게 한다(`SoundServiceAssetLocator.TryCreateDefaultMixer`, 설정을 새로 만들 때만). **런타임 Resources 의존 없음** — 에디터 도구만 `AssetDatabase`로 이 에셋을 찾는다.
+  - **Output 노출 파라미터는 `Reload Outputs`가 자동으로 설정한다**(`MixerExposureTool`). 손으로 `Expose to script` 하고 파라미터 이름을 그룹명과 맞출 필요가 없다 — 이름이 한 글자만 달라도 `SetFloat`이 조용히 실패하던 자리다. 유니티가 공개 API를 주지 않아 `UnityEditor.Audio` 내부 타입을 리플렉션으로 쓰며, **파라미터 이름은 그룹명을 직접 써야 한다**(`ResolveExposedParameterPath`는 `" (of BGM)"` 같은 값을 돌려줘 쓸 수 없다). 바인딩이 깨지면 `IsAvailable`이 false가 되고 수동 안내로 폴백한다 — `MixerExposureToolTest`가 EditMode에서 잡는다.
   - `SFX`/`Track`/`Output`은 `[SerializeField] string`을 감싼 `partial struct`. 에디터가 `<DataRoot>/Generated/`에 상수를 생성하고 같은 폴더의 `.asmref`로 `FoundationDI` 어셈블리에 합류시킨다.
   - Output 볼륨 영속화는 `ISoundVolumeStorage` seam(기본 `PlayerPrefsVolumeStorage`).
   - 에디터 도구는 `Assets/FoundationDI/Editor/SoundService/`(IMGUI): Audio Creator / Audio Collection / Output Manager / Settings 창 + 유사 enum PropertyDrawer + MusicZone 인스펙터.

@@ -1,8 +1,27 @@
 # plan.md
 
-## 활성 계획: 없음
+## 완료: SoundService 설정 단순화
 
-다음 작업이 정해지면 여기에 테스트 목록을 채운다.
+Output 설정에 손으로 하는 단계가 많고(믹서 그룹의 Volume을 우클릭 → Expose to script →
+노출 파라미터 이름을 그룹명과 정확히 일치시키기), 틀려도 컴파일 에러가 없고 볼륨만 조용히
+안 먹는다. 기본 Output이 비면 믹서를 통째로 우회하는 함정도 같은 뿌리다.
+
+유니티는 노출 파라미터를 다루는 공개 API를 주지 않지만, `UnityEditor.Audio`의 내부 타입으로
+전 과정을 자동화할 수 있음을 확인했다(`AudioMixerController.AddExposedParameter` +
+`AudioMixerGroupController.GetGUIDForVolume`). **파라미터 이름은 그룹명을 직접 써야 한다** —
+`ResolveExposedParameterPath`는 `" (of BGM)"` 같은 값을 돌려줘 쓸 수 없다.
+
+- [x] 믹서 내부 API 리플렉션 바인딩이 성립한다
+- [x] 기본 믹서를 만들면 Master 아래에 BGM/SFX 그룹이 생긴다
+- [x] 그룹 Volume을 노출하면 AudioMixer.GetFloat(그룹명)이 성공한다
+- [x] 공백이 있는 그룹명은 공백을 제거한 이름으로 노출된다
+- [x] 이미 올바르게 노출된 그룹은 다시 노출하지 않는다
+- [x] 믹서가 없는 설정에는 기본 믹서와 기본 Output을 채워 준다
+- [x] 믹서가 이미 지정된 설정에는 기본 믹서를 만들지 않는다
+
+오클루전 11개 파라미터를 폴드아웃으로 접는 작업은 순수 UI 변경이라(EditorPrefs에 접힘 상태
+저장) 검증할 로직이 없어 테스트 목록에 넣지 않는다. `SoundServiceSettings`는 건드리지 않아
+기존 `.asset`이 그대로 유효하다.
 
 ---
 

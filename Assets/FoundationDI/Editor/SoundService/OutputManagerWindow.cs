@@ -19,10 +19,12 @@ namespace DarkNaku.FoundationDI.Editor
             "1. Audio Mixer 창을 열고 Master 믹서를 선택한다.",
             "2. Groups 패널에서 '+'로 새 그룹을 추가한다.",
             "3. 그룹 이름을 원하는 Output 이름으로 바꾼다(공백은 제거된다).",
-            "4. 그룹을 선택한 뒤 Inspector에서 Volume을 우클릭 → 'Expose ... to script'.",
-            "5. Audio Mixer 창 오른쪽 위 'Exposed Parameters'에서 노출된 파라미터를 그룹 이름과 똑같이 바꾼다.",
-            "6. 이 창으로 돌아와 'Reload Outputs'를 누른다."
+            "4. 이 창으로 돌아와 'Reload Outputs'를 누른다."
         };
+
+        private const string ExposureNote =
+            "Volume 노출('Expose to script')과 파라미터 이름 맞추기는 'Reload Outputs'가 대신 한다. " +
+            "그룹만 만들면 된다.";
 
         private WindowLabel _currentLabel = WindowLabel.Main;
         private Vector2 _scroll;
@@ -114,7 +116,8 @@ namespace DarkNaku.FoundationDI.Editor
 
                 if (!exposed)
                 {
-                    EditorGUILayout.LabelField("Volume 파라미터가 노출되지 않았습니다.", EditorStyles.miniLabel);
+                    EditorGUILayout.LabelField("Volume 미노출 — 'Reload Outputs'를 누르세요.",
+                        EditorStyles.miniLabel);
                     EditorGUILayout.EndHorizontal();
                     continue;
                 }
@@ -151,6 +154,9 @@ namespace DarkNaku.FoundationDI.Editor
                 EditorGUILayout.LabelField(instruction, EditorStyles.wordWrappedLabel);
                 EditorGUILayout.Space(2f);
             }
+
+            EditorGUILayout.Space(4f);
+            EditorGUILayout.HelpBox(ExposureNote, MessageType.Info);
 
             EditorGUILayout.EndScrollView();
 

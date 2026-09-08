@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.Audio;
 
 namespace DarkNaku.FoundationDI.Editor
 {
@@ -134,12 +135,55 @@ namespace DarkNaku.FoundationDI.Editor
 
             EnsureCollections(settings);
 
+            // 새로 만든 설정에만 기본 믹서를 붙인다. 이미 쓰고 있는 설정에는 끼워 넣지 않는다.
+            if (TryCreateDefaultMixer(settings, DefaultDataRootPath))
+            {
+                SoundEditorHelper.ReloadOutputsDatabase(false);
+            }
+
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
 
             Debug.Log($"[SoundService] 기본 설정을 생성했습니다: {DefaultDataRootPath}SoundServiceSettings.asset");
 
             return settings;
+        }
+
+        /// <summary>Master 아래에 두는 기본 그룹. 이 이름이 그대로 Output 이름이 된다.</summary>
+        private static readonly string[] DefaultMixerGroups = { "BGM", "SFX" };
+
+        /// <summary>Output을 지정하지 않은 재생이 갈 기본 Output.</summary>
+        private const string DefaultOutputName = "SFX";
+
+        /// <summary>
+        /// 설정에 믹서가 없으면 Master/BGM/SFX 믹서를 만들어 연결하고 기본 Output까지 지정한다.
+        /// 기본 Output이 비면 믹서를 통째로 우회해 볼륨 설정이 안 먹으므로, 처음부터 채워 둔다.
+        /// </summary>
+        /// <returns>믹서를 새로 만들었으면 true. 이미 지정돼 있었거나 실패하면 false.</returns>
+        internal static bool TryCreateDefaultMixer(SoundServiceSettings settings, string folder)
+        {
+            if (settings == null || settings.MasterAudioMixer != null) return false;
+
+            string mixerPath = folder + "SoundMixer.mixer";
+
+            var existing = AssetDatabase.LoadAssetAtPath<AudioMixer>(mixerPath);
+
+            var mixer = existing != null
+                ? existing
+                : MixerExposureTool.CreateDefaultMixer(mixerPath, DefaultMixerGroups);
+
+            if (mixer == null) return false;
+
+            settings.MasterAudioMixer = mixer;
+            settings.DefaultOutput = Output.FromTag(DefaultOutputName);
+
+            EditorUtility.SetDirty(settings);
+
+            Debug.Log($"[SoundService] 기본 AudioMixer를 만들고 연결했습니다: {mixerPath} " +
+                      $"(그룹 Master/{string.Join("/", DefaultMixerGroups)}, " +
+                      $"기본 Output = {DefaultOutputName})");
+
+            return true;
         }
 
         /// <summary>설정이 참조하는 컬렉션 에셋이 없으면 만들어 연결한다.</summary>
