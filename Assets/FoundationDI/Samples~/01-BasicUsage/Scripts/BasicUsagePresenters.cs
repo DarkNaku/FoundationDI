@@ -56,11 +56,4 @@ namespace DarkNaku.FoundationDI.Samples
         protected override void OnInitialize() => View.label.text = "HUD (Above)";
     }
 
-    /// Reflex에는 엔트리포인트가 없다. 씬의 ContainerScope GameObject에 붙인다.
-    public class BasicUsageDemo : MonoBehaviour
-    {
-        [Inject] private IUINavigator _ui;
-
-        private void Start() => _ui.Page<MainMenuPage>();
-    }
 }
