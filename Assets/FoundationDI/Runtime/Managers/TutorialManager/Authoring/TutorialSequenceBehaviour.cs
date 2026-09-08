@@ -1,14 +1,14 @@
 using System.Collections.Generic;
 using UnityEngine;
-using VContainer;
+using Reflex.Attributes;
 
 namespace DarkNaku.FoundationDI
 {
     /// <summary>
     /// 씬에 배치해서 시퀀스 하나를 오써링한다. 자식의 TutorialStepBehaviour를 순서대로 모은다.
-    /// 씬에 직접 배치된 컴포넌트라 생성자 주입이 안 되므로 InjectableBehaviour를 쓴다.
+    /// 씬에 직접 배치된 컴포넌트라 생성자 주입이 안 되므로 [Inject] 메서드로 리졸버를 받는다.
     /// </summary>
-    public sealed class TutorialSequenceBehaviour : InjectableBehaviour
+    public sealed class TutorialSequenceBehaviour : MonoBehaviour
     {
         [Tooltip("진행도 저장 키. 비우면 GameObject 이름을 쓴다. 한 번 정하면 바꾸지 않는다.")]
         [SerializeField] private string _sequenceId;
@@ -23,7 +23,15 @@ namespace DarkNaku.FoundationDI
 
         [SerializeReference] private ITutorialTrigger _startTrigger = new AutoTrigger();
 
-        [Inject] private ITutorialManager _tutorial;
+        private ITutorialManager _tutorial;
+        [Inject]
+        public void Construct(IServiceResolver resolver)
+        {
+            if (resolver == null) return;
+
+            resolver.TryResolve(out _tutorial);
+        }
+
 
         private bool _registered;
 

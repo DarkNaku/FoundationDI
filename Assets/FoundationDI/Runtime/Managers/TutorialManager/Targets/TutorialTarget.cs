@@ -1,5 +1,5 @@
 using UnityEngine;
-using VContainer;
+using Reflex.Attributes;
 
 namespace DarkNaku.FoundationDI
 {
@@ -8,11 +8,19 @@ namespace DarkNaku.FoundationDI
     /// UI 프리팹의 버튼 등에 붙여두면 UINavigator가 그 View를 띄울 때마다 자동으로 등록된다.
     /// UINavigator는 이 컴포넌트의 존재를 모르고, 튜토리얼도 UINavigator에 의존하지 않는다.
     /// </summary>
-    public sealed class TutorialTarget : InjectableBehaviour
+    public sealed class TutorialTarget : MonoBehaviour
     {
         [SerializeField] private string _key;
 
-        [Inject] private ITutorialTargetRegistry _registry;
+        private ITutorialTargetRegistry _registry;
+        [Inject]
+        public void Construct(IServiceResolver resolver)
+        {
+            if (resolver == null) return;
+
+            resolver.TryResolve(out _registry);
+        }
+
 
         private bool _registered;
 
@@ -20,7 +28,6 @@ namespace DarkNaku.FoundationDI
 
         private void OnEnable()
         {
-            EnsureInjected();
             TryRegister();
         }
 

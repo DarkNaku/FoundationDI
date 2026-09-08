@@ -2,7 +2,7 @@ using System.Text.RegularExpressions;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-using VContainer;
+using Reflex.Attributes;
 
 namespace DarkNaku.FoundationDI
 {
@@ -10,9 +10,17 @@ namespace DarkNaku.FoundationDI
     /// AudioMixer Output 볼륨을 조절하는 UI 슬라이더. 마지막으로 저장된 볼륨으로 자동 복원한다.
     /// </summary>
     [RequireComponent(typeof(Slider))]
-    public class OutputVolumeSlider : InjectableBehaviour
+    public class OutputVolumeSlider : MonoBehaviour
     {
-        [Inject] private ISoundService _soundService;
+        private ISoundService _soundService;
+        [Inject]
+        public void Construct(IServiceResolver resolver)
+        {
+            if (resolver == null) return;
+
+            resolver.TryResolve(out _soundService);
+        }
+
 
         [Header("Settings")]
         [SerializeField] private Output _targetOutput;
@@ -23,9 +31,8 @@ namespace DarkNaku.FoundationDI
 
         private Slider _volumeSlider;
 
-        protected override void Awake()
+        private void Awake()
         {
-            base.Awake();
 
             _volumeSlider = GetComponent<Slider>();
             _volumeSlider.onValueChanged.AddListener(ChangeVolume);
@@ -33,8 +40,6 @@ namespace DarkNaku.FoundationDI
 
         private void Start()
         {
-            EnsureInjected();
-
             if (_soundService == null)
             {
                 Debug.LogError("[OutputVolumeSlider] ISoundService가 주입되지 않았습니다.");
@@ -52,8 +57,6 @@ namespace DarkNaku.FoundationDI
         /// <summary>Output 볼륨을 바꾸고 라벨을 갱신한다.</summary>
         public void ChangeVolume(float volume)
         {
-            EnsureInjected();
-
             if (_soundService == null) return;
 
             _soundService.ChangeOutputVolume(_targetOutput, volume);
