@@ -22,14 +22,14 @@ FoundationDI는 VContainer를 코어로 삼아 왔다. 그런데 VContainer 타�
 
 - VContainer 의존을 완전히 제거하고 Reflex 14.3.1로 대체한다.
 - **런타임 리졸버는 패키지 자체 인터페이스(`IServiceResolver`)로 감싼다.** 공개 시그니처와 테스트에서 DI 프레임워크 타입이 사라진다.
-- 마이그레이션 전 구간에서 **컴파일과 전체 테스트가 통과한다**(빅뱅 금지). 근거는 아래 "결정 9".
+- 마이그레이션 전 구간에서 **컴파일과 전체 테스트가 통과한다**(빅뱅 금지). 근거는 아래 "결정 10".
 - Reflex가 이미 하는 일을 우리가 다시 하지 않는다 — 중복 인프라는 포팅하지 않고 삭제한다. 근거는 "결정 3".
 
 비목표:
 
 - **등록(빌더) API의 프레임워크 중립화.** `RegisterXxx`는 Reflex `ContainerBuilder`를 직접 받는다. 근거는 "결정 2".
 - **서비스 내부 동작 변경.** MessageService/SoundService/AdService/AnalyticsService/IAPService/TutorialManager의 정책 계층은 전부 생성자 주입 POCO라 **한 줄도 바뀌지 않는다.** 바뀌는 것은 그것들을 등록하는 파일뿐이다.
-- **`[SourceGeneratorInjectable]` 도입.** Reflex의 소스 제너레이터 최적화는 이번 범위 밖이다. 근거는 "결정 8".
+- **`[SourceGeneratorInjectable]` 도입.** Reflex의 소스 제너레이터 최적화는 이번 범위 밖이다. 근거는 "결정 9".
 - **하위 호환 별칭.** `IObjectResolver`를 받는 오버로드를 `[Obsolete]`로 남기지 않는다. 남기려면 VContainer 참조가 남아야 하므로 목적과 모순된다.
 
 ---
@@ -179,11 +179,24 @@ Reflex에 엔트리포인트가 없다. 현재 `IStartable` 사용처는 셋이�
 
 **CLAUDE.md의 `RegisterTutorialManager` 주의사항이 없어진다.** "`InjectorService`가 정적 컨테이너 참조 하나를 공유하는 단일 컨테이너 모델이라 씬 스코프에 두면 조용히 실패한다"는 경고는 `InjectorService`가 사라지면서 함께 사라진다. Reflex는 씬 컨테이너가 부모를 제대로 상속하고, 씬 주입도 씬 컨테이너로 수행한다. `RegisterTutorialManager`는 문서대로 **씬 인스톨러**에 두면 된다.
 
-### 7. 생성자 모호성은 `[ReflexConstructor]`로 표시한다
+### 7. `WithParameter`가 없으므로 `RegisterPoolManager`는 팩토리로 바뀐다
 
-`UnityAdDispatcher`와 `HapticService`는 생성자가 둘이고, VContainer가 파라미터 많은 쪽을 고르는 것을 `[Inject]`로 막고 있었다. Reflex의 대응물은 `[ReflexConstructor]`다. 의미와 위치가 같아 1:1 치환이다.
+`RegisterPoolManager(this IContainerBuilder, Transform root = null)`은 VContainer의 `registration.WithParameter(root)`로 생성자 인자 하나만 덮어쓰고 나머지는 컨테이너가 채우게 한다. **Reflex에는 파라미터 오버라이드가 없다.**
 
-### 8. `[SourceGeneratorInjectable]`은 도입하지 않는다
+```csharp
+public static ContainerBuilder RegisterPoolManager(this ContainerBuilder builder, Transform root = null)
+    => builder.RegisterFactory<IPoolManager>(
+           c => new PoolManager(c.Resolve<IResourceService>(), c.Resolve<IServiceResolver>(), root),
+           Lifetime.Singleton, Resolution.Lazy);
+```
+
+`root`가 null이어도 같은 경로를 탄다 — `PoolManager`의 생성자가 이미 null을 "부모 없이 생성"으로 처리한다(`PoolManagerTest.부모_Transform이_없으면_풀_루트를_부모없이_생성한다`). 분기가 사라져 오히려 단순해진다.
+
+### 8. 생성자 모호성은 `[ReflexConstructor]`로 표시한다
+
+`UnityAdDispatcher`와 `HapticService`는 생성자가 둘이고, VContainer가 파라미터 많은 쪽을 고르는 것을 `[Inject]`로 막고 있었다. Reflex의 대응물은 `[ReflexConstructor]`다. 의미와 위치가 같아 1:1 치환이다. 대상은 `UnityAdDispatcher`의 `(bool)` 아닌 생성자와 `HapticService`의 무인자 생성자 둘이다.
+
+### 9. `[SourceGeneratorInjectable]`은 도입하지 않는다
 
 Reflex는 `partial class` + `[SourceGeneratorInjectable]`로 리플렉션을 걷어내는 최적화를 제공한다. 이번에는 쓰지 않는다.
 
@@ -193,7 +206,7 @@ Reflex는 `partial class` + `[SourceGeneratorInjectable]`로 리플렉션을 걷
 
 마이그레이션이 끝난 뒤 별도 작업으로 검토한다.
 
-### 9. 두 컨테이너를 공존시킨 뒤 VContainer를 마지막에 뺀다
+### 10. 두 컨테이너를 공존시킨 뒤 VContainer를 마지막에 뺀다
 
 Unity 프로젝트는 어셈블리 하나가 깨지면 전체가 깨진다. VContainer 참조를 먼저 지우면 100여 개 파일이 동시에 컴파일 에러를 내고, 그 상태에서는 **테스트를 한 줄도 돌릴 수 없다.** RED→GREEN 사이클이 성립하지 않는다.
 
@@ -214,6 +227,7 @@ Unity 프로젝트는 어셈블리 하나가 깨지면 전체가 깨진다. VCon
 | `builder.Register<T>(c => …, Lifetime.Singleton)` | `builder.RegisterFactory<T>(c => …, Lifetime.Singleton, Resolution.Lazy)` |
 | `builder.RegisterInstance(x)` | `builder.RegisterValue(x)` |
 | `builder.RegisterInstance(x).As<IX>()` | `builder.RegisterValue(x, new[]{ typeof(IX) })` |
+| `builder.Register<…>(…).WithParameter(x)` | **없음** → `RegisterFactory`로 인자를 손으로 넘긴다 |
 | `builder.RegisterEntryPoint<T>()` | 없음 → `MonoBehaviour.Start()` 또는 `Resolution.Eager` |
 | `resolver.Resolve<T>()` | `container.Resolve<T>()` |
 | `resolver.TryResolve<T>(out var x)` | `container.HasBinding<T>()` + `Resolve<T>()` (어댑터가 흡수) |
@@ -365,6 +379,6 @@ STRUCTURAL과 BEHAVIORAL을 섞지 않는다. 위 마이그레이션 순서의 �
 
 - `IObjectResolver` 호환 오버로드 — VContainer 참조가 남아야 하므로 목적과 모순
 - 빌더 래퍼 `IServiceRegistry` (결정 2)
-- 소스 제너레이터 최적화 (결정 8)
+- 소스 제너레이터 최적화 (결정 9)
 - `InjectorService`의 호환 껍데기 (결정 3)
 - `IServiceResolver`의 `Scope()`/`All<T>()`/`Single<T>()` — 현재 사용처 없음
