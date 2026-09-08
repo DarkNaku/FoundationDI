@@ -4,7 +4,6 @@
         "FoundationDI",
         "FoundationDI.TestSupport",
         "FoundationDI.Editor",
-        "VContainer",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner",
         "Reflex"

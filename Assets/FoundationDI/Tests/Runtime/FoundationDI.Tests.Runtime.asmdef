@@ -3,7 +3,6 @@
     "references": [
         "FoundationDI",
         "FoundationDI.TestSupport",
-        "VContainer",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner",
         "Reflex"

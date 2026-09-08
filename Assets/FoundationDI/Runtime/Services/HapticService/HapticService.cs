@@ -1,7 +1,10 @@
 using System;
 using System.Threading;
 using UnityEngine;
-using VContainer;
+using Reflex.Attributes;
+using Reflex.Core;
+using Reflex.Enums;
+using Resolution = Reflex.Enums.Resolution;
 
 namespace DarkNaku.FoundationDI
 {
@@ -33,11 +36,9 @@ namespace DarkNaku.FoundationDI
         private CancellationTokenSource _cts;
         private Awaitable _active;
 
-        // Reflex는 [ReflexConstructor]가 없으면 인자가 가장 많은 생성자를 고른다.
+        // [ReflexConstructor]가 없으면 Reflex가 인자가 가장 많은 생성자를 고른다.
         // 그러면 (IHapticProvider, Func<float>)가 뽑혀 IHapticProvider 미등록으로 해석이 실패한다.
-        // VContainer의 [Inject]는 전환이 끝날 때까지 함께 둔다.
-        [Inject]
-        [Reflex.Attributes.ReflexConstructor]
+        [ReflexConstructor]
         public HapticService() : this(CreatePlatformProvider())
         {
         }
@@ -128,12 +129,12 @@ namespace DarkNaku.FoundationDI
     public static class HapticServiceVContainerExtensions
     {
         /// <summary>HapticService를 컨테이너에 등록한다. 외부 리소스 의존이 없어 추가 인자는 불필요하다.</summary>
-        public static Reflex.Core.ContainerBuilder RegisterHapticService(
-            this Reflex.Core.ContainerBuilder builder)
+        public static ContainerBuilder RegisterHapticService(
+            this ContainerBuilder builder)
         {
             return builder.RegisterType(
                 typeof(HapticService), new[] { typeof(IHapticService) },
-                Reflex.Enums.Lifetime.Singleton, Reflex.Enums.Resolution.Lazy);
+                Lifetime.Singleton, Resolution.Lazy);
         }
     }
 }

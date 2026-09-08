@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
+using Reflex.Core;
+using Reflex.Enums;
 using UnityEngine;
+using Resolution = Reflex.Enums.Resolution;
 
 namespace DarkNaku.FoundationDI
 {
@@ -48,12 +51,12 @@ namespace DarkNaku.FoundationDI
         /// InitializeService를 컨테이너에 싱글턴으로 등록한다.
         /// IServiceResolver는 ServiceResolverBootstrap이 자동 등록한다.
         /// </summary>
-        public static Reflex.Core.ContainerBuilder RegisterInitializeService(
-            this Reflex.Core.ContainerBuilder builder)
+        public static ContainerBuilder RegisterInitializeService(
+            this ContainerBuilder builder)
         {
             return builder.RegisterType(
                 typeof(InitializeService), new[] { typeof(IInitializeService) },
-                Reflex.Enums.Lifetime.Singleton, Reflex.Enums.Resolution.Lazy);
+                Lifetime.Singleton, Resolution.Lazy);
         }
     }
 }
