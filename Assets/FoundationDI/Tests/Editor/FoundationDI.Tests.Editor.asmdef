@@ -6,7 +6,8 @@
         "FoundationDI.Editor",
         "VContainer",
         "UnityEngine.TestRunner",
-        "UnityEditor.TestRunner"
+        "UnityEditor.TestRunner",
+        "Reflex"
     ],
     "includePlatforms": [
         "Editor"

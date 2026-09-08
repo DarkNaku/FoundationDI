@@ -5,7 +5,8 @@
         "FoundationDI.TestSupport",
         "VContainer",
         "UnityEngine.TestRunner",
-        "UnityEditor.TestRunner"
+        "UnityEditor.TestRunner",
+        "Reflex"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
