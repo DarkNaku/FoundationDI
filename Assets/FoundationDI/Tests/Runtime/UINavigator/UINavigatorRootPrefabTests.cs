@@ -13,6 +13,9 @@ public class UINavigatorRootPrefabTests
 {
     public class V : UIView { }
 
+    // 소비자가 루트 프리팹에 붙일 법한 컴포넌트를 흉내낸다.
+    public class RootAddon : MonoBehaviour { }
+
     [UIPrefab("UI/RootPrefabSample")]
     public class P : UIPagePresenter<V>
     {
@@ -47,10 +50,13 @@ public class UINavigatorRootPrefabTests
     }
 
     private UINavigator CreateService(UINavigatorSettings settings)
+        => CreateService(settings, Substitute.For<IServiceResolver>());
+
+    private UINavigator CreateService(UINavigatorSettings settings, IServiceResolver resolver)
     {
         var resource = Substitute.For<IResourceService>();
         resource.Load<GameObject>("UI/RootPrefabSample").Returns(_viewPrefab);
-        return new UINavigator(settings, new UIInstanceFactory(Substitute.For<IServiceResolver>()), resource);
+        return new UINavigator(settings, new UIInstanceFactory(resolver), resource);
     }
 
     [UnityTest]
@@ -115,6 +121,31 @@ public class UINavigatorRootPrefabTests
         await AwaitableTest.WaitUntil(() => p.Shown);
 
         Assert.IsTrue(p.Shown, "레이어가 비어 있어도 크래시 없이 표시(비록 화면 밖이라도)는 계속되어야 한다");
+
+        service.Dispose();
+    });
+
+    [UnityTest]
+    public IEnumerator 루트프리팹에_붙은_컴포넌트도_주입받는다() => AwaitableTest.Run(async () =>
+    {
+        // InjectorService 시절에는 InjectableBehaviour가 스스로 주입을 요청해서
+        // Instantiate만 해도 채워졌다. Reflex에는 그 경로가 없으므로
+        // 인스턴스화한 쪽이 명시적으로 주입해야 한다.
+        _rootTemplate.GO.AddComponent<RootAddon>();
+
+        var settings = ScriptableObject.CreateInstance<UINavigatorSettings>();
+        settings.RootPrefab = _rootTemplate;
+
+        var resolver = Substitute.For<IServiceResolver>();
+        var service = CreateService(settings, resolver);
+        var p = service.Page<P>();
+        await AwaitableTest.WaitUntil(() => p.Shown);
+
+        var clone = p.ViewBase.transform.root.GetComponent<UIRoot>();
+
+        resolver.Received(1).InjectGameObject(
+            Arg.Is<GameObject>(go => go.GetComponent<RootAddon>() != null));
+        Assert.IsNotNull(clone.GO.GetComponent<RootAddon>(), "클론에도 컴포넌트가 남아 있어야 한다");
 
         service.Dispose();
     });

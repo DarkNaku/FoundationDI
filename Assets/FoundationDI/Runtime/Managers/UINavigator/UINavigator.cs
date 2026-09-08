@@ -81,6 +81,11 @@ namespace DarkNaku.FoundationDI
             if (prefab != null)
             {
                 root = UnityEngine.Object.Instantiate(prefab);
+
+                // 런타임 생성물은 씬 주입(ContainerScope) 대상이 아니다. 소비자가 루트
+                // 프리팹에 붙인 컴포넌트도 주입받으려면 여기서 명시적으로 해야 한다.
+                // (InjectorService 시절에는 InjectableBehaviour가 스스로 요청했다.)
+                _factory?.Resolver?.InjectGameObject(root.GO);
             }
             else
             {

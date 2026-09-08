@@ -130,6 +130,15 @@ DI 컨테이너가 **VContainer에서 Reflex 14.3.1로 바뀌었습니다.** 파
 3. `LifetimeScope` 서브클래스를 `MonoBehaviour, IInstaller`로 바꾸고 `Configure(IContainerBuilder)` → `InstallBindings(ContainerBuilder)`.
 4. 씬 스코프가 있던 GameObject에 `ContainerScope` 컴포넌트를 붙입니다. 부모 연결은 자동입니다(씬 컨테이너는 항상 루트의 자식).
 5. **`InjectableBehaviour`와 `InjectorService`가 삭제됐습니다.** 상속을 `MonoBehaviour`로 내리고 `builder.RegisterInjector()` 호출을 지웁니다. 씬 주입은 `ContainerScope`가 어떤 `Awake`보다도 먼저 자동으로 합니다.
+
+   ⚠️ **자가 주입은 사라졌습니다.** `InjectableBehaviour`는 런타임에 `Instantiate`된 오브젝트도 스스로 주입을 요청했습니다. Reflex에는 그 경로가 없으므로 **씬에 미리 배치되지 않은 오브젝트는 생성한 쪽이 직접 주입해야 합니다.**
+
+   ```csharp
+   var go = Instantiate(prefab);
+   GameObjectInjector.InjectRecursive(go, gameObject.scene.GetSceneContainer());
+   ```
+
+   패키지 안에서는 `PoolManager`와 `UINavigator`가 이 일을 대신하므로, 그 경로로 만들어지는 View·풀 오브젝트는 그대로 동작합니다. 직접 `Instantiate` 하는 코드만 확인하세요 — 빠뜨리면 `[Inject]` 대상이 **에러 없이 null로 남습니다**. `DontDestroyOnLoad`로 옮긴 오브젝트는 소속 씬에 컨테이너가 없어 `GetSceneContainer()`가 예외를 던지므로, 필요한 참조는 이동 전에 주입받아 두세요.
 6. **`[Inject]` 필드로 서비스를 직접 받던 씬 컴포넌트는 리졸버 주입으로 바꾸는 것을 권합니다.**
    ```csharp
    private ISoundService _sound;

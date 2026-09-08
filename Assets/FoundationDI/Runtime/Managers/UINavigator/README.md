@@ -404,6 +404,8 @@ _ui.Popup<ConfirmDialog>()
 
 **동작이 바뀝니다**: 씬이 언로드되면 캔버스·풀·프리젠터가 모두 파괴됩니다. 씬을 가로질러 살아남아야 하는 UI(로딩 화면·페이드)는 이 컴포넌트 밖에서 별도 캔버스로 만드세요.
 
+**루트 프리팹과 View는 UINavigator가 주입합니다.** 둘 다 런타임 생성물이라 씬 주입(`ContainerScope`) 대상이 아닙니다 — `CreateRoot()`가 루트 프리팹을, 전용 풀이 View 계층을 각각 `InjectGameObject`로 채웁니다. 루트 프리팹이나 View 프리팹에 `[Inject]`를 쓰는 컴포넌트를 붙여도 동작합니다.
+
 **씬 배치 컴포넌트도 `IUINavigator`를 해결할 수 있습니다.** Reflex는 씬을 그 씬의 컨테이너로 주입하므로, `RegisterUINavigator`를 씬 인스톨러에 두면 같은 씬의 MonoBehaviour가 `[Inject] Construct(IServiceResolver)`로 받아 `TryResolve<IUINavigator>()` 할 수 있습니다. (VContainer 시절에는 `InjectorService`가 정적 리졸버 하나를 공유해 이것이 불가능했습니다.)
 
 `UIPresenter`/`UIView`/`UIRoot`/`[UIPrefab]`은 이름이 그대로이므로 **프리젠터·뷰 선언부는 손댈 필요가 없습니다.**

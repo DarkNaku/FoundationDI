@@ -50,6 +50,8 @@ DI 코어는 **Reflex 14.3.1**이다. `Assets/Scripts/Installers/RootInstaller.c
 
 ⚠️ **씬 주입에는 컴포넌트별 격리가 없다.** `GameObjectInjector.InjectRecursive`에 try/catch가 없고 `FieldInjector`는 해석 실패를 다시 던지므로, **미등록 서비스를 요구하는 `[Inject]` 필드 하나가 그 뒤 순번 전체의 씬 주입을 막는다.** 그래서 패키지의 씬 컴포넌트는 서비스를 `[Inject]` 필드로 직접 받지 않고 `[Inject] Construct(IServiceResolver)` + `TryResolve`로 선택 주입한다.
 
+⚠️ **자가 주입이 없다.** 씬 주입은 씬에 **미리 배치된** 오브젝트만 덮는다. 런타임에 `Instantiate`한 것은 생성한 쪽이 `InjectGameObject`를 불러야 한다 — `PoolManager`(`PoolManager.cs:157`)와 `UINavigator.CreateRoot`(`UINavigator.cs:86`)가 그렇게 한다. 새로 `Instantiate`하는 코드를 추가하면 같이 넣어야 하고, 빠뜨리면 `[Inject]` 대상이 **에러 없이 null로 남는다**.
+
 ⚠️ **Reflex는 public 생성자만 본다.** `TypeConstructionInfoCache`가 `type.GetConstructors()`를 쓰므로 `internal` 생성자만 있는 타입은 `RegisterType`으로 등록하면 폴백 활성자가 **null을 돌려준다**(`UINavigator`가 그 경우다). 그런 타입은 `RegisterFactory`로 직접 생성한다. `WithParameter` 같은 파라미터 오버라이드도 없어 `RegisterPoolManager`도 팩토리다.
 
 ### 핵심 서비스 (`Assets/FoundationDI/Runtime/`)

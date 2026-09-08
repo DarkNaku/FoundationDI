@@ -146,7 +146,8 @@ for (var j = 0; j < monoBehaviours.Count; j++)
 
 - `UIButton.EnsureInjected()`와 `_requested` 플래그가 사라진다. `[Inject] public void Construct(IServiceResolver)` 하나로 끝난다.
 - 위 네 컴포넌트의 `EnsureInjected()` 호출과 `InjectableBehaviour` 상속이 사라진다. **주입 지연에 대비한 `Update` 폴링은 남긴다** — 제거는 이번 범위 밖이다.
-- 런타임 생성물(PoolManager 인스턴스, UINavigator의 Presenter/View)은 원래도 자동 주입 대상이 아니었고, 지금처럼 `InjectGameObject`/`Inject`로 명시 주입한다. **이 경로는 그대로다.** `PoolManager`는 자체 try/catch가 있어 격리가 유지된다.
+- 런타임 생성물(PoolManager 인스턴스, UINavigator의 Presenter/View)은 지금처럼 `InjectGameObject`/`Inject`로 명시 주입한다. `PoolManager`는 자체 try/catch가 있어 격리가 유지된다.
+- **자가 주입 능력은 사라진다.** `InjectableBehaviour`는 런타임 `Instantiate` 시에도 스스로 주입을 요청했다(`Awake` → `Request(this)` → 컨테이너가 준비돼 있으면 즉시 주입). Reflex에는 대응물이 없다 — `GameObjectSelfInjector`가 있지만 `internal`이라 소비자가 쓸 수 없다. 따라서 **씬에 미리 배치되지 않은 오브젝트는 생성한 쪽이 주입 책임을 진다.** 패키지 안에서는 `PoolManager`와 `UINavigator.CreateRoot`가 그 책임을 지고, 소비자 코드에는 README로 안내한다(공개 자가 주입 컴포넌트를 새로 만드는 것은 이번 범위 밖이다).
 
 **공개 타입 2개가 사라지는 파괴적 변경**이다(`InjectorService`, `InjectableBehaviour`). 0.9.x 단계이고 README에 마이그레이션 안내를 싣는 조건으로 감수한다. 버전을 0.10.0으로 올린다.
 
