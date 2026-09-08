@@ -31,14 +31,14 @@ AppLovin(`FoundationDI.AppLovin`)과 LevelPlay(`FoundationDI.LevelPlay`)는 각�
 ```csharp
 using DarkNaku.FoundationDI;
 using UnityEngine;
-using VContainer;
-using VContainer.Unity;
+using Reflex;
+using Reflex.Unity;
 
-public class RootLifetimeScope : LifetimeScope
+public class RootInstaller : MonoBehaviour, IInstaller
 {
     [SerializeField] private AdServiceSettings _adServiceSettings;
 
-    protected override void Configure(IContainerBuilder builder)
+    public void InstallBindings(ContainerBuilder builder)
     {
         builder.RegisterAdService(_adServiceSettings);
     }
@@ -48,7 +48,7 @@ public class RootLifetimeScope : LifetimeScope
 `RegisterAdService`는 `IAdRemovalStorage`(기본 `PlayerPrefsAdRemovalStorage`),
 `IAdDispatcher`(기본 `UnityAdDispatcher`), `IAdProviderFactory`(`AdProviderFactory`),
 `IAdService`(`AdService`)를 싱글턴으로 등록합니다. `settings`가 `null`이면 에러 로그만 남기고
-서비스를 등록하지 않습니다(등록 자체를 건너뛰므로, 주입받는 쪽에서 VContainer 해석 에러로 드러납니다).
+서비스를 등록하지 않습니다(등록 자체를 건너뛰므로, 주입받는 쪽에서 Reflex 해석 에러로 드러납니다).
 
 ### 1.3 사용
 

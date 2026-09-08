@@ -133,13 +133,13 @@ _iap.PurchaseAsync(IapProducts.RemoveAds);   // 오타가 컴파일 타임에 �
 ## 4. DI 등록
 
 ```csharp
-protected override void Configure(IContainerBuilder builder)
+public void InstallBindings(ContainerBuilder builder)
 {
     builder.RegisterIapService(_iapServiceSettings);
 
     // 선택 — 등록 순서는 상관없다.
-    builder.Register<IIapFulfillment, MyFulfillment>(Lifetime.Singleton);
-    builder.Register<IEntitlementStorage, CloudEntitlementStorage>(Lifetime.Singleton);
+    builder.RegisterType(typeof(MyFulfillment), new[] { typeof(IIapFulfillment) }, Lifetime.Singleton, Resolution.Lazy);
+    builder.RegisterType(typeof(CloudEntitlementStorage), new[] { typeof(IEntitlementStorage) }, Lifetime.Singleton, Resolution.Lazy);
 }
 ```
 

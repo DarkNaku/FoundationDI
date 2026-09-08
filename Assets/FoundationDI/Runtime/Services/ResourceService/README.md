@@ -14,20 +14,20 @@
 
 ## 사용법
 
-### 1) DI 등록 (VContainer)
+### 1) DI 등록 (Reflex)
 
 ```csharp
-using VContainer;
-using VContainer.Unity;
+using Reflex;
+using Reflex.Unity;
 using DarkNaku.FoundationDI;
 
-public class RootLifetimeScope : LifetimeScope
+public class RootInstaller : MonoBehaviour, IInstaller
 {
-    protected override void Configure(IContainerBuilder builder)
+    public void InstallBindings(ContainerBuilder builder)
     {
         // 백엔드 선택: ResourcesProvider ↔ AddressablesProvider 로만 교체
-        builder.Register<IResourceProvider, AddressablesProvider>(Lifetime.Singleton);
-        builder.Register<IResourceService, ResourceService>(Lifetime.Singleton);
+        builder.RegisterType(typeof(AddressablesProvider), new[] { typeof(IResourceProvider) }, Lifetime.Singleton, Resolution.Lazy);
+        builder.RegisterType(typeof(ResourceService), new[] { typeof(IResourceService) }, Lifetime.Singleton, Resolution.Lazy);
     }
 }
 ```

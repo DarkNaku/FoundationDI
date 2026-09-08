@@ -13,16 +13,16 @@
 
 ## 사용법
 
-### 1) DI 등록 (VContainer)
+### 1) DI 등록 (Reflex)
 
 ```csharp
-using VContainer;
-using VContainer.Unity;
+using Reflex;
+using Reflex.Unity;
 using DarkNaku.FoundationDI;
 
-public class RootLifetimeScope : LifetimeScope
+public class RootInstaller : MonoBehaviour, IInstaller
 {
-    protected override void Configure(IContainerBuilder builder)
+    public void InstallBindings(ContainerBuilder builder)
     {
         builder.RegisterMessageService();
     }

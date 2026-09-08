@@ -2,7 +2,7 @@
 
 **게임 부트스트랩 순차 초기화 서비스**입니다. 초기화 단위를 ScriptableObject(`InitializeItem`)로 정의하고, 여러 항목을 묶은 카탈로그(`InitializeCatalog`)를 `IInitializeService.InitializeAsync(catalog)`에 넘기면 리스트 순서대로 **순차(직렬)** 실행합니다. 서비스 세션(생성~`Dispose`) 동안 아이템·카탈로그 단위로 완료 여부를 기억해 **중복 실행을 방지**합니다.
 
-- **선언형 초기화 항목** — `InitializeItem`을 상속한 SO를 만들고 `InitializeAsync(IObjectResolver)`에 초기화 로직을 작성
+- **선언형 초기화 항목** — `InitializeItem`을 상속한 SO를 만들고 `InitializeAsync(IServiceResolver)`에 초기화 로직을 작성
 - **카탈로그로 묶어서 실행** — `InitializeCatalog` SO 에셋에 항목들을 리스트로 등록, 실행 순서 = 리스트 순서
 - **세션 내 중복 방지** — 이미 완료된 아이템/카탈로그는 재호출 시 스킵(카탈로그 전체 완료 시 즉시 반환)
 - **예외 즉시 전파 + 실패 지점부터 재개** — 아이템에서 던진 예외는 그대로 호출자에게 전파되고, 실패한 아이템은 미완료로 남아 다음 호출에서 그 지점부터 이어서 실행
@@ -13,18 +13,18 @@
 
 ### 1) 초기화 항목(`InitializeItem`) 작성
 
-`InitializeItem`을 상속하고 `InitializeAsync(IObjectResolver resolver)`를 오버라이드합니다. `resolver.Resolve<T>()`로 DI 컨테이너의 다른 서비스에 접근할 수 있으며, 내부에서 UniTask를 `await`해도 됩니다(UniTask도 어웨이터를 제공하므로 `Awaitable` 반환 메서드 안에서 자유롭게 혼용 가능).
+`InitializeItem`을 상속하고 `InitializeAsync(IServiceResolver resolver)`를 오버라이드합니다. `resolver.Resolve<T>()`로 DI 컨테이너의 다른 서비스에 접근할 수 있으며, 내부에서 UniTask를 `await`해도 됩니다(UniTask도 어웨이터를 제공하므로 `Awaitable` 반환 메서드 안에서 자유롭게 혼용 가능).
 
 ```csharp
 using UnityEngine;
-using VContainer;
+using Reflex;
 using Cysharp.Threading.Tasks;
 using DarkNaku.FoundationDI;
 
 [CreateAssetMenu(menuName = "MyGame/Initialize/RemoteConfigInitializeItem")]
 public class RemoteConfigInitializeItem : InitializeItem
 {
-    public override async Awaitable InitializeAsync(IObjectResolver resolver)
+    public override async Awaitable InitializeAsync(IServiceResolver resolver)
     {
         var remoteConfig = resolver.Resolve<IRemoteConfigService>();
         await remoteConfig.FetchAsync(); // UniTask 반환 메서드도 await 가능
@@ -41,11 +41,11 @@ public class RemoteConfigInitializeItem : InitializeItem
 ### 3) DI 등록
 
 ```csharp
-// RootLifetimeScope.Configure(IContainerBuilder builder)
+// RootInstaller.InstallBindings(ContainerBuilder builder)
 builder.RegisterInitializeService();
 ```
 
-`IObjectResolver`는 VContainer가 자동으로 주입하므로 별도 등록이 필요 없습니다.
+`IServiceResolver`는 Reflex가 자동으로 주입하므로 별도 등록이 필요 없습니다.
 
 ### 4) 호출
 
@@ -87,11 +87,11 @@ public class Bootstrap
 ```csharp
 public abstract class InitializeItem : ScriptableObject
 {
-    public abstract Awaitable InitializeAsync(IObjectResolver resolver);
+    public abstract Awaitable InitializeAsync(IServiceResolver resolver);
 }
 ```
 
-초기화 단위 1개를 나타내는 추상 SO입니다. `resolver`는 `InitializeService` 생성 시 주입된 `IObjectResolver`(루트 컨테이너)가 그대로 전달됩니다.
+초기화 단위 1개를 나타내는 추상 SO입니다. `resolver`는 `InitializeService` 생성 시 주입된 `IServiceResolver`(루트 컨테이너)가 그대로 전달됩니다.
 
 ### `InitializeCatalog`
 
@@ -108,10 +108,10 @@ public class InitializeCatalog : ScriptableObject
 ### 생성자
 
 ```csharp
-public InitializeService(IObjectResolver resolver); // VContainer가 자동 주입
+public InitializeService(IServiceResolver resolver); // Reflex가 자동 주입
 ```
 
-`RegisterInitializeService()`로 등록하면 `IObjectResolver`는 VContainer가 자동으로 채워주므로 직접 생성할 일은 거의 없습니다.
+`RegisterInitializeService()`로 등록하면 `IServiceResolver`는 Reflex가 자동으로 채워주므로 직접 생성할 일은 거의 없습니다.
 
 ---
 
@@ -133,7 +133,7 @@ public InitializeService(IObjectResolver resolver); // VContainer가 자동 주�
 ### 정리(Dispose)
 
 - `Dispose()`는 아이템·카탈로그 완료 기록을 모두 지웁니다. 이후 같은 카탈로그로 `InitializeAsync`를 호출하면 처음부터 다시 실행됩니다.
-- VContainer가 `Singleton` 수명을 관리하면 컨테이너 Dispose 시 자동 호출됩니다.
+- Reflex가 `Singleton` 수명을 관리하면 컨테이너 Dispose 시 자동 호출됩니다.
 
 ### 범위 밖 (Out of scope)
 

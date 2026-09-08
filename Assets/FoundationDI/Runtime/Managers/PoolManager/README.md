@@ -2,7 +2,7 @@
 
 키(string) 기반 **GameObject 오브젝트 풀 매니저**입니다. 자주 생성·파괴되는 오브젝트(투사체, 이펙트, 적 등)를 미리 만들어 재사용해 `Instantiate`/`Destroy` 비용과 GC 부담을 줄입니다.
 
-- **씬 수명** — 보통 씬 `LifetimeScope`에 등록해 풀이 씬과 수명을 함께합니다. 씬 언로드 시 `scope.Dispose()`로 풀과 로드한 에셋이 자동 정리됩니다(전역 풀이 필요하면 루트 스코프에 등록).
+- **씬 수명** — 보통 씬 `IInstaller`에 등록해 풀이 씬과 수명을 함께합니다. 씬 언로드 시 `scope.Dispose()`로 풀과 로드한 에셋이 자동 정리됩니다(전역 풀이 필요하면 루트 스코프에 등록).
 - **로딩 위임** — 프리팹 로드는 직접 `Resources`/`Addressables`를 호출하지 않고 [`IResourceService`](../../Services/ResourceService/README.md)에 위임합니다(핸들·참조 카운팅을 한 곳에서 관리).
 - **Unity ObjectPool 기반** — 키마다 `UnityEngine.Pool.ObjectPool<IPoolItem>`을 두고, `PoolData`가 풀 상태를, `PoolItem`이 항목 생명주기 콜백과 지연 반환을 담당합니다.
 
@@ -10,18 +10,18 @@
 
 ## 사용법
 
-### 1) DI 등록 (VContainer)
+### 1) DI 등록 (Reflex)
 
-`RegisterPoolManager`를 **씬 LifetimeScope**에서 호출합니다. `transform`을 넘기면 풀 루트가 활성 씬이 아니라 그 transform이 속한 씬에 확실히 귀속됩니다(additive 로드 안전).
+`RegisterPoolManager`를 **씬 `IInstaller`**에서 호출합니다. `transform`을 넘기면 풀 루트가 활성 씬이 아니라 그 transform이 속한 씬에 확실히 귀속됩니다(additive 로드 안전).
 
 ```csharp
-using VContainer;
-using VContainer.Unity;
+using Reflex;
+using Reflex.Unity;
 using DarkNaku.FoundationDI;
 
-public class SceneLifetimeScope : LifetimeScope   // 씬에 배치
+public class SceneInstaller : MonoBehaviour, IInstaller   // 씬에 배치
 {
-    protected override void Configure(IContainerBuilder builder)
+    public void InstallBindings(ContainerBuilder builder)
     {
         // 전제: 부모(루트) 스코프에 IResourceService가 이미 등록되어 있어야 한다.
         builder.RegisterPoolManager(transform);
@@ -97,7 +97,7 @@ public PoolManager(IResourceService resourceService, Transform parent = null);
 ```
 
 - `resourceService` — 프리팹 로드를 위임할 리소스 서비스(필수, DI 주입).
-- `parent` — 풀 루트(`[PoolManager]`)를 둘 부모. 보통 씬 `LifetimeScope`의 transform. `null`이면 활성 씬에 생성됩니다.
+- `parent` — 풀 루트(`[PoolManager]`)를 둘 부모. 보통 씬 `IInstaller`의 transform. `null`이면 활성 씬에 생성됩니다.
 
 ---
 
@@ -106,7 +106,7 @@ public PoolManager(IResourceService resourceService, Transform parent = null);
 ### 씬 수명과 메모리 정리
 
 - 풀 루트는 `DontDestroyOnLoad`로 두지 않습니다. `parent`(씬 스코프 transform) 아래에 붙어 해당 씬과 함께 파괴됩니다.
-- 씬 언로드 → 씬 `LifetimeScope`의 `scope.Dispose()` → `PoolManager.Dispose()` → 풀 정리 + 로드한 키마다 `IResourceService.Release()`. 참조가 0이 되면 에셋이 언로드됩니다.
+- 씬 언로드 → 씬 `IInstaller`의 `scope.Dispose()` → `PoolManager.Dispose()` → 풀 정리 + 로드한 키마다 `IResourceService.Release()`. 참조가 0이 되면 에셋이 언로드됩니다.
 - 파괴 순서(씬의 GameObject 파괴 ↔ `Dispose`)는 보장되지 않으므로, 이미 파괴된 항목·루트는 fake-null 가드로 건너뜁니다.
 
 ### 로딩 위임 (ResourceService)
