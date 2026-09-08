@@ -120,11 +120,33 @@ public static ContainerBuilder RegisterMessageService(this ContainerBuilder buil
 
 Reflex에는 그 레이스가 없다. `ContainerScope`가 `-1_000_000_000` 실행 순서로 돌면서 씬 컨테이너를 만들고 `SceneInjector`가 씬 전체를 재귀 주입하는 일이 **모든 `Awake`보다 먼저** 끝난다. 큐를 포팅하면 언제나 비어 있는 큐를 유지하는 코드만 남는다.
 
+**단, `InjectorService`는 일을 두 개 한다.** 하나는 위의 지연이고, 다른 하나는 **주입 실패를 대상 하나에 가두는 것**(`TryInject`의 try/catch)이다. Reflex는 첫 번째만 해결하고 두 번째는 하지 않는다 — 소스로 확인했다:
+
+```csharp
+// Reflex GameObjectInjector.InjectRecursiveMany — 컴포넌트별 try/catch가 없다
+for (var j = 0; j < monoBehaviours.Count; j++)
+    if (monoBehaviour != null)
+        AttributeInjector.Inject(monoBehaviour, container);
+```
+
+그리고 `FieldInjector.Inject`는 해석 실패를 `FieldInjectorException`으로 다시 던진다. 따라서 **미등록 서비스를 요구하는 컴포넌트 하나가 그 뒤 순번 전체의 씬 주입을 막는다.** 지금은 `InjectorService`가 이것을 잡아 주고 있다.
+
+그래서 삭제와 **함께** `[Inject]` 필드로 서비스를 직접 받던 씬 컴포넌트 넷을 리졸버 방식으로 바꾼다 — `UIButton`이 이미 쓰는 그 패턴이다.
+
+| 컴포넌트 | 지금 | 이후 |
+|---|---|---|
+| `TutorialTarget` | `[Inject] ITutorialTargetRegistry _registry` | `[Inject] Construct(IServiceResolver)` + `TryResolve` |
+| `TutorialSequenceBehaviour` | `[Inject] ITutorialManager _tutorial` | 〃 |
+| `MusicZone` | `[Inject] ISoundService _soundService` | 〃 |
+| `OutputVolumeSlider` | `[Inject] ISoundService _soundService` | 〃 |
+
+`IServiceResolver`는 결정 4로 항상 등록되므로 이 경로는 **절대 던지지 않는다.** 예외가 없으니 격리 인프라도 필요 없다. 넷 다 이미 널 가드(`_x == null`)를 갖고 있어 미등록 시 동작은 지금과 같다.
+
 연쇄 결과:
 
 - `UIButton.EnsureInjected()`와 `_requested` 플래그가 사라진다. `[Inject] public void Construct(IServiceResolver)` 하나로 끝난다.
-- `InjectableBehaviour`를 상속하던 씬 컴포넌트는 그냥 `MonoBehaviour`가 되고 `[Inject]` 필드만 남긴다.
-- 런타임 생성물(PoolManager 인스턴스, UINavigator의 Presenter/View)은 원래도 자동 주입 대상이 아니었고, 지금처럼 `InjectGameObject`/`Inject`로 명시 주입한다. **이 경로는 그대로다.**
+- 위 네 컴포넌트의 `EnsureInjected()` 호출과 `InjectableBehaviour` 상속이 사라진다. **주입 지연에 대비한 `Update` 폴링은 남긴다** — 제거는 이번 범위 밖이다.
+- 런타임 생성물(PoolManager 인스턴스, UINavigator의 Presenter/View)은 원래도 자동 주입 대상이 아니었고, 지금처럼 `InjectGameObject`/`Inject`로 명시 주입한다. **이 경로는 그대로다.** `PoolManager`는 자체 try/catch가 있어 격리가 유지된다.
 
 **공개 타입 2개가 사라지는 파괴적 변경**이다(`InjectorService`, `InjectableBehaviour`). 0.9.x 단계이고 README에 마이그레이션 안내를 싣는 조건으로 감수한다. 버전을 0.10.0으로 올린다.
 
@@ -276,9 +298,9 @@ Unity 프로젝트는 어셈블리 하나가 깨지면 전체가 깨진다. VCon
 | `UIButton.cs` | `Construct(IServiceResolver)`, `EnsureInjected`/`_requested` 삭제 |
 | `UnityAdDispatcher.cs` · `HapticService.cs` | `[Inject]` 생성자 → `[ReflexConstructor]` |
 
-### `InjectableBehaviour` 상속을 걷어내는 것
+### `[Inject]` 필드를 리졸버 주입으로 바꾸는 것
 
-`TutorialSequenceBehaviour.cs` · `TutorialTarget.cs` · `MusicZone.cs` · `OutputVolumeSlider.cs` — **넷 다 `InjectableBehaviour`를 상속한다.** `MonoBehaviour`로 내리고 `using VContainer` → `using Reflex.Attributes`. `[Inject]` 필드는 그대로 두면 Reflex 씬 주입이 채운다. `Awake` 오버라이드에서 `base.Awake()`를 부르는 곳이 있으면 함께 정리한다.
+`TutorialSequenceBehaviour.cs` · `TutorialTarget.cs` · `MusicZone.cs` · `OutputVolumeSlider.cs` — **넷 다 `InjectableBehaviour`를 상속하고 `[Inject]` 필드로 서비스를 직접 받는다.** `MonoBehaviour`로 내리고, 필드 주입을 `[Inject] Construct(IServiceResolver)` + `TryResolve`로 바꾼다(결정 3의 표). `EnsureInjected()` 호출과 `base.Awake()`를 지운다.
 
 샘플의 `SoundSampleDemo.cs`도 같은 상속을 쓰므로 8단계에서 같이 내린다.
 
@@ -370,7 +392,7 @@ STRUCTURAL과 BEHAVIORAL을 섞지 않는다. 위 마이그레이션 순서의 �
 - **Reflex 14.3.1은 Unity 2021+ 지원을 표방한다.** 이 프로젝트는 6000.3.17f1이다. 1단계에서 설치 직후 컴파일과 기존 테스트를 돌려 확인한다. 여기서 막히면 이후 단계가 의미 없으므로 **1단계가 사실상 게이트**다.
 - **씬 자동 주입 범위.** Reflex는 `ContainerScope`가 있는 씬만 주입한다. 호스트 씬에 배치하는 것을 8단계에서 빠뜨리면 `[Inject]` 필드가 조용히 null이 된다. PlayMode 테스트가 이를 잡는다.
 - **`DontDestroyOnLoad` 오브젝트.** 씬 소속이 아니므로 자동 주입 대상이 아니다. 현재 그런 대상은 `[AdService] Runner`(`HideAndDontSave`)뿐이고 주입을 받지 않으므로 영향 없다.
-- **`AttributeInjector.Inject`는 미등록 의존에 예외를 던진다.** VContainer도 같았고, `IServiceResolver`는 결정 4로 항상 등록되므로 새 함정은 아니다. 다만 `UIButton`이 서비스를 직접 `[Inject]` 필드로 받지 않는 현재 설계는 **그대로 유지해야 한다**(README의 근거 문단도 Reflex 기준으로 다시 쓴다).
+- **씬 주입에는 컴포넌트별 격리가 없다.** `AttributeInjector.Inject`가 던지면 그 뒤 컴포넌트가 전부 주입되지 않는다. 결정 3으로 `[Inject]` 서비스 필드를 전부 없앴으므로 패키지 안에는 던질 경로가 남지 않지만, **이 패키지를 쓰는 프로젝트가 자기 컴포넌트에 `[Inject]` 필드를 쓰면 같은 함정에 빠진다.** README에 명시한다. 다만 `UIButton`이 서비스를 직접 `[Inject]` 필드로 받지 않는 현재 설계는 **그대로 유지해야 한다**(README의 근거 문단도 Reflex 기준으로 다시 쓴다).
 - **`link.xml` / `SdkDefineTable`은 영향 없다.** 어댑터 보존은 SDK 어셈블리 기준이고 DI와 무관하다.
 
 ---

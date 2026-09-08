@@ -1244,7 +1244,7 @@ git commit -m "[BEHAVIORAL] 리졸버 소비자를 IServiceResolver로 옮긴다
 
 ---
 
-### Task 8: `[Inject]` 컴포넌트와 생성자 속성
+### Task 8: 씬 컴포넌트 주입과 생성자 속성
 
 **Files:**
 - Modify: `Runtime/Components/UIButton.cs`
@@ -1357,16 +1357,107 @@ UnityMCP `read_console`.
 
 `private bool _requested;` 필드와 `EnsureInjected()` 메서드를 통째로 지운다.
 
-- [ ] **Step 4: `InjectableBehaviour` 상속 4개를 `MonoBehaviour`로 내린다**
+- [ ] **Step 4: 씬 컴포넌트 4개를 리졸버 주입으로 바꾼다**
 
-`TutorialSequenceBehaviour` · `TutorialTarget` · `MusicZone` · `OutputVolumeSlider`. 각각:
+> **왜 필드 주입을 그냥 두지 않는가:** Reflex의 `GameObjectInjector.InjectRecursiveMany`에는 컴포넌트별 try/catch가 없고 `FieldInjector.Inject`는 해석 실패를 `FieldInjectorException`으로 다시 던진다. 미등록 서비스를 요구하는 컴포넌트 하나가 **그 뒤 순번 전체의 씬 주입을 막는다.** 지금은 `InjectorService.TryInject`가 이걸 잡아 주고 있고, Task 9에서 그게 사라진다. `IServiceResolver`는 항상 등록되므로 리졸버 주입은 던지지 않는다.
+
+넷 다 공통 변경:
 
 - `using VContainer;` → `using Reflex.Attributes;`
 - `: InjectableBehaviour` → `: MonoBehaviour`
-- `protected override void Awake()` → `private void Awake()`(또는 `protected virtual`), `base.Awake();` 호출 제거
-- `[Inject] private IXxx _field;`는 **그대로 둔다**
+- `[Inject] private IXxx _field;` → 평범한 `private IXxx _field;` + 아래 `Construct`
+- `EnsureInjected()` 호출 제거, `base.Awake()` 제거(`protected override void Awake` → `private void Awake`)
+- **`Update` 폴링과 널 가드는 남긴다** — 제거는 이번 범위 밖이다
 
-`MusicZone`과 `OutputVolumeSlider`는 `public class`라 파생 클래스가 있을 수 있다. `Awake`가 `protected virtual`이었다면 유지한다.
+`TutorialTarget.cs`:
+
+```csharp
+        private ITutorialTargetRegistry _registry;
+
+        [Inject]
+        public void Construct(IServiceResolver resolver)
+        {
+            if (resolver == null) return;
+
+            resolver.TryResolve(out _registry);
+        }
+
+        private void OnEnable()
+        {
+            TryRegister();
+        }
+```
+
+`TutorialSequenceBehaviour.cs`:
+
+```csharp
+        private ITutorialManager _tutorial;
+
+        [Inject]
+        public void Construct(IServiceResolver resolver)
+        {
+            if (resolver == null) return;
+
+            resolver.TryResolve(out _tutorial);
+        }
+```
+
+`MusicZone.cs` — 클래스 선언의 XML 주석에서 `InjectableBehaviour` 언급도 고친다:
+
+```csharp
+    /// <summary>
+    /// 구/박스 영역 안에서만 들리는 음악 존. 영역 밖 페이드 구간에서 거리에 비례해 볼륨이 줄어든다.
+    /// 씬에 배치하는 컴포넌트이므로 <see cref="IServiceResolver"/>로 <see cref="ISoundService"/>를
+    /// 선택 주입받는다 — 미등록 시 던지면 같은 씬의 다른 컴포넌트 주입까지 막힌다.
+    /// </summary>
+    public class MusicZone : MonoBehaviour
+    {
+        private ISoundService _soundService;
+
+        [Inject]
+        public void Construct(IServiceResolver resolver)
+        {
+            if (resolver == null) return;
+
+            resolver.TryResolve(out _soundService);
+        }
+```
+
+`OutputVolumeSlider.cs` — `Awake`에서 `base.Awake()`를 지우고, `Start`/`ChangeVolume`의 `EnsureInjected()`를 지운다:
+
+```csharp
+        private ISoundService _soundService;
+
+        [Inject]
+        public void Construct(IServiceResolver resolver)
+        {
+            if (resolver == null) return;
+
+            resolver.TryResolve(out _soundService);
+        }
+
+        private void Awake()
+        {
+            _volumeSlider = GetComponent<Slider>();
+            _volumeSlider.onValueChanged.AddListener(ChangeVolume);
+        }
+
+        private void Start()
+        {
+            if (_soundService == null)
+            {
+                Debug.LogError("[OutputVolumeSlider] ISoundService가 주입되지 않았습니다.");
+                return;
+            }
+            ...
+        }
+
+        public void ChangeVolume(float volume)
+        {
+            if (_soundService == null) return;
+            ...
+        }
+```
 
 - [ ] **Step 5: 생성자 속성 2개를 바꾼다**
 
