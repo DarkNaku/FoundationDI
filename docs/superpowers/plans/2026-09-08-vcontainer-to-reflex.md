@@ -22,6 +22,11 @@
 - Reflex UPM URL은 정확히 `https://github.com/gustavopsantos/reflex.git?path=/Assets/Reflex/#14.3.1`.
 - 패키지 버전 최종값: `0.9.7` → `0.10.0` (`Assets/FoundationDI/package.json`).
 - Task 완료 조건은 매번 동일하다: **컴파일 에러 0 + `FoundationDI.Tests` 전체 통과**.
+- **`Resolution`은 이름 충돌한다.** `Reflex.Enums.Resolution`과 `UnityEngine.Resolution`이 부딪히므로, `using UnityEngine;`과 `using Reflex.Enums;`를 함께 쓰는 파일에는 반드시 별칭을 넣는다:
+  ```csharp
+  using Resolution = Reflex.Enums.Resolution;
+  ```
+  해당 파일: `ServiceResolverBootstrap.cs`, `AdServiceRegistration.cs`, `AnalyticsServiceRegistration.cs`, `IapServiceRegistration.cs`, `PoolManager.cs`, `SoundServiceRegistration.cs`(UnityEngine을 쓰면).
 
 ---
 
