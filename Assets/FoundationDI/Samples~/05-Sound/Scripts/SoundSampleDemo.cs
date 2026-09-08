@@ -1,6 +1,6 @@
 using System.Linq;
 using UnityEngine;
-using VContainer;
+using Reflex.Attributes;
 
 namespace DarkNaku.FoundationDI.Samples
 {
@@ -8,9 +8,17 @@ namespace DarkNaku.FoundationDI.Samples
     /// SoundService의 주요 기능을 한 화면에서 눌러 볼 수 있는 데모 패널.
     /// UI 프리팹 배선 대신 <see cref="OnGUI"/>로 그려서, 샘플이 사운드 API 자체에만 집중하도록 했다.
     /// </summary>
-    public class SoundSampleDemo : InjectableBehaviour
+    public class SoundSampleDemo : MonoBehaviour
     {
-        [Inject] private ISoundService _sound;
+        private ISoundService _sound;
+
+        [Inject]
+        public void Construct(IServiceResolver resolver)
+        {
+            if (resolver == null) return;
+
+            resolver.TryResolve(out _sound);
+        }
 
         private Sound _click;
         private Sound _coin;

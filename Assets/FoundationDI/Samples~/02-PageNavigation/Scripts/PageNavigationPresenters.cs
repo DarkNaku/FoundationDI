@@ -1,6 +1,6 @@
 using UnityEngine;
-using VContainer;
-using VContainer.Unity;
+using Reflex.Attributes;
+using UnityEngine;
 
 namespace DarkNaku.FoundationDI.Samples
 {
@@ -68,10 +68,11 @@ namespace DarkNaku.FoundationDI.Samples
             => View.backButton.onClick.RemoveAllListeners();
     }
 
-    public class PageNavigationDemo : IStartable
+    /// Reflex에는 엔트리포인트가 없다. 씬의 ContainerScope GameObject에 붙인다.
+    public class PageNavigationDemo : MonoBehaviour
     {
-        private readonly IUINavigator _ui;
-        public PageNavigationDemo(IUINavigator ui) => _ui = ui;
-        public void Start() => _ui.Page<TitlePage>();
+        [Inject] private IUINavigator _ui;
+
+        private void Start() => _ui.Page<TitlePage>();
     }
 }

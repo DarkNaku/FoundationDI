@@ -1,5 +1,5 @@
-using VContainer;
-using VContainer.Unity;
+using Reflex.Attributes;
+using UnityEngine;
 
 namespace DarkNaku.FoundationDI.Samples
 {
@@ -56,10 +56,11 @@ namespace DarkNaku.FoundationDI.Samples
         protected override void OnInitialize() => View.label.text = "HUD (Above)";
     }
 
-    public class BasicUsageDemo : IStartable
+    /// Reflex에는 엔트리포인트가 없다. 씬의 ContainerScope GameObject에 붙인다.
+    public class BasicUsageDemo : MonoBehaviour
     {
-        private readonly IUINavigator _ui;
-        public BasicUsageDemo(IUINavigator ui) => _ui = ui;
-        public void Start() => _ui.Page<MainMenuPage>();
+        [Inject] private IUINavigator _ui;
+
+        private void Start() => _ui.Page<MainMenuPage>();
     }
 }

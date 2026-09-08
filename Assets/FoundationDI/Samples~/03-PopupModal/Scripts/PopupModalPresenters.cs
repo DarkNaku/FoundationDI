@@ -1,6 +1,6 @@
 using UnityEngine;
-using VContainer;
-using VContainer.Unity;
+using Reflex.Attributes;
+using UnityEngine;
 
 namespace DarkNaku.FoundationDI.Samples
 {
@@ -48,10 +48,11 @@ namespace DarkNaku.FoundationDI.Samples
         }
     }
 
-    public class PopupModalDemo : IStartable
+    /// Reflex에는 엔트리포인트가 없다. 씬의 ContainerScope GameObject에 붙인다.
+    public class PopupModalDemo : MonoBehaviour
     {
-        private readonly IUINavigator _ui;
-        public PopupModalDemo(IUINavigator ui) => _ui = ui;
-        public void Start() => _ui.Page<ModalHostPage>();
+        [Inject] private IUINavigator _ui;
+
+        private void Start() => _ui.Page<ModalHostPage>();
     }
 }

@@ -1,5 +1,5 @@
-using VContainer;
-using VContainer.Unity;
+using Reflex.Attributes;
+using UnityEngine;
 
 namespace DarkNaku.FoundationDI.Samples
 {
@@ -46,12 +46,12 @@ namespace DarkNaku.FoundationDI.Samples
         }
     }
 
-    public class OverlayDemo : IStartable
+    /// Reflex에는 엔트리포인트가 없다. 씬의 ContainerScope GameObject에 붙인다.
+    public class OverlayDemo : MonoBehaviour
     {
-        private readonly IUINavigator _ui;
-        public OverlayDemo(IUINavigator ui) => _ui = ui;
+        [Inject] private IUINavigator _ui;
 
-        public void Start()
+        private void Start()
         {
             _ui.Overlay<BackgroundBelowOverlay>();   // Below 배경
             _ui.Page<OverlayHostPage>();             // Page — OnBeforeShow에서 Above HUD 생성
