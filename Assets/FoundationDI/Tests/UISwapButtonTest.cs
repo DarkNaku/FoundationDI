@@ -6,7 +6,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using Reflex.Core;
 
-public class UIStateButtonTest
+public class UISwapButtonTest
 {
     private GameObject _buttonGo;
     private GameObject _targetGo;
@@ -44,14 +44,14 @@ public class UIStateButtonTest
         if (_disabled != null) Object.DestroyImmediate(_disabled);
     }
 
-    private UIStateButton NewButtonWithSet()
+    private UISwapButton NewButtonWithSet()
     {
         var set = new UIImageStateSet { Target = _target };
         set.Normal = new UIImageStateValue { Override = UIImageSwap.Sprite, Sprite = _normal };
         set.Pressed = new UIImageStateValue { Override = UIImageSwap.Sprite, Sprite = _pressed };
         set.Disabled = new UIImageStateValue { Override = UIImageSwap.Sprite, Sprite = _disabled };
 
-        var button = _buttonGo.AddComponent<UIStateButton>();
+        var button = _buttonGo.AddComponent<UISwapButton>();
         button.SetSetsForTest(new List<UIImageStateSet> { set }, null);
         return button;
     }
@@ -95,7 +95,7 @@ public class UIStateButtonTest
     [Test]
     public void 세트가_비어도_상태_전이가_예외를_내지_않는다()
     {
-        var button = _buttonGo.AddComponent<UIStateButton>();
+        var button = _buttonGo.AddComponent<UISwapButton>();
 
         Assert.DoesNotThrow(() => button.interactable = false);
     }
@@ -110,7 +110,7 @@ public class UIStateButtonTest
         textSet.Normal = new UITextStateValue { Override = UITextSwap.Text, Text = "시작" };
         textSet.Disabled = new UITextStateValue { Override = UITextSwap.Text, Text = "잠김" };
 
-        var button = _buttonGo.AddComponent<UIStateButton>();
+        var button = _buttonGo.AddComponent<UISwapButton>();
         button.SetSetsForTest(null, new List<UITextStateSet> { textSet });
 
         button.ApplyState(UIButtonState.Disabled);

@@ -5,9 +5,9 @@ using UnityEngine.UI;
 
 namespace DarkNaku.FoundationDI.Editor
 {
-    [CustomEditor(typeof(UIStateButton), true)]
+    [CustomEditor(typeof(UISwapButton), true)]
     [CanEditMultipleObjects]
-    public class UIStateButtonEditor : UIButtonEditor
+    public class UISwapButtonEditor : UIButtonEditor
     {
         private SerializedProperty _imageSets;
         private SerializedProperty _textSets;

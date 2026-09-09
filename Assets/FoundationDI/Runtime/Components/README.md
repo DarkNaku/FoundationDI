@@ -3,7 +3,7 @@
 씬 저작용 uGUI 위젯이 사는 자리다(서비스도 매니저도 아니다). 현재 세 컴포넌트가 있다.
 
 - **`UIButton`** — uGUI `Button`을 상속해 클릭 시 SFX 재생 + 햅틱 `Impact`를 낸다.
-- **`UIStateButton`** — `UIButton`을 상속해, 상태(Normal/Highlighted/Pressed/Selected/Disabled)별로
+- **`UISwapButton`** — `UIButton`을 상속해, 상태(Normal/Highlighted/Pressed/Selected/Disabled)별로
   여러 `Image`/텍스트를 동시에 스왑한다. uGUI 내장 Transition은 `targetGraphic` 하나에만 걸리지만,
   이 컴포넌트는 세트마다 다른 타깃을 몰 수 있다.
 - **`UIScaleButton`** — `UIButton`을 상속해, 호버하면 커지고 누르면 작아졌다 떼면 다시 커진다.
@@ -43,14 +43,14 @@ public class RootInstaller : MonoBehaviour, IInstaller
 ### 2) 씬에 배치
 
 전용 GameObject 생성 메뉴는 없다 — 기존 GameObject의 **Add Component**에서 `FoundationDI/UI Button`,
-`FoundationDI/UI State Button`, `FoundationDI/UI Scale Button`을 검색해 붙인다(`[AddComponentMenu]`로 노출된다). `Button`을
+`FoundationDI/UI Swap Button`, `FoundationDI/UI Scale Button`을 검색해 붙인다(`[AddComponentMenu]`로 노출된다). `Button`을
 대체하는 컴포넌트이므로 같은 오브젝트에 `Button`과 `UIButton`을 함께 두지 않는다.
 
 인스펙터에서 SFX/Output/Volume/RandomPitch(Sound)와 UseHaptic/HapticImpact(Haptic)를 설정한다.
-`UIStateButton`은 그 아래에 이미지 세트/텍스트 세트 목록과 `Deselect On Click`이 추가로 나온다.
+`UISwapButton`은 그 아래에 이미지 세트/텍스트 세트 목록과 `Deselect On Click`이 추가로 나온다.
 
 **기존 `Button`을 붙였던 자리를 마이그레이션하는 경우** — Add Component 대신 인스펙터 하단의
-컨텍스트 메뉴로 **Script**를 `UIButton`/`UIStateButton`으로 교체하는 경로를 더 많이 쓰게 된다. 이
+컨텍스트 메뉴로 **Script**를 `UIButton`/`UISwapButton`으로 교체하는 경로를 더 많이 쓰게 된다. 이
 경로는 `Reset()`을 부르지 않으므로 기존 `Button`의 `m_Transition`(예: `ColorTint`)과
 `targetGraphic`이 그대로 남는다. 스왑 세트를 아직 추가하지 않았다면 인스펙터 경고도 뜨지 않으니,
 **Transition을 손으로 `None`으로 바꿔야 한다**(위 "`transition`은 `None`으로 둘 것" 참고).
@@ -59,7 +59,7 @@ public class RootInstaller : MonoBehaviour, IInstaller
 
 ## 상태 5종과 폴백 규칙
 
-`UIStateButton`이 쓰는 상태는 `UIButtonState`(`Normal`/`Highlighted`/`Pressed`/`Selected`/`Disabled`)
+`UISwapButton`이 쓰는 상태는 `UIButtonState`(`Normal`/`Highlighted`/`Pressed`/`Selected`/`Disabled`)
 다섯 가지다. uGUI의 `Selectable.SelectionState`와 값·순서가 같지만 `protected` 중첩 enum이라 공개
 API에서 쓸 수 없어 별도로 둔 것이므로, 캐스팅이 아니라 명시적 매핑으로 번역된다.
 
@@ -98,7 +98,7 @@ uGUI가 클릭한 버튼을 선택 상태로 계속 유지하는 성질과 겹�
 > **에디터에서는 아직 값이 구워진다.** `Selectable`이 `[ExecuteAlways]`라 에디터에서도 `OnValidate`
 > → `DoStateTransition`이 돌고, 이 스왑은 uGUI의 `overrideSprite`/`CanvasRenderer`와 달리 직렬화
 > 필드를 직접 쓴다. 인스펙터에서 `interactable`을 껐다 켜면 `Disabled` 값이 프리팹에 남을 수 있다.
-> `plan.md`의 "대기: UIStateButton 복원 기준값"에 남아 있는 항목이다.
+> `plan.md`의 "대기: UISwapButton 복원 기준값"에 남아 있는 항목이다.
 
 ---
 
@@ -107,7 +107,7 @@ uGUI가 클릭한 버튼을 선택 상태로 계속 유지하는 성질과 겹�
 **주의 1 — `onClick.RemoveAllListeners()`는 클릭 피드백도 지운다.**
 `PlayFeedback()`(사운드+햅틱)은 다른 리스너와 마찬가지로 `Awake`에서 `onClick.AddListener`로 걸려
 있다. `RemoveAllListeners()`를 부르고 자기 리스너만 다시 등록하면 피드백이 조용히 사라진다.
-`onClick.AddListener(PlayFeedback)`을 함께 다시 걸어야 한다. **`UIStateButton`에서 `_deselectOnClick`을
+`onClick.AddListener(PlayFeedback)`을 함께 다시 걸어야 한다. **`UISwapButton`에서 `_deselectOnClick`을
 켰다면 문제가 하나 더 있다** — 이 옵션은 `onClick`에 `Deselect`라는 **private** 메서드를 별도로
 등록하는데, `RemoveAllListeners()`는 이것도 함께 지우고 `private`이라 게임 코드가 다시 등록할 수
 없다. `_deselectOnClick`을 쓰는 버튼에서는 애초에 `RemoveAllListeners()`를 피하고, 필요하면 특정
@@ -140,7 +140,7 @@ Material Preset을 만들어 `Material` 필드로 교체한다.
 
 ## `transition`은 `None`으로 둘 것
 
-`UIStateButton`은 `Button`(→`Selectable`)의 `transition`(`m_Transition`)을 그대로 물려받는다.
+`UISwapButton`은 `Button`(→`Selectable`)의 `transition`(`m_Transition`)을 그대로 물려받는다.
 기본값 `ColorTint`를 켜 두면 uGUI가 `targetGraphic.color`를 자체적으로 보간하는데, 이 컴포넌트의
 `Color` 스왑도 같은 `Graphic.color`를 쓰므로 **두 색 변경이 곱해져 적용**된다. `Reset()`이 새로 붙일
 때 `transition = None`으로 초기화하고, 인스펙터도 스왑 세트가 하나라도 있는데 `Transition`이
@@ -173,7 +173,7 @@ Material Preset을 만들어 `Material` 필드로 교체한다.
 주요 직렬화 필드: `_sfx`(SFX), `_output`(Output), `_volume`(0~1, 기본 1), `_randomPitch`(bool),
 `_useHaptic`(bool, 기본 true), `_hapticImpact`(HapticImpact, 기본 Light).
 
-### `UIStateButton : UIButton`
+### `UISwapButton : UIButton`
 
 | 멤버 | 시그니처 | 설명 |
 | --- | --- | --- |
@@ -271,7 +271,7 @@ uGUI의 레이캐스트 영역은 `Graphic`의 rect에 **트랜스폼 스케일�
 
 ### 상태 규칙
 
-`UIStateButton`과 달리 uGUI의 `SelectionState`를 쓰지 않는다. 대신 포인터의 안/밖과 누름 여부를
+`UISwapButton`과 달리 uGUI의 `SelectionState`를 쓰지 않는다. 대신 포인터의 안/밖과 누름 여부를
 직접 추적한다.
 
 ```
@@ -283,10 +283,10 @@ uGUI의 레이캐스트 영역은 `Graphic`의 rect에 **트랜스폼 스케일�
 
 `SelectionState`를 쓰지 않는 이유는 uGUI의 우선순위가 `Pressed > Selected > Highlighted`이기
 때문이다. PC에서 클릭 후 마우스를 떼면 버튼이 `Selected`로 남아 `Highlighted`로 돌아오지 않는다
-(`UIStateButton`이 `_deselectOnClick`을 둔 것이 이 문제 때문이다). 포인터 상태를 직접 보면
+(`UISwapButton`이 `_deselectOnClick`을 둔 것이 이 문제 때문이다). 포인터 상태를 직접 보면
 "떼면 다시 커진다"가 PC·모바일 양쪽에서 그대로 나오고, 탭한 버튼이 확대된 채 남는 일도 없다.
 
-비활성 배율의 폴백 대상은 `UIStateButton`과 같이 **언제나 Normal**이다. `Override Disabled Scale`을
+비활성 배율의 폴백 대상은 `UISwapButton`과 같이 **언제나 Normal**이다. `Override Disabled Scale`을
 켜지 않으면 비활성 버튼은 본래 크기로 돌아간다.
 
 ### 기준 스케일
@@ -307,7 +307,7 @@ uGUI의 레이캐스트 영역은 `Graphic`의 rect에 **트랜스폼 스케일�
 
 ### 에디터에서는 스케일을 쓰지 않는다
 
-`localScale`은 직렬화 프로퍼티라 `UIStateButton`의 스왑과 같은 위험이 있다 — `Selectable`이
+`localScale`은 직렬화 프로퍼티라 `UISwapButton`의 스왑과 같은 위험이 있다 — `Selectable`이
 `[ExecuteAlways]`라 에디터에서도 상태 전이가 도는데, 여기서 스케일을 쓰면 인스펙터에서
 `interactable`을 껐다 켜는 것만으로 확대된 값이 **프리팹에 구워진다**. 그래서
 `Update`/`OnEnable`/`OnDisable`/`DoStateTransition`은 모두 `Application.isPlaying`일 때만 동작한다.
@@ -339,7 +339,7 @@ uGUI의 레이캐스트 영역은 `Graphic`의 rect에 **트랜스폼 스케일�
 - `UIScaleButtonEditor` — 위 에디터를 상속해 Scale 섹션을 추가하고, 히트 영역이 스케일을 따라
   변하는 배선(타깃 미지정 / 타깃이 버튼 자신 / 타깃 하위에 켜진 Raycast Target / 타깃이 자식이
   아님)을 경고한다. `Create Scale Content` 버튼으로 `Content` 래퍼를 만들어 준다.
-- `UIStateButtonEditor` — 위 에디터를 상속해 State Swap 섹션을 추가하고, 스왑 세트가 있는데
+- `UISwapButtonEditor` — 위 에디터를 상속해 State Swap 섹션을 추가하고, 스왑 세트가 있는데
   `Transition`이 `None`이 아니면 경고, 세트의 `Target`이 비어 있으면 경고, `Normal`이 오버라이드하지
   않는 필드를 다른 상태가 오버라이드하면 경고를 띄운다(위 "상태 5종과 폴백 규칙"의 하자).
 - `UIImageStateValueDrawer`/`UITextStateValueDrawer`(`UIStateValueDrawers.cs`) — 각각
@@ -350,7 +350,7 @@ uGUI의 레이캐스트 영역은 `Graphic`의 rect에 **트랜스폼 스케일�
 
 ## 테스트
 
-EditMode 단위 테스트(`Assets/FoundationDI/Tests/`)는 `UIStateButton.ApplyState(UIButtonState)`를
+EditMode 단위 테스트(`Assets/FoundationDI/Tests/`)는 `UISwapButton.ApplyState(UIButtonState)`를
 직접 호출해 EventSystem 포인터 시뮬레이션 없이 5상태 매핑과 폴백 규칙을 검증한다. 서비스 주입은
 `SetServicesForTest`/`ConfigureForTest`(둘 다 `internal`) 헬퍼로 대체한다.
 

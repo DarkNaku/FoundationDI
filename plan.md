@@ -135,7 +135,7 @@ Adjust 어댑터 쪽(설정 토글 → `IsFirstSessionDelayEnabled`, 훅 → `En
    그래서 스케일은 `_scaleTarget`(자식 `RectTransform`)에만 걸고 버튼 자신의 트랜스폼은 건드리지
    않는다. 레이캐스트를 받는 `Graphic`은 버튼 본체에 남는다.
 2. **`SelectionState`를 쓰지 않는다.** uGUI의 우선순위는 `Pressed > Selected > Highlighted`라
-   PC에서 클릭 후 마우스를 떼면 `Selected`가 되어 `Highlighted`로 돌아오지 않는다(`UIStateButton`이
+   PC에서 클릭 후 마우스를 떼면 `Selected`가 되어 `Highlighted`로 돌아오지 않는다(`UISwapButton`이
    `_deselectOnClick`을 둔 이유). 대신 `OnPointerEnter/Exit/Down/Up`으로 `_pointerInside`/
    `_pointerDown`을 직접 추적해 "떼면 다시 커진다"가 PC·모바일 양쪽에서 그대로 나오게 한다.
 
@@ -186,7 +186,7 @@ UIService를 씬 LifetimeScope가 소유하는 UINavigator로 바꿨다. 캔버�
 
 ---
 
-## 완료: UIButton / UIStateButton
+## 완료: UIButton / UISwapButton
 
 uGUI Button을 상속한 피드백 버튼(사운드+햅틱)과, 상태별로 여러 Image/Text를 스왑하는 버튼.
 스왑 세트는 Selectable을 모르는 순수 타입이라 EditMode에서 단독으로 테스트된다.
@@ -260,7 +260,7 @@ EditMode 범위 밖: Pressed/Highlighted/Selected 매핑은 EventSystem 포인�
 해석 정책은 `SoundService.ResolveOutput`(internal) 순수 메서드로 분리해 AudioMixer 에셋 없이
 EditMode에서 검증한다. 실제 `AudioMixerGroup` 조회가 붙는 경로는 실기 확인 대상이다.
 
-## 대기: UIStateButton 복원 기준값
+## 대기: UISwapButton 복원 기준값
 
 스왑 세트가 복원 기준을 갖고 있지 않아 생기는 문제 두 가지를 함께 푼다. 뿌리가 같다 —
 직렬화 필드(`Image.sprite`/`color`/`enabled`)를 되돌릴 기준 없이 직접 쓴다.

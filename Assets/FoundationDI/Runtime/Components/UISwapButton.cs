@@ -9,8 +9,8 @@ namespace DarkNaku.FoundationDI
     /// uGUI 내장 Transition은 targetGraphic 하나에만 걸리지만, 이 버튼은 세트마다
     /// 다른 타깃을 몰 수 있다.
     /// </summary>
-    [AddComponentMenu("FoundationDI/UI State Button")]
-    public class UIStateButton : UIButton
+    [AddComponentMenu("FoundationDI/UI Swap Button")]
+    public class UISwapButton : UIButton
     {
         [Header("State Swap")]
         [SerializeField] private List<UIImageStateSet> _imageSets = new List<UIImageStateSet>();

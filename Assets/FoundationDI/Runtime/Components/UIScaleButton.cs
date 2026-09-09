@@ -128,7 +128,7 @@ namespace DarkNaku.FoundationDI
 
             if (!IsInteractable())
             {
-                // 폴백 대상은 UIStateButton과 같이 언제나 Normal이다.
+                // 폴백 대상은 UISwapButton과 같이 언제나 Normal이다.
                 _targetScale = _overrideDisabledScale ? _disabledScale : 1f;
             }
             else if (_pointerInside)
