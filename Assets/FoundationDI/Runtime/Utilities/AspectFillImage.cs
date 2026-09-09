@@ -8,6 +8,9 @@ using UnityEngine.UI;
 /// Unity 기본 Image의 Preserve Aspect는 '맞춤(fit)'만 되어 여백이 생기지만, 이 컴포넌트는
 /// 넘치게 채우고(잘림) 종횡비는 왜곡 없이 보존한다. Fit 모드는 반대로 안에 맞춘다(레터박스).
 ///
+/// Fit에서 남는 여백은 기본적으로 양쪽에 균등하게 나뉘지만, FitAlignment로 9분할 기준 위치를
+/// 지정하면 한쪽으로 몰 수 있다(CSS의 object-position에 해당).
+///
 /// 넘치는 영역의 잘림은 부모의 RectMask2D/Mask 또는 화면 경계가 처리한다.
 /// rect가 스프라이트 종횡비에 정확히 맞춰지므로 Image의 왜곡이 없어 Preserve Aspect가 보존된다.
 /// </summary>
@@ -34,6 +37,9 @@ public sealed class AspectFillImage : UIBehaviour, ILayoutSelfController
     [Tooltip("Image/스프라이트가 없을 때 사용할 수동 종횡비(가로÷세로). 0 이하이면 무시.")]
     [SerializeField] private float _manualAspect;
 
+    [Tooltip("Fit에서 남는 여백을 어느 쪽으로 몰지. Cover는 여백이 없어 무시된다.")]
+    [SerializeField] private TextAnchor _fitAlignment = TextAnchor.MiddleCenter;
+
     [System.NonSerialized] private RectTransform _rect;
     private RectTransform Rect => _rect != null ? _rect : (_rect = (RectTransform)transform);
 
@@ -44,6 +50,13 @@ public sealed class AspectFillImage : UIBehaviour, ILayoutSelfController
     {
         get => _mode;
         set { if (_mode != value) { _mode = value; Apply(); } }
+    }
+
+    /// <summary>Fit에서 여백을 몰 기준 위치(9분할). Cover에서는 아무 효과가 없다.</summary>
+    public TextAnchor FitAlignment
+    {
+        get => _fitAlignment;
+        set { if (_fitAlignment != value) { _fitAlignment = value; Apply(); } }
     }
 
     protected override void OnEnable()
@@ -121,5 +134,37 @@ public sealed class AspectFillImage : UIBehaviour, ILayoutSelfController
         Rect.sizeDelta = widthDriven
             ? new Vector2(0f, area.x / srcAspect - area.y)
             : new Vector2(area.y * srcAspect - area.x, 0f);
+
+        // Cover는 넘치는 쪽을 잘라내므로 몰아 줄 여백 자체가 없다. 중앙(=0)을 유지해야
+        // 잘림이 양쪽으로 균등하게 일어난다.
+        if (_mode == FitMode.Fit) Rect.anchoredPosition = FitOffset(Rect.sizeDelta);
+    }
+
+    /// <summary>
+    /// Fit에서 sizeDelta는 "부모보다 얼마나 작은가"라 음수이고, 그 절댓값이 곧 남는 여백이다.
+    /// 중앙(0.5)에서 기준 위치만큼 벗어난 비율을 여백에 곱하면 이동량이 나온다.
+    /// 꽉 찬 축은 sizeDelta가 0이라 기준 위치와 무관하게 0이 된다.
+    /// </summary>
+    private Vector2 FitOffset(Vector2 sizeDelta)
+    {
+        Vector2 anchor = Normalize(_fitAlignment);
+        return new Vector2((0.5f - anchor.x) * sizeDelta.x, (0.5f - anchor.y) * sizeDelta.y);
+    }
+
+    // (0,0)=좌하 ~ (1,1)=우상. 값 순서에 기대지 않고 명시적으로 옮긴다.
+    private static Vector2 Normalize(TextAnchor anchor)
+    {
+        switch (anchor)
+        {
+            case TextAnchor.UpperLeft: return new Vector2(0f, 1f);
+            case TextAnchor.UpperCenter: return new Vector2(0.5f, 1f);
+            case TextAnchor.UpperRight: return new Vector2(1f, 1f);
+            case TextAnchor.MiddleLeft: return new Vector2(0f, 0.5f);
+            case TextAnchor.MiddleRight: return new Vector2(1f, 0.5f);
+            case TextAnchor.LowerLeft: return new Vector2(0f, 0f);
+            case TextAnchor.LowerCenter: return new Vector2(0.5f, 0f);
+            case TextAnchor.LowerRight: return new Vector2(1f, 0f);
+            default: return new Vector2(0.5f, 0.5f);
+        }
     }
 }
