@@ -90,6 +90,12 @@ namespace DarkNaku.FoundationDI
 
         public void Release(GameObject item, float delay = 0f)
         {
+            // Get과 같은 가드. 컨테이너 Dispose는 resolve 역순(LIFO)이라 PoolManager가
+            // 먼저 정리된 뒤에도 다른 서비스의 Dispose 경로에서 반환이 들어올 수 있다.
+            // 그때 PoolData는 객체로 살아 있고 내부 풀만 null이라 아래 가드들을 전부
+            // 통과해 PoolData.Release에서 터진다.
+            if (_disposed) return;
+
             if (item == null) return;
 
             item.GetComponent<IPoolItem>()?.Release(delay);

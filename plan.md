@@ -1,5 +1,25 @@
 # plan.md
 
+## 완료: Dispose된 PoolManager의 Release가 NRE를 낸다
+
+`PoolManager.Get`에는 `if (_disposed) return null;` 가드가 있지만 `Release`에는 없다. 이 비대칭이
+플레이 모드 종료 시 `NullReferenceException`으로 드러난다.
+
+Reflex의 `DisposableCollection`은 `Stack`이라 resolve 순서의 역순(LIFO)으로 Dispose한다.
+`UINavigator`가 먼저 resolve되고 `PoolManager`가 나중에 resolve되므로 **`PoolManager`가 먼저
+Dispose된다** — `PoolData.Clear()`가 `_pool`을 null로 만든 뒤에 `UINavigator.Dispose()` →
+`ClearContent()` → 게임 쪽 정리 → `PoolManager.Release(go)`가 들어온다. `PoolItem.DoRelease`의
+`PD == null` 가드는 **PD 객체 자체는 살아 있어** 통과하고, `PoolData.Release`의 `_pool.Release`가
+터진다.
+
+EditMode에서는 재현되지 않는다 — `DestroyImmediate`가 즉시 돌아 아이템이 fake-null이 되고
+`Release`의 `item == null`에서 조기 반환된다. PlayMode는 `Destroy`가 프레임 끝까지 지연되므로
+Dispose 직후에도 아이템이 살아 있어 안쪽까지 들어간다. 그래서 PlayMode 테스트로 잡는다.
+
+- [x] Dispose된 뒤에 들어온 Release는 예외 없이 무시된다
+
+---
+
 ## 완료: AspectFillImage Fit 기준 위치
 
 `AspectFillImage`의 Fit은 종횡비를 유지해 부모 안에 맞추므로 한 축에 여백이 남는데, `pivot`과
