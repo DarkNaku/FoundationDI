@@ -1,5 +1,20 @@
 # plan.md
 
+## 완료: 정리된 PoolData는 반환을 스스로 거부한다
+
+`PoolManager.Release`의 `_disposed` 가드는 매니저를 거치는 경로만 막는다. `IPoolItem.Release`가
+public이라 아이템 쪽에서 직접 부르면(예약해 둔 지연 반환 포함) 가드를 우회해 같은 NRE가 그대로
+난다. 정리된 상태를 아는 것은 `PoolData` 자신이므로 여기서 거부하는 편이 맞다.
+
+`_pool`은 `Clear()`에서만 null이 되고 `Clear()`는 `Dispose()`에서만 불리므로, `_pool == null`이
+곧 "이 풀은 이미 정리됐다"는 뜻이다. `Get`은 가드하지 않는다 — 호출자가 `PoolManager.Get`뿐이고
+거기에 이미 `_disposed` 가드가 있으며, 여기서 null을 돌려주면 `item.GO`에서 오히려 더 나쁜
+자리에 NRE가 난다.
+
+- [x] Clear된 PoolData에 들어온 Release는 예외 없이 무시된다
+
+---
+
 ## 완료: Dispose된 PoolManager의 Release가 NRE를 낸다
 
 `PoolManager.Get`에는 `if (_disposed) return null;` 가드가 있지만 `Release`에는 없다. 이 비대칭이

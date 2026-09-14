@@ -27,6 +27,12 @@ namespace DarkNaku.FoundationDI
 
         public void Release(IPoolItem item)
         {
+            // _pool은 Clear()에서만 null이 되고 Clear()는 Dispose()에서만 불린다.
+            // 즉 null이면 이 풀은 이미 정리됐다는 뜻이다. IPoolItem.Release가 public이라
+            // PoolManager를 거치지 않고 아이템이 직접 반환을 시도할 수 있으므로
+            // (예약해 둔 지연 반환 포함) 정리된 상태는 여기서도 거부한다.
+            if (_pool == null) return;
+
             _pool.Release(item);
 
             _items.Remove(item);
