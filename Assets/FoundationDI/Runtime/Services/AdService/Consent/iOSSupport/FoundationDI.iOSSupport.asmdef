@@ -1,0 +1,22 @@
+{
+    "name": "FoundationDI.iOSSupport",
+    "rootNamespace": "",
+    "references": [
+        "FoundationDI",
+        "Unity.Advertisement.IosSupport"
+    ],
+    "includePlatforms": [
+        "Editor",
+        "iOS"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "FOUNDATIONDI_IOSSUPPORT"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

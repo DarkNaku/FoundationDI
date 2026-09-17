@@ -1,5 +1,30 @@
 # plan.md
 
+## 완료: iOS ATT 동의를 AdService 초기화 앞에서 받는다
+
+iOS 14부터 IDFA 접근에는 ATT(App Tracking Transparency) 동의가 필요하다. 광고 SDK는
+초기화 시점의 ATT 상태를 보고 타게팅 가능 여부를 결정하므로, 동의 요청은 provider 초기화
+**앞에** 끝나 있어야 한다. 그래서 `AdService.InitializeAsync`가 `_provider.InitializeAsync`
+직전에 한 번 요청한다.
+
+바인딩은 `com.unity.ads.ios-support`(iOS 14 Advertising Support)의 `ATTrackingStatusBinding`
+이다. 코어가 이 패키지를 참조할 수 없으므로(설치되지 않은 프로젝트가 깨진다) 다른 SDK와
+같은 모양으로 나눈다 — 코어는 `ITrackingAuthorization` seam과 레지스트리만 갖고, 옵셔널
+어셈블리 `FoundationDI.iOSSupport`가 `[RuntimeInitializeOnLoadMethod]`에서 자신을 등록한다.
+심볼 `FOUNDATIONDI_IOSSUPPORT`는 `SdkDefineTable`에 한 줄 넣어 자동 관리에 얹는다.
+
+`NSUserTrackingUsageDescription`은 유니티 플레이어 설정에 필드가 없어 Xcode 후처리로 넣는다.
+문구가 없으면 iOS가 다이얼로그 자체를 띄우지 않고 앱 심사도 리젝된다.
+
+- [x] 등록된 구현이 없으면 레지스트리는 지원하지 않는 구현을 돌려준다
+- [x] 초기화는 provider보다 먼저 추적 권한을 요청한다
+- [x] 이미 답을 받은 상태에서는 다시 묻지 않는다
+- [x] 설정이 꺼져 있으면 요청하지 않는다
+- [x] 권한 요청이 실패해도 광고 초기화는 계속된다
+- [x] 후처리는 지정된 문구로 NSUserTrackingUsageDescription을 채운다
+
+---
+
 ## 완료: 정리된 PoolData는 반환을 스스로 거부한다
 
 `PoolManager.Release`의 `_disposed` 가드는 매니저를 거치는 경로만 막는다. `IPoolItem.Release`가

@@ -380,7 +380,74 @@ LevelPlay의 전면·보상 임프레션도 `FullScreenAdUnit`이 정상적으�
 
 ---
 
-## 6. 구조
+## 6. iOS 추적 권한(ATT)
+
+iOS 14부터 IDFA를 읽으려면 App Tracking Transparency 동의가 필요합니다. 광고 SDK는 **초기화
+시점의 ATT 상태**를 보고 IDFA 사용 여부와 타게팅 가능 여부를 정하므로, 동의는 provider
+초기화보다 **먼저** 끝나 있어야 합니다. 뒤에 물으면 동의를 받고도 그 세션의 첫 요청들이
+비타게팅으로 나갑니다.
+
+그래서 `AdService.InitializeAsync`가 `_provider.InitializeAsync` 직전에 한 번 요청합니다.
+게임 코드가 따로 할 일은 없습니다.
+
+```csharp
+await _ads.InitializeAsync();   // 이 안에서 ATT 다이얼로그 → provider 초기화 순으로 진행
+```
+
+### 6.1 설치
+
+바인딩은 유니티 공식 패키지 **iOS 14 Advertising Support**(`com.unity.ads.ios-support`)의
+`ATTrackingStatusBinding`입니다. Package Manager에서 설치하면 그걸로 끝입니다 —
+스크립팅 심볼 `FOUNDATIONDI_IOSSUPPORT`는 `SdkDefineSynchronizer`가 패키지의 존재를 보고
+자동으로 켜고, 패키지를 지우면 다시 끕니다(손으로 정의하지 마세요).
+
+**패키지를 설치하지 않으면 아무 일도 일어나지 않습니다.** 코어는 이 패키지를 참조하지 않고,
+`TrackingAuthorizationRegistry`가 `UnsupportedTrackingAuthorization`으로 떨어져 초기화가
+그대로 진행됩니다. 안드로이드·에디터에서도 같습니다.
+
+### 6.2 동의 문구
+
+`NSUserTrackingUsageDescription`은 `AttIosPostProcess`가 Xcode 빌드 후처리로 Info.plist에
+넣습니다. 유니티 플레이어 설정에는 이 키를 넣을 자리가 없고, **문구가 없으면 iOS는
+다이얼로그를 아예 띄우지 않고** 심사에서도 리젝됩니다.
+
+현재 문구:
+
+> We use your activity data to provide personalized ads and measure ad performance.
+
+바꾸려면 `Editor/AdService/AttIosPostProcess.cs`의 `UsageDescription` 상수를 고칩니다.
+다국어가 필요하면 `InfoPlist.strings`를 쓰거나 별도 후처리로 값을 먼저 채우세요 —
+**이미 값이 있으면 이 후처리는 덮지 않습니다.**
+
+### 6.3 시점을 직접 고르고 싶을 때
+
+사전 안내 화면을 먼저 보여주는 식으로 시점을 조절하려면 `AdServiceSettings`의
+**Request Tracking Authorization**을 끄고 직접 부릅니다.
+
+```csharp
+var status = await _ads.TrackingAuthorization.RequestAsync();
+```
+
+`IAdService.TrackingAuthorization`은 설정을 꺼도, 패키지가 없어도 항상 null이 아닙니다
+(`IsSupported`가 false일 뿐입니다).
+
+### 6.4 동작 규칙
+
+- **iOS 실기에서만 묻습니다.** 에디터·안드로이드에서는 `IsSupported`가 false라 건너뜁니다.
+- **이미 답을 받았으면 다시 묻지 않습니다.** iOS는 두 번째 요청에 다이얼로그를 띄우지 않고
+  기존 상태를 그대로 돌려줍니다.
+- **요청이 실패해도 광고 초기화는 계속됩니다.** 비타게팅 광고는 여전히 나가고, 여기서
+  던지면 그마저 잃습니다.
+- **60초 타임아웃이 있습니다.** iOS는 앱이 아직 활성 상태가 아닐 때 요청하면 다이얼로그도,
+  콜백도 없이 조용히 무시합니다 — 풀어 주지 않으면 그 한 번의 타이밍 사고로 초기화가
+  영원히 끝나지 않아 광고가 통째로 죽습니다.
+- **`IAdConsent`와는 다른 축입니다.** `IAdConsent`는 광고 네트워크가 요구하는 개인정보 동의
+  (GDPR/UMP/T&P Flow)로 provider마다 구현이 다르고, ATT는 OS 권한이라 provider와 무관하게
+  하나뿐입니다.
+
+---
+
+## 7. 구조
 
 ```
 AdService/
@@ -404,7 +471,12 @@ AdService/
 │   ├── IAdDispatcher.cs          메인스레드 마샬링 + 지연 + 프레임 대기 seam
 │   ├── UnityAdDispatcher.cs      실제 구현. `HideAndDontSave` GameObject를 코드로 만들어 펌프한다(프리팹 아님)
 │   └── AdServiceRunner.cs        Update에서 큐를 퍼내는 MonoBehaviour(직접 배치하지 않는다)
-├── Consent/                      IAdConsent seam + NoopAdConsent(Dummy용)
+├── Consent/
+│   ├── IAdConsent.cs             광고 네트워크 개인정보 동의 seam + NoopAdConsent(Dummy용)
+│   ├── ITrackingAuthorization.cs iOS ATT seam + TrackingAuthorizationStatus
+│   ├── UnsupportedTrackingAuthorization.cs  패키지·플랫폼이 없을 때의 기본 구현
+│   ├── TrackingAuthorizationRegistry.cs     iOSSupport 어셈블리가 자신을 등록하는 진입점
+│   └── iOSSupport/               FOUNDATIONDI_IOSSUPPORT 옵셔널 어셈블리(ATTrackingStatusBinding 래핑)
 ├── Storage/                      IAdRemovalStorage seam + PlayerPrefsAdRemovalStorage
 └── Settings/
     ├── AdServiceSettings.cs      ScriptableObject. 인스펙터에서 편집하고 ToOptions()로 값 타입 변환
@@ -421,7 +493,7 @@ AdService/
 
 ---
 
-## 7. IL2CPP 빌드에서의 어댑터 보존
+## 8. IL2CPP 빌드에서의 어댑터 보존
 
 **어댑터 어셈블리(`FoundationDI.AppLovin`, `FoundationDI.LevelPlay`)는 IL2CPP 빌드에서 보존되어야 한다.**
 
@@ -434,7 +506,7 @@ AdService/
 **에디터에서는 링커가 돌지 않아 재현되지 않는다 — 빌드해 봐야만 드러난다.** 문서가 없으면
 매번 같은 시간을 쓰게 되는 종류의 실패다.
 
-### 7.1 패키지가 스스로 막는다 (소비 프로젝트가 할 일 없음)
+### 8.1 패키지가 스스로 막는다 (소비 프로젝트가 할 일 없음)
 
 - `FoundationDILinkXmlGenerator`(`Editor/Linker/`)가 `IUnityLinkerProcessor`로 빌드마다
   link.xml을 생성해 링커에 넘긴다. 어댑터 어셈블리와 **그 뒤의 SDK 어셈블리**(`MaxSdk.Scripts`, `Unity.LevelPlay`)를
@@ -453,7 +525,7 @@ AdService/
 > 아래만 본다. UPM(git URL)으로 설치하면 패키지는 `Library/PackageCache/` 아래에 놓이므로
 > 거기 넣어 둔 link.xml은 영원히 읽히지 않는다.
 
-### 7.2 빌드에서 확인하는 방법
+### 8.2 빌드에서 확인하는 방법
 
 빌드 산출물의 global-metadata에 타입 이름이 남아 있는지 본다.
 
@@ -471,14 +543,14 @@ unzip -p app.apk assets/bin/Data/Managed/Metadata/global-metadata.dat \
 스트리핑된 것이다(에디터에서는 재현되지 않는다). Dummy provider로 대체한다.
 ```
 
-### 7.3 어댑터를 추가할 때
+### 8.3 어댑터를 추가할 때
 
 `SdkDefineTable.Entries`(`Editor/SdkDefines/`)에 한 줄 넣는 것이 전부다 — 심볼, 판정용
 어셈블리, 어댑터 어셈블리, 보존할 SDK 어셈블리가 한 곳에 있다. 빠뜨리면
 `FoundationDILinkXmlTest`가 asmdef와 대조해 EditMode에서 잡는다(스트리핑 자체는 EditMode에서
 재현할 수 없지만, 표 누락은 잡을 수 있다).
 
-## 8. 알려진 범위 밖
+## 9. 알려진 범위 밖
 
 - **AdMob 어댑터** — seam과 매핑표만 준비돼 있고, SDK 설치 후 별도 계획으로 진행합니다.
 - **AppLovin MAX·LevelPlay 어댑터의 컴파일·실기 검증** — 두 어댑터는 구현돼 있지만 **두 SDK

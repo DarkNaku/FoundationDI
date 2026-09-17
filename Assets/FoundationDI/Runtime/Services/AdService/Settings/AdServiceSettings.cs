@@ -54,6 +54,13 @@ namespace DarkNaku.FoundationDI
                  "보상형에는 적용되지 않는다.")]
         [SerializeField, Min(0)] private float _interstitialCooldownSeconds = 120f;
 
+        [Header("iOS Tracking (ATT)")]
+        [Tooltip("iOS에서 광고 SDK를 초기화하기 전에 ATT(추적 권한) 다이얼로그를 띄운다. " +
+                 "iOS 14 Advertising Support 패키지가 설치돼 있어야 실제로 동작하며, " +
+                 "다른 플랫폼에서는 켜 두어도 아무 일도 하지 않는다. " +
+                 "사전 안내 화면을 먼저 보여주는 등 시점을 직접 고르고 싶으면 끈다.")]
+        [SerializeField] private bool _requestTrackingAuthorization = true;
+
         [Header("Debug")]
         [SerializeField] private bool _verboseLogging;
         [SerializeField] private bool _testMode;
@@ -84,7 +91,8 @@ namespace DarkNaku.FoundationDI
                 retryPolicy: new AdRetryPolicy(maxRetryAttempts, retryBaseSeconds, maxRetryDelaySeconds),
                 rewardGraceFrames: _rewardGraceFrames,
                 interstitialCooldownSeconds: interstitialCooldownSeconds,
-                autoLoadOnInitialize: _autoLoadOnInitialize);
+                autoLoadOnInitialize: _autoLoadOnInitialize,
+                requestTrackingAuthorization: _requestTrackingAuthorization);
         }
     }
 }

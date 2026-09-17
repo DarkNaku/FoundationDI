@@ -35,7 +35,11 @@ namespace DarkNaku.FoundationDI
                 var forceDummy = settings.ForceDummyInEditor && Application.isEditor;
                 var provider = factory.Create(settings.Provider, settings.DummyOptions, forceDummy);
 
-                return new AdService(provider, dispatcher, settings.ToOptions(), storage);
+                // 등록된 구현이 없으면(= iOS 14 Advertising Support 패키지가 없거나
+                // 다른 플랫폼이면) UnsupportedTrackingAuthorization으로 떨어진다.
+                var tracking = TrackingAuthorizationRegistry.Create(dispatcher);
+
+                return new AdService(provider, dispatcher, settings.ToOptions(), storage, tracking);
             }, Lifetime.Singleton, Resolution.Lazy);
         }
     }

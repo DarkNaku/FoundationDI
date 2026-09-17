@@ -9,6 +9,7 @@ public class SdkDefineSynchronizerTest
     private const string AppLovin = "FOUNDATIONDI_APPLOVIN";
     private const string LevelPlay = "FOUNDATIONDI_LEVELPLAY";
     private const string Adjust = "FOUNDATIONDI_ADJUST";
+    private const string IosSupport = "FOUNDATIONDI_IOSSUPPORT";
 
     private static Dictionary<string, bool> Present(bool firebase = false, bool unityIAP = false,
                                                     bool appLovin = false) =>
@@ -125,7 +126,7 @@ public class SdkDefineSynchronizerTest
             symbols.Add(entry.Symbol);
         }
 
-        CollectionAssert.AreEquivalent(new[] { Firebase, UnityIAP, AppLovin, LevelPlay, Adjust }, symbols);
+        CollectionAssert.AreEquivalent(new[] { Firebase, UnityIAP, AppLovin, LevelPlay, Adjust, IosSupport }, symbols);
     }
 
     [Test]
@@ -148,6 +149,17 @@ public class SdkDefineSynchronizerTest
 
         Assert.IsTrue(present[Adjust]);
         Assert.IsFalse(present[Firebase]);
+    }
+
+    [Test]
+    public void iOS_Support_심볼은_Unity_Advertisement_IosSupport_어셈블리로_판정한다()
+    {
+        // 어댑터 asmdef가 참조하는 어셈블리 이름과 같아야 한다
+        // (com.unity.ads.ios-support의 Runtime/Unity.Advertisement.IosSupport.asmdef).
+        var present = SdkDefineSynchronizer.DetectPresent(new[] { "Unity.Advertisement.IosSupport" });
+
+        Assert.IsTrue(present[IosSupport]);
+        Assert.IsFalse(present[AppLovin]);
     }
 
     [Test]

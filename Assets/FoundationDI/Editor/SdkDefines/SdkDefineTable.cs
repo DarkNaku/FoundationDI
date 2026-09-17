@@ -94,6 +94,15 @@ namespace DarkNaku.FoundationDI.Editor
                                "FoundationDI.LevelPlay",
                                new[] { "Unity.LevelPlay" }),
 
+            // 광고 SDK가 아니라 OS 권한 바인딩이다. 어댑터가 ITrackingAuthorization 하나만
+            // 제공하고 AdProviderRegistry와는 무관하지만, "코어가 참조할 수 없는 옵셔널
+            // 어셈블리"라는 점이 같아 심볼 관리와 링커 보존은 똑같이 필요하다.
+            new SdkDefineEntry("FOUNDATIONDI_IOSSUPPORT",
+                               "Unity.Advertisement.IosSupport",
+                               "iOS 14 Advertising Support",
+                               "FoundationDI.iOSSupport",
+                               new[] { "Unity.Advertisement.IosSupport" }),
+
             new SdkDefineEntry("FOUNDATIONDI_ADJUST",
                                "AdjustSdk.Scripts",
                                "Adjust",
