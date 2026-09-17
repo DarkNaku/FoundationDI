@@ -401,6 +401,15 @@ await _ads.InitializeAsync();   // 이 안에서 ATT 다이얼로그 → provide
 스크립팅 심볼 `FOUNDATIONDI_IOSSUPPORT`는 `SdkDefineSynchronizer`가 패키지의 존재를 보고
 자동으로 켜고, 패키지를 지우면 다시 끕니다(손으로 정의하지 마세요).
 
+**버전은 아무거나 괜찮습니다.** 이 패키지는 버전 번호가 시간순과 어긋나 있습니다 —
+1.2.0이 2021-11에, 1.0.1이 2025-10에 게시됐고 레지스트리가 `latest`로 가리키는 쪽은
+**1.0.1**입니다(그래서 Package Manager에서 그냥 설치하면 1.0.1이 들어옵니다). 두 버전은
+API도 다릅니다: 완료 콜백을 받는
+`RequestAuthorizationTracking(RequestAuthorizationTrackingCompleteHandler)`는 1.2.0에만
+있습니다. asmdef 이름은 같아서 어느 쪽이든 심볼은 켜지므로, 어댑터가 그 오버로드를 쓰면
+1.0.1 사용자는 컴파일조차 되지 않습니다. 그래서 `AttTrackingAuthorization`은 모든 버전에
+있는 파라미터 없는 요청 + 상태 폴링만 씁니다.
+
 **패키지를 설치하지 않으면 아무 일도 일어나지 않습니다.** 코어는 이 패키지를 참조하지 않고,
 `TrackingAuthorizationRegistry`가 `UnsupportedTrackingAuthorization`으로 떨어져 초기화가
 그대로 진행됩니다. 안드로이드·에디터에서도 같습니다.
@@ -438,9 +447,12 @@ var status = await _ads.TrackingAuthorization.RequestAsync();
   기존 상태를 그대로 돌려줍니다.
 - **요청이 실패해도 광고 초기화는 계속됩니다.** 비타게팅 광고는 여전히 나가고, 여기서
   던지면 그마저 잃습니다.
-- **60초 타임아웃이 있습니다.** iOS는 앱이 아직 활성 상태가 아닐 때 요청하면 다이얼로그도,
-  콜백도 없이 조용히 무시합니다 — 풀어 주지 않으면 그 한 번의 타이밍 사고로 초기화가
-  영원히 끝나지 않아 광고가 통째로 죽습니다.
+- **완료 콜백 대신 상태를 폴링합니다.** 콜백 오버로드가 1.2.0에만 있기 때문입니다(위 6.1
+  참고). 폴링은 디스패처 펌프 위에서만 돌아 메인 스레드 마샬링이 필요 없고, 바인딩이
+  진행 중인 요청에 던지는 `InvalidOperationException`도 지나치지 않습니다.
+- **60초 타임아웃이 있습니다.** iOS는 앱이 아직 활성 상태가 아닐 때 요청하면 다이얼로그를
+  띄우지도, 상태를 바꾸지도 않고 조용히 무시합니다 — 풀어 주지 않으면 그 한 번의 타이밍
+  사고로 초기화가 영원히 끝나지 않아 광고가 통째로 죽습니다.
 - **`IAdConsent`와는 다른 축입니다.** `IAdConsent`는 광고 네트워크가 요구하는 개인정보 동의
   (GDPR/UMP/T&P Flow)로 provider마다 구현이 다르고, ATT는 OS 권한이라 provider와 무관하게
   하나뿐입니다.
