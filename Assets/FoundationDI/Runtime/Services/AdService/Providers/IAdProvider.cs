@@ -30,14 +30,44 @@ namespace DarkNaku.FoundationDI
         public bool TestMode { get; }
         public IReadOnlyList<string> TestDeviceIds { get; }
 
+        // ATT 응답. provider가 이것을 자기 SDK의 프라이버시 세터로 번역한다.
+        //
+        // IAdProvider의 별도 메서드가 아니라 context에 실은 이유는 순서 때문이다. LevelPlay·MAX·
+        // AdMob 모두 프라이버시 세터를 SDK Init **이전에** 불러야 효력이 있는데, 별도 메서드로
+        // 두면 그 규약이 문서로만 존재해 언제든 깨진다. 초기화 인자로 두면 provider가 이 값을
+        // 받는 시점이 곧 Init 직전이라 순서를 틀릴 수가 없다.
+        public TrackingAuthorizationStatus TrackingStatus { get; }
+
+        // 추적이 명시적으로 막혔는가. provider는 이 값 하나만 보고 분기한다.
+        //
+        // NotDetermined가 false인 것이 핵심이다. 그 값은 "iOS인데 아직 안 물었다"와 "ATT가
+        // 없는 플랫폼(안드로이드·에디터)"을 함께 뜻하는데, 후자가 압도적으로 흔하다
+        // (UnsupportedTrackingAuthorization.Status는 항상 NotDetermined다). 제한으로 해석하면
+        // 안드로이드 광고가 통째로 비개인화로 떨어져 수익이 이유 없이 죽는다.
+        //
+        // iOS에서 "아직 안 물었다"가 provider까지 도달하는 경로는
+        // AdServiceOptions.RequestTrackingAuthorization = false뿐이고, 그건 게임이 직접 묻겠다고
+        // 선언한 경우라 판단 주체가 게임이다.
+        public bool IsTrackingRestricted =>
+            TrackingStatus == TrackingAuthorizationStatus.Denied ||
+            TrackingStatus == TrackingAuthorizationStatus.Restricted;
+
         public AdProviderContext(string appKey, bool verboseLogging, bool testMode,
-                                 IReadOnlyList<string> testDeviceIds)
+                                 IReadOnlyList<string> testDeviceIds,
+                                 TrackingAuthorizationStatus trackingStatus =
+                                     TrackingAuthorizationStatus.NotDetermined)
         {
             AppKey = appKey;
             VerboseLogging = verboseLogging;
             TestMode = testMode;
             TestDeviceIds = testDeviceIds;
+            TrackingStatus = trackingStatus;
         }
+
+        // 설정에서 만들어진 context는 ATT를 묻기 전에 조립되므로 추적 상태를 모른다.
+        // AdService가 응답을 받은 뒤 이 메서드로 채워 provider에 넘긴다.
+        public AdProviderContext WithTrackingStatus(TrackingAuthorizationStatus status) =>
+            new(AppKey, VerboseLogging, TestMode, TestDeviceIds, status);
     }
 
     public interface IAdProvider : IDisposable
