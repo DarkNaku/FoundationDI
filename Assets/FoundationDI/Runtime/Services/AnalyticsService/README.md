@@ -240,9 +240,23 @@ _analytics.CollectionEnabled = false;   // 게임이 판단해서 밀어 넣는�
 
 혼동이 잦은 지점이라 명시해 둡니다.
 
-- **ATT(iOS 추적 동의)** — 거부하면 **OS가 IDFA를 막습니다.** 앱이 아무것도 하지 않아도 그 정보는
-  얻어지지 않습니다. SDK는 그대로 돌고 이벤트도 그대로 나가며, 광고 식별자만 비어 옵니다.
-  이 서비스가 할 일이 없습니다.
+- **ATT(iOS 추적 동의)** — 거부하면 OS가 IDFA를 막습니다. **하지만 그것으로 끝이 아닙니다.**
+  Apple 기준에서 ATT 거부는 IDFA 차단이 아니라 **쿠키·핑거프린팅을 포함한 모든 크로스-컴퍼니
+  추적 금지**입니다. "SDK는 그대로 돌아도 된다"고 읽으면 리젝됩니다 — 실제로 그렇게 읽고
+  광고 SDK에 아무것도 통보하지 않았다가 App Store 5.1.1(iv)로 리젝된 적이 있습니다
+  (2026-09-18, InfiniteSteps 1.1.7). 광고 쪽은 `AdService`가 `AdProviderContext.TrackingStatus`로
+  provider까지 전달해 SDK에 비개인화를 통보합니다.
+
+  **분석 쪽은 게임이 판단합니다.** `IAnalyticsService`는 ATT를 보지 않습니다 — 수집을 ATT에
+  묶을지는 사용하는 SDK와 수집 항목에 달린 법적 판단이고, 이 서비스가 대신 내릴 수 없습니다.
+  묶기로 했다면 게임이 ATT 응답을 받은 뒤 `CollectionEnabled`를 세팅하면 됩니다.
+
+  > **iOS에서 하나 더**: Firebase Analytics는 `AnalyticsService.InitializeAsync`가 돌기 전,
+  > 앱 런치 시점에 이미 수집을 시작합니다. `CollectionEnabledByDefault = false`로 출시한다면
+  > Info.plist에 `FIREBASE_ANALYTICS_COLLECTION_ENABLED = NO`도 함께 넣어야 그 구간이 막힙니다.
+  > 이 키는 패키지가 넣지 않습니다 — `AnalyticsServiceSettings`가 DI로 주입되는 에셋이라
+  > 에디터 후처리가 "이 프로젝트의 설정"을 특정할 수 없기 때문입니다. 게임의 빌드 후처리에서
+  > 넣으세요.
 - **GDPR형 수집 동의** — **OS가 강제하지 않습니다.** `FirebaseAnalytics.LogEvent()`를 부르면 그냥
   나갑니다. 앱이 안 부르거나 SDK에 명시적으로 꺼달라고 해야만 안 나갑니다. 그래서 게이트가
   필요합니다.
