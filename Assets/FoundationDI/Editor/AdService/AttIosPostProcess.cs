@@ -17,6 +17,12 @@ namespace DarkNaku.FoundationDI.Editor
     {
         internal const string UsageDescriptionKey = "NSUserTrackingUsageDescription";
 
+        // AdMob(GMA SDK)은 이 키가 없으면 didFinishLaunchingWithOptions에서 App Measurement를
+        // 자동 초기화한다 — AdService가 ATT를 묻기도 전, 다이얼로그가 떠 있는 동안이다.
+        // 런타임 코드가 닿을 수 없는 구간이라 plist로만 막힌다. true면 앱이
+        // GADMobileAds.start를 부를 때까지 미뤄지고, 그 시점은 ATT 응답 이후다.
+        internal const string DelayAppMeasurementKey = "GADDelayAppMeasurementInit";
+
         // 이 문구가 다이얼로그 본문에 그대로 나온다.
         internal const string UsageDescription =
             "We use your activity data to provide personalized ads and measure ad performance.";
@@ -54,6 +60,11 @@ namespace DarkNaku.FoundationDI.Editor
                 : null;
 
             plist.root.SetString(UsageDescriptionKey, Resolve(existing));
+
+            // 값이 이미 있어도 덮는다. UsageDescription과 달리 이건 프로젝트가 고를 수 있는
+            // 문구가 아니라 켜져 있어야만 하는 스위치다 — false로 남아 있으면 리젝 사유가 된다.
+            plist.root.SetBoolean(DelayAppMeasurementKey, true);
+
             plist.WriteToFile(plistPath);
         }
 

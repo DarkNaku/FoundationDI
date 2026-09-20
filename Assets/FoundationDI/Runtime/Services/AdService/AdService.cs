@@ -125,7 +125,13 @@ namespace DarkNaku.FoundationDI
                 // 다이얼로그가 떠 있는 동안 씬이 언로드돼 서비스가 정리됐을 수 있다.
                 if (_isDisposed) return false;
 
-                ok = await _provider.InitializeAsync(_options.ProviderContext);
+                // RequestAsync의 반환값이 아니라 Status를 다시 읽는다. 요청을 건너뛴 경로
+                // (RequestTrackingAuthorization = false, 이미 답한 상태, 물을 수 없는 플랫폼)
+                // 에서도 현재 상태를 provider에 실어야 하기 때문이다 — 반환값을 쓰면 그 세
+                // 경로가 전부 NotDetermined로 뭉개진다.
+                var context = _options.ProviderContext.WithTrackingStatus(_tracking.Status);
+
+                ok = await _provider.InitializeAsync(context);
 
                 if (!ok)
                 {

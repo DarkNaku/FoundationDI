@@ -178,4 +178,112 @@ public class AdTrackingAuthorizationTest
         Assert.IsTrue(await sut.InitializeAsync());
         Assert.IsFalse(sut.TrackingAuthorization.IsSupported);
     });
+
+    [Test]
+    public void 거부와_제한만_추적_제한으로_본다()
+    {
+        var context = new AdProviderContext("app-key", false, false, new List<string>());
+
+        Assert.IsFalse(context.WithTrackingStatus(TrackingAuthorizationStatus.Authorized).IsTrackingRestricted);
+        Assert.IsTrue(context.WithTrackingStatus(TrackingAuthorizationStatus.Denied).IsTrackingRestricted);
+        Assert.IsTrue(context.WithTrackingStatus(TrackingAuthorizationStatus.Restricted).IsTrackingRestricted);
+    }
+
+    [Test]
+    public void 묻지_않은_상태는_제한으로_보지_않는다()
+    {
+        var context = new AdProviderContext("app-key", false, false, new List<string>());
+
+        // NotDetermined는 "아직 안 물었다"와 "ATT가 없는 플랫폼"을 함께 뜻한다.
+        // 제한으로 보면 안드로이드 광고가 통째로 비개인화로 떨어진다.
+        Assert.AreEqual(TrackingAuthorizationStatus.NotDetermined, context.TrackingStatus);
+        Assert.IsFalse(context.IsTrackingRestricted);
+    }
+
+    [Test]
+    public void 추적_상태를_바꿔도_나머지_설정은_그대로다()
+    {
+        var ids = new List<string> { "device-a" };
+        var context = new AdProviderContext("app-key", true, true, ids)
+            .WithTrackingStatus(TrackingAuthorizationStatus.Denied);
+
+        Assert.AreEqual("app-key", context.AppKey);
+        Assert.IsTrue(context.VerboseLogging);
+        Assert.IsTrue(context.TestMode);
+        Assert.AreSame(ids, context.TestDeviceIds);
+    }
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 추적을_거부하면_provider가_거부됨으로_받는다() => AwaitableTest.Run(async () =>
+    {
+        var provider = new FakeAdProvider();
+        var tracking = new FakeTrackingAuthorization();
+        var sut = new AdService(provider, new FakeAdDispatcher(), NewOptions(),
+                                new FakeRemovalStorage(), tracking);
+
+        var initializing = sut.InitializeAsync();
+
+        tracking.Respond(TrackingAuthorizationStatus.Denied);
+
+        await initializing;
+
+        Assert.AreEqual(TrackingAuthorizationStatus.Denied, provider.ReceivedContext.TrackingStatus);
+        Assert.IsTrue(provider.ReceivedContext.IsTrackingRestricted,
+                      "거부를 provider가 모르면 SDK는 동의받은 것으로 간주하고 계속 추적한다");
+    });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 추적을_허용하면_provider가_허용됨으로_받는다() => AwaitableTest.Run(async () =>
+    {
+        var provider = new FakeAdProvider();
+        var tracking = new FakeTrackingAuthorization();
+        var sut = new AdService(provider, new FakeAdDispatcher(), NewOptions(),
+                                new FakeRemovalStorage(), tracking);
+
+        var initializing = sut.InitializeAsync();
+
+        tracking.Respond(TrackingAuthorizationStatus.Authorized);
+
+        await initializing;
+
+        Assert.AreEqual(TrackingAuthorizationStatus.Authorized, provider.ReceivedContext.TrackingStatus);
+        Assert.IsFalse(provider.ReceivedContext.IsTrackingRestricted);
+    });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 권한을_묻지_않기로_했어도_현재_상태는_전달한다() => AwaitableTest.Run(async () =>
+    {
+        // 게임이 직접 묻는 모드(RequestTrackingAuthorization = false). AdService는 다이얼로그를
+        // 띄우지 않지만, 게임이 이미 받아 둔 답이 있으면 그것을 provider에 실어야 한다.
+        var provider = new FakeAdProvider();
+        var tracking = new FakeTrackingAuthorization
+        {
+            Status = TrackingAuthorizationStatus.Denied,
+        };
+        var sut = new AdService(provider, new FakeAdDispatcher(), NewOptions(false),
+                                new FakeRemovalStorage(), tracking);
+
+        await sut.InitializeAsync();
+
+        Assert.AreEqual(0, tracking.RequestCount, "묻지 않기로 했는데 다이얼로그를 띄웠다");
+        Assert.IsTrue(provider.ReceivedContext.IsTrackingRestricted);
+    });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 물을_수_없는_플랫폼은_제한으로_보지_않는다() => AwaitableTest.Run(async () =>
+    {
+        // 안드로이드·에디터 경로. UnsupportedTrackingAuthorization은 항상 NotDetermined다.
+        var provider = new FakeAdProvider();
+        var sut = new AdService(provider, new FakeAdDispatcher(), NewOptions(),
+                                new FakeRemovalStorage(), new UnsupportedTrackingAuthorization());
+
+        await sut.InitializeAsync();
+
+        Assert.IsFalse(provider.ReceivedContext.IsTrackingRestricted,
+                       "ATT가 없는 플랫폼에서 추적을 끄면 이유 없이 수익이 죽는다");
+    });
 }

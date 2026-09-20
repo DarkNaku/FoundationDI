@@ -30,4 +30,12 @@ public class AttIosPostProcessTest
     {
         Assert.AreEqual("NSUserTrackingUsageDescription", AttIosPostProcess.UsageDescriptionKey);
     }
+
+    [Test]
+    public void AdMob_자동_측정_지연_키_이름은_구글이_요구하는_그대로다()
+    {
+        // 오타가 나도 plist는 조용히 받아들이고 SDK는 그냥 예전처럼 런치 때 초기화한다.
+        // 실패가 심사 리젝으로만 드러나는 자리라 문자열을 테스트로 못 박는다.
+        Assert.AreEqual("GADDelayAppMeasurementInit", AttIosPostProcess.DelayAppMeasurementKey);
+    }
 }
