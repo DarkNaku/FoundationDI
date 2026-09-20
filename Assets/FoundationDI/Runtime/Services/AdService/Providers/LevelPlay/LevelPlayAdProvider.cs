@@ -52,12 +52,16 @@ namespace DarkNaku.FoundationDI
         // 이 문자열이 AdImpression.AdPlatform으로 나가 Firebase의 ad_platform이 된다.
         public string Name => "LevelPlay";
 
-        // LevelPlay의 동의 플로우(LevelPlayPrivacySettings.SetGDPRConsent/SetCCPA/SetCOPPA)는
-        // 이번 범위 밖이다 — IAdConsent가 요구하는 것은 "동의 폼을 띄우고 CanRequestAds를
-        // 갱신하는" CMP 수준의 계약인데, LevelPlay가 제공하는 것은 이미 받은 동의 값을 SDK에
-        // 통보하는 세터뿐이라 폼을 띄우는 주체(UMP/CMP)가 따로 필요하다. 억지로 매핑하면
-        // "RequestAsync를 불렀는데 아무 폼도 안 뜨고 true가 온다"가 되므로, AppLovin provider와
-        // 동일하게 no-op seam을 그대로 노출한다.
+        // IAdConsent는 여전히 no-op이다. 이 인터페이스가 요구하는 것은 "동의 폼을 띄우고
+        // CanRequestAds를 갱신하는" CMP 수준의 계약인데, LevelPlay가 제공하는 것은 이미 받은
+        // 동의 값을 SDK에 통보하는 세터뿐이라 폼을 띄우는 주체(UMP/CMP)가 따로 필요하다.
+        // 억지로 매핑하면 "RequestAsync를 불렀는데 아무 폼도 안 뜨고 true가 온다"가 된다.
+        //
+        // **ATT는 이 축이 아니다.** 폼을 OS가 대신 띄워 주므로 세터만 있으면 충분하고,
+        // 실제로 ApplyPrivacy가 LevelPlayPrivacySettings로 통보한다. 예전에는 이 주석이
+        // "LevelPlay의 동의 플로우는 범위 밖"이라며 두 축을 함께 버렸고, 그 결과 ATT를
+        // 거부해도 미디에이션 네트워크들이 동의받은 상태로 돌아 App Store 5.1.1(iv)로
+        // 리젝됐다(2026-09-18, InfiniteSteps 1.1.7).
         public IAdConsent Consent { get; } = new NoopAdConsent();
 
         // provider 전역 임프레션 경로. IAdProvider의 주석은 이 이벤트의 존재 이유로 LevelPlay를
@@ -167,6 +171,9 @@ namespace DarkNaku.FoundationDI
         // 한다 — 한 번 켜면 다시 끌 수 없는 API로 두지 않는다).
         private static void ApplyContext(AdProviderContext context)
         {
+            // 프라이버시 먼저다. 아래 로그 설정과 달리 이건 Init 이후에 부르면 효력이 없다.
+            ApplyPrivacy(context);
+
             // LevelPlay 자신의 상세 로그는 컴파일 심볼
             // (ENABLE_UNITY_SERVICES_LEVELPLAY_VERBOSE_LOGGING)로 게이트돼 있어 런타임에 켤 수
             // 없다. 런타임 토글로 존재하는 가장 가까운 것이 미디에이션 어댑터 디버그 로그이며,
@@ -192,6 +199,34 @@ namespace DarkNaku.FoundationDI
                 Debug.Log("[AdService] LevelPlay는 AdProviderContext.TestDeviceIds를 쓰지 않는다. " +
                           "테스트 기기는 LevelPlay 대시보드에 등록한다.");
             }
+        }
+
+        // ATT 거부를 LevelPlay와 미디에이션 어댑터들에게 통보한다.
+        //
+        // ATT 거부는 IDFA만 막는 것이 아니다. Apple 기준으로는 쿠키·핑거프린팅을 포함한 모든
+        // 크로스-컴퍼니 추적이 금지된다. 통보하지 않으면 네트워크들(AdMob/Vungle/UnityAds)은
+        // 동의받은 것으로 간주하고 IDFA의 공백을 자기 웹뷰의 쿠키로 메운다 — 그것이
+        // 2026-09-18 App Store 5.1.1(iv) 리젝에서 심사가 캡처한 트래픽이다.
+        //
+        // 세 호출 모두 LevelPlay.Init 이전이어야 한다. 호출부(ApplyContext)가 그것을 보장한다.
+        private static void ApplyPrivacy(AdProviderContext context)
+        {
+            // 제한 방향으로만 통보한다. 허용일 때 SetGDPRConsent(true)를 부르지 않는 이유는,
+            // ATT 허용이 "Apple의 크로스-앱 추적 동의"이지 "GDPR 개인정보 처리 동의"가
+            // 아니기 때문이다. 둘은 법적으로 다른 동의이고, 받지 않은 동의를 SDK에 긍정하면
+            // 그쪽이 더 큰 문제가 된다. GDPR 동의는 UMP/CMP가 받아 IAdConsent 축으로 흘린다.
+            if (!context.IsTrackingRestricted) return;
+
+            // GDPR 동의 거부. 유럽 밖에서도 대부분의 어댑터가 이 플래그를 개인화 스위치로 읽는다.
+            LevelPlayPrivacySettings.SetGDPRConsent(false);
+
+            // CCPA는 의미가 뒤집힌 플래그다 — true가 "개인정보 판매를 거부했다"는 뜻이다.
+            LevelPlayPrivacySettings.SetCCPA(true);
+
+            // do_not_sell은 CCPA를 지원하는 어댑터로 전파되는 메타데이터다. SetCCPA와 겹쳐
+            // 보이지만 어댑터마다 읽는 쪽이 달라 둘 다 넣는다 — 한쪽만 넣었다가 특정
+            // 네트워크에서만 추적이 남으면 프록시 캡처 전에는 알 방법이 없다.
+            LevelPlay.SetMetaData("do_not_sell", "true");
         }
 
         // LevelPlay.OnInitSuccess/OnInitFailed를 래치에 연결한다. LevelPlayInstaller가
