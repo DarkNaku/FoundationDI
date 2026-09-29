@@ -1,5 +1,33 @@
 # plan.md
 
+## 진행 중: iOS 수출 규정 관리 문서를 빌드 후처리로 신고한다
+
+TestFlight에 올린 뒤 App Store Connect가 "수출 규정 관리 문서 누락"을 띄우면 그 빌드는
+손으로 암호화 질문에 답하기 전까지 제출할 수 없다. 빌드마다 반복되는 수작업이고, 잊으면
+배포가 멈춘다. `Info.plist`의 `ITSAppUsesNonExemptEncryption`이 있으면 그 질문 자체가
+사라지므로 Xcode 후처리로 못 박는다 — 유니티 플레이어 설정에는 이 키를 넣을 자리가 없다.
+
+값은 `false`다. HTTPS와 OS 기본 암호화만 쓰는 앱에 해당하는 신고이며, 패키지를 쓰는
+대부분의 게임이 여기 속한다. 자체 암호화(세이브 파일 AES 등)를 넣은 프로젝트에는 이 신고가
+거짓이 되므로 빠져나갈 구멍을 둔다 — `IosExportCompliance.Enabled = false`.
+
+스위치를 스크립팅 심볼이나 설정 에셋이 아니라 **정적 프로퍼티**로 둔 이유는 빌드 스크립트가
+제어 지점이기 때문이다. `BuildPipeline.BuildPlayer` 앞에 한 줄 대입하면 같은 도메인에서
+후처리까지 이어진다. 심볼이면 껐다 켤 때마다 도메인 리로드를 기다려야 하고, 에셋이면
+로드·수정·저장이 필요하다.
+
+- [ ] plist 키 이름은 애플이 요구하는 그대로다
+- [ ] 기본값은 신고를 주입하는 쪽이다
+- [ ] Enabled를 끄면 신고하지 않는다
+- [ ] 이미 신고된 plist는 덮지 않는다
+- [ ] 신고할 값은 면제 대상(false)이다
+
+> **미검증.** 코드와 테스트는 작성됐지만 UnityMCP가 연결되지 않아(포트 8086 ConnectionRefused)
+> 컴파일도 테스트 실행도 하지 못했다. Unity Editor를 띄우고 `run_tests`(EditMode)로
+> `IosExportComplianceTest` 5개를 확인한 뒤 체크한다.
+
+---
+
 ## 완료: iOS ATT 동의를 AdService 초기화 앞에서 받는다
 
 iOS 14부터 IDFA 접근에는 ATT(App Tracking Transparency) 동의가 필요하다. 광고 SDK는
