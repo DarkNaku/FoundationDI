@@ -183,6 +183,26 @@ DI 코어는 **Reflex 14.3.1**이다. `Assets/Scripts/Installers/RootInstaller.c
   EditMode에서 재현 불가).
 
 
+### iOS 빌드 후처리
+
+`Info.plist`와 Xcode 프로젝트를 만지는 `[PostProcessBuild]`가 셋이며, 같은 산출물을 각자 읽고
+쓰므로 우선순위로 줄을 세운다 — `FDI_HapticiOSPostProcess`(999) → `AttIosPostProcess`(1000) →
+`IosExportCompliance`(1001). **새 후처리를 추가하면 그 뒤 번호를 준다.**
+
+- `IosExportCompliance`(`Editor/Build/`)는 `ITSAppUsesNonExemptEncryption = false`를 넣는다.
+  이 키가 없으면 TestFlight 업로드마다 App Store Connect가 "수출 규정 관리 문서 누락"을 띄워
+  그 빌드를 제출도 외부 테스터 배포도 할 수 없다. 유니티 플레이어 설정에 자리가 없어 후처리로만
+  넣을 수 있다.
+- **끄는 스위치가 정적 프로퍼티(`IosExportCompliance.Enabled`)인 이유는 빌드 스크립트가 제어
+  지점이기 때문이다.** `BuildPipeline.BuildPlayer` 앞에 대입하면 같은 도메인에서 후처리까지
+  이어진다. 스크립팅 심볼이면 값을 바꿀 때마다 도메인 리로드를 기다려야 하고, 설정 에셋이면
+  로드·수정·저장을 거쳐야 한다.
+- `false`는 "면제 대상 외 암호화를 쓰지 않는다"는 **신고**다. 자체 암호화를 넣은 프로젝트에는
+  거짓이 되므로 `true` 경로는 일부러 열지 않았다 — 애플 발급 `ITSEncryptionExportComplianceCode`가
+  따로 필요하고, 그런 프로젝트는 스위치를 끄고 자기 후처리로 넣는다.
+- 이미 키가 있는 plist는 값과 무관하게 덮지 않는다(`ShouldDeclare`). 다른 후처리가 넣은 `true`를
+  `false`로 뒤집으면 조용히 허위 신고가 되고, 되돌아간 것처럼 보이지도 않아 발견이 늦다.
+
 ### 네임스페이스
 런타임 코드는 `DarkNaku.FoundationDI` 단일 네임스페이스로 통일한다(UIManager 리뉴얼로 구 `FoundationDI` 네임스페이스는 제거됨). 새 코드를 추가할 때 같은 디렉터리의 기존 파일이 쓰는 네임스페이스를 따른다.
 

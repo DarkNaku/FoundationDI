@@ -1,7 +1,7 @@
 # FoundationDI
 
 ![Unity](https://img.shields.io/badge/Unity-6000.3%2B-black?logo=unity)
-![Version](https://img.shields.io/badge/version-0.10.9-blue)
+![Version](https://img.shields.io/badge/version-0.10.10-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Author](https://img.shields.io/badge/author-DarkNaku-orange)
 
@@ -60,6 +60,29 @@ FoundationDI는 다음 패키지를 전제로 합니다. 먼저 설치되어 있
 - 관리 대상 심볼만 건드리므로 프로젝트의 다른 심볼은 그대로 보존됩니다.
 
 심볼이 없으면 각각 Dummy/Debug provider로 폴백해 에디터에서 전체 플로우를 그대로 확인할 수 있습니다.
+
+## iOS 빌드 후처리
+
+Xcode 프로젝트가 생성된 뒤 패키지가 자동으로 손보는 것들입니다. **따로 설정할 것은 없습니다.**
+
+| 넣는 것 | 왜 |
+| --- | --- |
+| `ITSAppUsesNonExemptEncryption = false` | 없으면 TestFlight 업로드마다 App Store Connect가 "수출 규정 관리 문서 누락"을 띄우고, 웹에서 손으로 답하기 전까지 그 빌드를 제출도 외부 테스터 배포도 할 수 없습니다. |
+| `NSUserTrackingUsageDescription` | 없으면 iOS가 ATT 다이얼로그를 아예 띄우지 않습니다(심사 리젝 사유). `FOUNDATIONDI_IOSSUPPORT`가 켜졌을 때만. |
+| `GADDelayAppMeasurementInit = true` | AdMob이 ATT 다이얼로그가 떠 있는 동안 App Measurement를 자동 초기화하는 것을 막습니다. |
+| `CoreHaptics` / `AppTrackingTransparency` weak-link | iOS 13/14 미만에서 실행 시 죽지 않게. |
+
+### 수출 규정 신고를 끄려면
+
+`false`는 **"면제 대상 외 암호화를 쓰지 않는다"**는 신고입니다. HTTPS와 OS가 제공하는 암호화만 쓰는 앱에 해당하며 대부분의 게임이 여기 속합니다. 세이브 파일 AES 암호화처럼 **자체 암호화를 넣었다면 이 신고는 거짓**이므로 꺼야 합니다.
+
+```csharp
+using DarkNaku.FoundationDI.Editor;
+
+IosExportCompliance.Enabled = false;   // BuildPipeline.BuildPlayer 앞에서
+```
+
+정적 프로퍼티라 빌드 스크립트가 그대로 제어 지점이 됩니다. 끄면 이 키를 건드리지 않으므로, `true`와 애플이 발급한 `ITSEncryptionExportComplianceCode`는 프로젝트가 자기 후처리로 넣습니다. 이미 `Info.plist`에 이 키가 있으면 값과 무관하게 덮어쓰지 않습니다.
 
 ## 빠른 시작
 
