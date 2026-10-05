@@ -323,4 +323,36 @@ public class UnityIAPServiceTest
         Assert.AreEqual("remove_ads", result.Purchase.ProductId);
         Assert.IsEmpty(store.PurchaseCalls, "이미 소유인데 스토어를 호출했다");
     });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 구매가_진행_중이면_두_번째_호출은_즉시_NotReady다() => AwaitableTest.Run(async () =>
+    {
+        var store = new UnityIAPStoreHarness();
+        var sut = NewService(store);
+        await sut.InitializeAsync();
+
+        var first = sut.PurchaseAsync("gems");
+        var second = await sut.PurchaseAsync("remove_ads");
+
+        Assert.AreEqual(IAPPurchaseOutcome.NotReady, second.Outcome);
+        Assert.AreEqual(1, store.PurchaseCalls.Count, "진행 중인데 스토어를 또 호출했다");
+
+        store.RaisePending(store.Pending("gems", "tx-b"));
+        Assert.AreEqual(IAPPurchaseOutcome.Purchased, (await first).Outcome);
+    });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 카탈로그에_없는_상품_구매는_NotReady다() => AwaitableTest.Run(async () =>
+    {
+        var store = new UnityIAPStoreHarness();
+        var sut = NewService(store);
+        await sut.InitializeAsync();
+
+        LogAssert.Expect(LogType.Warning, new Regex("IAPService.*unknown"));
+
+        Assert.AreEqual(IAPPurchaseOutcome.NotReady, (await sut.PurchaseAsync("unknown")).Outcome);
+        Assert.IsEmpty(store.PurchaseCalls);
+    });
 }

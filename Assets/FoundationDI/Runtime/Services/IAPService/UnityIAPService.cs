@@ -136,6 +136,7 @@ namespace DarkNaku.FoundationDI
 
             if (string.IsNullOrEmpty(productId) || !_unityProducts.TryGetValue(productId, out var product))
             {
+                Debug.LogWarning($"[IAPService] 카탈로그에 없는 상품을 구매하려 했다: {productId}");
                 return IAPPurchaseResult.NotReady();
             }
 
@@ -145,6 +146,8 @@ namespace DarkNaku.FoundationDI
             {
                 return IAPPurchaseResult.AlreadyOwned(OwnedPurchaseOf(product));
             }
+
+            if (_pendingSource != null) return IAPPurchaseResult.NotReady();
 
             _pendingSource = new AwaitableCompletionSource<IAPPurchaseResult>();
             _pendingProductId = productId;
