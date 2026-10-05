@@ -136,4 +136,31 @@ public class DummyIAPProviderTest
 
         restored.Dispose();
     });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 초기화_때_확정된_비소모성_목록을_보고한다() => AwaitableTest.Run(async () =>
+    {
+        var provider = NewProvider();
+        await provider.InitializeAsync(Context());
+
+        string tx = null;
+        provider.PurchasePending += p => tx = p.TransactionId;
+        provider.Purchase("remove_ads_store");
+        provider.Confirm(tx);
+        provider.Dispose();
+
+        // 새 인스턴스(= 앱 재시작). 실제 스토어처럼 초기화 조회에서 확정 목록이 온다.
+        var restarted = NewProvider();
+
+        IReadOnlyCollection<string> owned = null;
+        restarted.OwnedProductsFetched += ids => owned = ids;
+
+        await restarted.InitializeAsync(Context());
+
+        Assert.IsNotNull(owned, "초기화에서 소유 목록을 보고하지 않았다");
+        CollectionAssert.AreEquivalent(new[] { "remove_ads_store" }, owned);
+
+        restarted.Dispose();
+    });
 }

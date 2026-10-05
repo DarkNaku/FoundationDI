@@ -62,6 +62,9 @@ namespace DarkNaku.FoundationDI
                 }
             }
 
+            // 실제 스토어는 초기화 조회에서 확정 구매를 돌려준다 — 정책 계층은 그걸로 소유를 맞춘다.
+            OwnedProductsFetched?.Invoke(CollectOwned());
+
             var source = new AwaitableCompletionSource<bool>();
             source.SetResult(true);
             return source.Awaitable;
@@ -113,6 +116,21 @@ namespace DarkNaku.FoundationDI
             PurchaseFailed = null;
             PurchaseDeferred = null;
             OwnedProductsFetched = null;
+        }
+
+        private List<string> CollectOwned()
+        {
+            var owned = new List<string>();
+
+            foreach (var pair in _byStoreId)
+            {
+                if (pair.Value.Type != IAPProductType.NonConsumable) continue;
+                if (PlayerPrefs.GetInt(OwnedKeyPrefix + pair.Key, 0) == 0) continue;
+
+                owned.Add(pair.Key);
+            }
+
+            return owned;
         }
 
         // 지연이 0이면 동기적으로 끝난다 — 테스트가 프레임을 기다릴 필요가 없다.
