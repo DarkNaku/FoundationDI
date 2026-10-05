@@ -93,7 +93,7 @@ UnityIAPService 테스트
 
 ---
 
-## 진행 중: iOS 수출 규정 관리 문서를 빌드 후처리로 신고한다
+## 완료: iOS 수출 규정 관리 문서를 빌드 후처리로 신고한다
 
 TestFlight에 올린 뒤 App Store Connect가 "수출 규정 관리 문서 누락"을 띄우면 그 빌드는
 손으로 암호화 질문에 답하기 전까지 제출할 수 없다. 빌드마다 반복되는 수작업이고, 잊으면
@@ -109,15 +109,13 @@ TestFlight에 올린 뒤 App Store Connect가 "수출 규정 관리 문서 누�
 후처리까지 이어진다. 심볼이면 껐다 켤 때마다 도메인 리로드를 기다려야 하고, 에셋이면
 로드·수정·저장이 필요하다.
 
-- [ ] plist 키 이름은 애플이 요구하는 그대로다
-- [ ] 기본값은 신고를 주입하는 쪽이다
-- [ ] Enabled를 끄면 신고하지 않는다
-- [ ] 이미 신고된 plist는 덮지 않는다
-- [ ] 신고할 값은 면제 대상(false)이다
+- [x] plist 키 이름은 애플이 요구하는 그대로다
+- [x] 기본값은 신고를 주입하는 쪽이다
+- [x] Enabled를 끄면 신고하지 않는다
+- [x] 이미 신고된 plist는 덮지 않는다
+- [x] 신고할 값은 면제 대상(false)이다
 
-> **미검증.** 코드와 테스트는 작성됐지만 UnityMCP가 연결되지 않아(포트 8086 ConnectionRefused)
-> 컴파일도 테스트 실행도 하지 못했다. Unity Editor를 띄우고 `run_tests`(EditMode)로
-> `IosExportComplianceTest` 5개를 확인한 뒤 체크한다.
+> 2026-10-05 UnityMCP 재연결 후 `IosExportComplianceTest` 5개 통과를 확인했다.
 
 ---
 
