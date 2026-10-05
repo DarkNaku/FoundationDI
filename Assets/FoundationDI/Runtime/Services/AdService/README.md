@@ -394,6 +394,16 @@ iOS 14부터 IDFA를 읽으려면 App Tracking Transparency 동의가 필요합�
 await _ads.InitializeAsync();   // 이 안에서 ATT 다이얼로그 → provider 초기화 순으로 진행
 ```
 
+> **다른 권한 팝업(알림·위치 등)은 `await InitializeAsync()` 이후에 요청하세요.** iOS는 시스템
+> 권한 요청을 동시에 받으면 하나만 남기고 버립니다("Concurrent requests aren't preserved by
+> iOS"). 같은 프레임 `Start`에서 알림 권한을 요청하면 ATT가 버려질 수 있습니다 — 아래 6.4의
+> 재요청이 복구를 시도하지만, 처음부터 겹치지 않게 하는 것이 확실합니다.
+>
+> ```csharp
+> await _ads.InitializeAsync();
+> await RequestNotificationPermissionAsync();   // ATT가 끝난 뒤
+> ```
+
 ### 6.1 설치
 
 바인딩은 유니티 공식 패키지 **iOS 14 Advertising Support**(`com.unity.ads.ios-support`)의
@@ -440,7 +450,68 @@ var status = await _ads.TrackingAuthorization.RequestAsync();
 `IAdService.TrackingAuthorization`은 설정을 꺼도, 패키지가 없어도 항상 null이 아닙니다
 (`IsSupported`가 false일 뿐입니다).
 
-### 6.4 동작 규칙
+### 6.4 요청 시점: Active를 기다렸다가 묻는다
+
+**iOS 15부터 `requestTrackingAuthorization`은 앱이 `UIApplicationStateActive`일 때만 팝업을
+띄웁니다.** 그 외 상태에서 요청하면 팝업도 오류도 없이 `notDetermined`로 끝납니다. 심사에서는
+"ATT 권한 요청을 찾을 수 없다"(Guideline 2.1)로 리젝됩니다.
+
+문제는 **Unity 6.3 iOS 트램펄린이 첫 씬을 Inactive 구간에서 로드한다**는 점입니다. UIScene
+라이프사이클의 시작 순서가 이렇습니다.
+
+```
+sceneWillEnterForeground → initUnityWithScene → startUnity
+  → UnityLoadApplication   ← 첫 씬 로드: Awake/Start가 여기서 돈다 (아직 Inactive)
+  → UnitySetPlayerFocus(1)
+  → ... → sceneDidBecomeActive   ← 여기서야 Active
+```
+
+첫 씬 `Awake`에서 `InitializeAsync()`를 부르면 첫 `await` 전에 동기로 요청이 나가므로, 그대로
+두면 요청이 Inactive에서 버려집니다. 그래서 `AttTrackingAuthorization`은 이렇게 동작합니다.
+
+1. **Active 대기** — 매 프레임 네이티브 헬퍼 `FDI_Att_IsApplicationActive()`로
+   `UIApplication.applicationState`를 확인하고, Active가 되면 **0.5초 안정화** 후 요청합니다.
+   안정화 중 다시 Inactive가 되면 1단계로 돌아갑니다.
+2. **요청 → 폴링** — 상태가 `NotDetermined`를 벗어나면 완료합니다.
+3. **무시 판정과 재요청** — 요청 직전의 `FDI_Att_ResignActiveCount()`(앱이 Inactive로 내려간
+   횟수)를 기억해 두고,
+   - 1.5초 동안 카운트가 그대로(= 팝업이 뜨지 않음)이고 `NotDetermined`면 무시된 것으로 봅니다.
+   - 카운트가 올랐는데(= 다른 팝업 등으로 Inactive를 거침) Active로 돌아온 뒤에도
+     `NotDetermined`면 역시 무시된 것으로 봅니다.
+
+   어느 쪽이든 **1초 → 2초 → 4초** 뒤 1단계부터 다시 묻고, **최대 3회**까지 재요청합니다.
+   iOS는 이미 답한 뒤의 요청에는 팝업을 띄우지 않으므로 재요청은 안전합니다. 상한을 넘기면
+   타임아웃을 기다리지 않고 현재 상태로 끝냅니다.
+4. **전체 60초 타임아웃** — Active 대기와 재요청을 모두 포함합니다. 어떤 경우에도
+   `InitializeAsync`가 영원히 멈추지 않습니다.
+
+시간은 광고 디스패처 펌프(`Time.unscaledDeltaTime`)로 셉니다. 트램펄린은
+`applicationWillResignActive`에서 플레이어 루프를 멈추므로(`UnityPause(1)`), **팝업이 떠 있는
+동안에는 1.5초 판정도 60초 타임아웃도 흐르지 않습니다** — 사용자가 팝업을 읽는 중에 무시로
+오판하거나 타임아웃이 끼어들지 않습니다.
+
+**`Application.isFocused`나 `OnApplicationFocus`를 쓰지 않는 이유:** 위 순서에서 보듯
+`UnitySetPlayerFocus(1)`이 `sceneDidBecomeActive`보다 먼저 불려, 포커스가 true인데 앱은 아직
+Inactive인 구간이 있습니다. 첫 씬이 바로 그 구간입니다. `OnApplicationFocus`는 일부 기기에서
+누락 보고도 있습니다. 그래서 `UIApplication` 상태와 `UIApplicationWillResignActiveNotification`
+을 네이티브에서 직접 읽습니다(`Consent/iOSSupport/Plugins/iOS/FDI_Att.mm`, AppTrackingTransparency
+는 import하지 않음 — 요청과 상태 조회는 계속 ios-support 바인딩이 합니다).
+
+**실기기에서 확인하는 방법:** Xcode 콘솔에서 단계별 로그를 트램펄린 로그와 대조합니다.
+
+```
+-> sceneDidBecomeActive()
+[AdService] ATT Active 대기 종료 — 0.5초 안정화 후 요청한다
+[AdService] ATT 1번째 요청
+-> sceneWillResignActive()          ← 팝업이 떴다
+-> sceneDidBecomeActive()
+[AdService] ATT 최종 상태: Authorized (요청 1회)
+```
+
+`ATT Active 대기 시작`이 `sceneDidBecomeActive`보다 앞서고, `1번째 요청`이 그 뒤에 나오면
+정상입니다. `무시 판정`이 찍히면 다른 권한 팝업과 겹치지 않았는지 먼저 확인하세요.
+
+### 6.5 동작 규칙
 
 - **iOS 실기에서만 묻습니다.** 에디터·안드로이드에서는 `IsSupported`가 false라 건너뜁니다.
 - **이미 답을 받았으면 다시 묻지 않습니다.** iOS는 두 번째 요청에 다이얼로그를 띄우지 않고
@@ -450,9 +521,9 @@ var status = await _ads.TrackingAuthorization.RequestAsync();
 - **완료 콜백 대신 상태를 폴링합니다.** 콜백 오버로드가 1.2.0에만 있기 때문입니다(위 6.1
   참고). 폴링은 디스패처 펌프 위에서만 돌아 메인 스레드 마샬링이 필요 없고, 바인딩이
   진행 중인 요청에 던지는 `InvalidOperationException`도 지나치지 않습니다.
-- **60초 타임아웃이 있습니다.** iOS는 앱이 아직 활성 상태가 아닐 때 요청하면 다이얼로그를
-  띄우지도, 상태를 바꾸지도 않고 조용히 무시합니다 — 풀어 주지 않으면 그 한 번의 타이밍
-  사고로 초기화가 영원히 끝나지 않아 광고가 통째로 죽습니다.
+- **60초 타임아웃이 있습니다.** Active가 끝내 오지 않거나 요청이 계속 버려져도 초기화가
+  영원히 끝나지 않는 일은 없습니다(6.4 참고). 타임아웃이나 재요청 상한으로 끝나면 경고 로그를
+  남기고 현재 상태로 초기화를 계속합니다.
 - **`IAdConsent`와는 다른 축입니다.** `IAdConsent`는 광고 네트워크가 요구하는 개인정보 동의
   (GDPR/UMP/T&P Flow)로 provider마다 구현이 다르고, ATT는 OS 권한이라 provider와 무관하게
   하나뿐입니다.

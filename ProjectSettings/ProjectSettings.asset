@@ -785,9 +785,9 @@ PlayerSettings:
   webWasm2023: 0
   webEnableSubmoduleStrippingCompatibility: 0
   scriptingDefineSymbols:
-    Android: FOUNDATIONDI_UNITYIAP
-    Standalone: LEVELPLAY_DEPENDENCIES_INSTALLED;FOUNDATIONDI_UNITYIAP
-    iPhone: FOUNDATIONDI_UNITYIAP
+    Android: FOUNDATIONDI_UNITYIAP;FOUNDATIONDI_IOSSUPPORT
+    Standalone: LEVELPLAY_DEPENDENCIES_INSTALLED;FOUNDATIONDI_UNITYIAP;FOUNDATIONDI_IOSSUPPORT
+    iPhone: FOUNDATIONDI_UNITYIAP;FOUNDATIONDI_IOSSUPPORT
   additionalCompilerArguments: {}
   platformArchitecture: {}
   scriptingBackend:
