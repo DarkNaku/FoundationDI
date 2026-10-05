@@ -289,6 +289,13 @@ namespace DarkNaku.FoundationDI
         {
             var product = ProductOf(order);
             var productId = product?.definition?.id;
+            var transactionId = order.Info?.TransactionID;
+
+            if (string.IsNullOrEmpty(transactionId))
+            {
+                Debug.LogWarning($"[IAPService] 트랜잭션 ID가 없는 구매가 도착했다: {productId}. 확정할 수 없어 건너뛴다.");
+                return;
+            }
 
             var purchase = BuildPurchase(product, order, isRestored);
 

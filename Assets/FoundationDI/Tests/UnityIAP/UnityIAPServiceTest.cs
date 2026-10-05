@@ -355,4 +355,23 @@ public class UnityIAPServiceTest
         Assert.AreEqual(IAPPurchaseOutcome.NotReady, (await sut.PurchaseAsync("unknown")).Outcome);
         Assert.IsEmpty(store.PurchaseCalls);
     });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 트랜잭션_ID가_없는_주문은_건너뛴다() => AwaitableTest.Run(async () =>
+    {
+        var store = new UnityIAPStoreHarness();
+        var fulfillment = new FakeFulfillment();
+        var sut = NewService(store, fulfillment);
+        await sut.InitializeAsync();
+
+        LogAssert.Expect(LogType.Warning, new Regex("IAPService.*트랜잭션"));
+
+        // 확정할 수단이 없다 — 지급하면 다음 실행에 재전달돼 이중 지급이 된다.
+        store.RaisePending(store.Pending("gems", string.Empty));
+        await AwaitableTest.NextFrame();
+
+        Assert.IsEmpty(fulfillment.Calls);
+        Assert.IsEmpty(store.ConfirmCalls);
+    });
 }
