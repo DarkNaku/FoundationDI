@@ -13,6 +13,7 @@ namespace DarkNaku.FoundationDI
         // 지급 실패는 스토어 실패와 구분되는 원인이지만 결과 enum을 늘리는 대신 에러 코드로 남긴다 —
         // 호출부가 분기할 이유가 없다(둘 다 "이번엔 못 줬다"이고 재시도는 스토어가 알아서 한다).
         internal const int FulfillmentFailedCode = -1001;
+        internal const int DisposedCode = -1003;
         internal const int NotInitializedCode = -1004;
         internal const int RestoreFailedCode = -1005;
         internal const int RestoreInProgressCode = -1006;
@@ -64,6 +65,7 @@ namespace DarkNaku.FoundationDI
         private AwaitableCompletionSource<bool> _fetchingPurchases;
 
         private bool _subscribed;
+        private bool _disposed;
 
         internal UnityIAPService(IStoreService store, IProductService products, IPurchaseService purchases,
                                  IReadOnlyList<ProductDefinition> catalog,
@@ -90,6 +92,7 @@ namespace DarkNaku.FoundationDI
 
         public Awaitable<bool> InitializeAsync()
         {
+            if (_disposed) return Completed(false);
             if (IsInitialized) return Completed(true);
 
             if (_initializing)
@@ -154,7 +157,7 @@ namespace DarkNaku.FoundationDI
 
         public async Awaitable<IAPPurchaseResult> PurchaseAsync(string productId)
         {
-            if (!IsInitialized) return IAPPurchaseResult.NotReady();
+            if (_disposed || !IsInitialized) return IAPPurchaseResult.NotReady();
 
             if (string.IsNullOrEmpty(productId) || !_unityProducts.TryGetValue(productId, out var product))
             {
@@ -185,7 +188,7 @@ namespace DarkNaku.FoundationDI
         // OnPurchasesFetched로 온다.
         public async Awaitable<IAPRestoreResult> RestoreAsync()
         {
-            if (!IsInitialized)
+            if (_disposed || !IsInitialized)
             {
                 return IAPRestoreResult.Fail(new IAPError(NotInitializedCode, "초기화되지 않았다"));
             }
@@ -229,6 +232,15 @@ namespace DarkNaku.FoundationDI
 
         public void Dispose()
         {
+            if (_disposed) return;
+
+            _disposed = true;
+            Unsubscribe();
+
+            // 대기 중인 구매·복원이 영원히 매달리지 않게 끊어준다.
+            CompletePending(IAPPurchaseResult.Failed(new IAPError(DisposedCode, "서비스가 해제됐다")));
+            FinishRestore(false);
+            CompleteInitWaiters(false);
         }
 
         private void CompleteInitWaiters(bool success)
@@ -282,6 +294,23 @@ namespace DarkNaku.FoundationDI
             _purchaseService.OnPurchasesFetchFailed += HandlePurchasesFetchFailed;
 
             _subscribed = true;
+        }
+
+        private void Unsubscribe()
+        {
+            if (!_subscribed) return;
+
+            _store.OnStoreConnected -= HandleStoreConnected;
+            _store.OnStoreDisconnected -= HandleStoreDisconnected;
+            _productService.OnProductsFetched -= HandleProductsFetched;
+            _productService.OnProductsFetchFailed -= HandleProductsFetchFailed;
+            _purchaseService.OnPurchasesFetched -= HandlePurchasesFetched;
+            _purchaseService.OnPurchasePending -= HandlePurchasePending;
+            _purchaseService.OnPurchaseFailed -= HandlePurchaseFailed;
+            _purchaseService.OnPurchaseDeferred -= HandlePurchaseDeferred;
+            _purchaseService.OnPurchasesFetchFailed -= HandlePurchasesFetchFailed;
+
+            _subscribed = false;
         }
 
         private void HandleStoreConnected() => _connecting?.TrySetResult(true);
@@ -494,6 +523,9 @@ namespace DarkNaku.FoundationDI
                 fulfilled = false;
             }
 
+            // 지급을 기다리는 사이 해제됐다. 확정하지 않으면 스토어가 다음 실행에 다시 준다.
+            if (_disposed) return;
+
             if (!fulfilled)
             {
                 // 확정하지 않는다 — 스토어가 다음 실행에 같은 구매를 다시 내려준다.
@@ -546,7 +578,14 @@ namespace DarkNaku.FoundationDI
         {
             if (_pendingSource == null || _pendingProductId != productId) return;
 
+            CompletePending(result);
+        }
+
+        private void CompletePending(IAPPurchaseResult result)
+        {
             var source = _pendingSource;
+            if (source == null) return;
+
             _pendingSource = null;
             _pendingProductId = null;
             source.SetResult(result);

@@ -704,4 +704,24 @@ public class UnityIAPServiceTest
         store.RaisePurchasesFetched();
         Assert.IsTrue((await first).Success, "두 번째 호출이 첫 번째 복원을 망가뜨렸다");
     });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator Dispose하면_구독이_풀리고_이후_구매는_NotReady다() => AwaitableTest.Run(async () =>
+    {
+        var store = new UnityIAPStoreHarness(Catalog);
+        var fulfillment = new FakeFulfillment();
+        var sut = NewService(store, fulfillment);
+        await sut.InitializeAsync();
+
+        sut.Dispose();
+        sut.Dispose();   // 중복 Dispose도 안전해야 한다
+
+        store.RaisePending(store.Pending("gems", "tx-after"));
+        await AwaitableTest.NextFrame();
+
+        Assert.IsEmpty(fulfillment.Calls, "해제된 서비스가 주문을 처리했다");
+        Assert.AreEqual(IAPPurchaseOutcome.NotReady, (await sut.PurchaseAsync("gems")).Outcome);
+        Assert.IsFalse((await sut.RestoreAsync()).Success);
+    });
 }
