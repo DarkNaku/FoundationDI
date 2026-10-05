@@ -42,6 +42,10 @@ namespace DarkNaku.FoundationDI
         // 같은 장치(세션 처리 목록)를 꺼 뒀기 때문에 직접 한다.
         private readonly HashSet<string> _inFlight = new();
 
+        // 이번 세션에 확정한 트랜잭션. 확정은 스토어에 비동기로 반영되므로 직후의 조회가 같은 주문을
+        // 아직 미확정으로 돌려줄 수 있다 — 다시 지급하면 이중 지급이고, 소유 목록에서 빠지면 회수된다.
+        private readonly HashSet<string> _confirmedInSession = new();
+
         private AwaitableCompletionSource<bool> _connecting;
         private AwaitableCompletionSource<bool> _fetchingProducts;
         private AwaitableCompletionSource<bool> _fetchingPurchases;
@@ -261,10 +265,23 @@ namespace DarkNaku.FoundationDI
 
         private void HandlePurchasesFetched(Orders orders)
         {
-            // 앱이 죽어 확정하지 못했던 구매들. 지급되지 않았을 수 있으므로 다시 흘려보낸다.
-            foreach (var order in orders.PendingOrders) ProcessPending(order, isRestored: true);
-
             var owned = new HashSet<string>();
+
+            // 앱이 죽어 확정하지 못했던 구매들. 지급되지 않았을 수 있으므로 다시 흘려보낸다.
+            foreach (var order in orders.PendingOrders)
+            {
+                var transactionId = order.Info?.TransactionID;
+
+                // 이번 세션에 확정했지만 스토어에 아직 반영되지 않은 주문 — 지급은 끝났으니 소유로 센다.
+                if (!string.IsNullOrEmpty(transactionId) && _confirmedInSession.Contains(transactionId))
+                {
+                    var productId = ProductOf(order)?.definition?.id;
+                    if (!string.IsNullOrEmpty(productId)) owned.Add(productId);
+                    continue;
+                }
+
+                ProcessPending(order, isRestored: true);
+            }
 
             foreach (var order in orders.ConfirmedOrders)
             {
@@ -398,6 +415,7 @@ namespace DarkNaku.FoundationDI
                 return;
             }
 
+            _confirmedInSession.Add(order.Info.TransactionID);
             _purchaseService.ConfirmPurchase(order);
 
             if (purchase.Type == IAPProductType.NonConsumable && !_entitlements.IsOwned(productId))

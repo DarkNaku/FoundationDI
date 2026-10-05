@@ -539,4 +539,31 @@ public class UnityIAPServiceTest
         Assert.AreEqual(1, fulfillment.Calls.Count, "지급 중인 주문을 또 지급했다");
         Assert.AreEqual(1, store.ConfirmCalls.Count);
     });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 이번_세션에_확정한_주문이_조회에_미확정으로_와도_다시_지급하지_않고_소유로_센다() => AwaitableTest.Run(async () =>
+    {
+        var store = new UnityIAPStoreHarness(Catalog);
+        var fulfillment = new FakeFulfillment();
+        var sut = NewService(store, fulfillment);
+        await sut.InitializeAsync();
+
+        var order = store.Pending("remove_ads", "tx-1");
+        var task = sut.PurchaseAsync("remove_ads");
+        store.RaisePending(order);
+        await task;
+
+        var changed = 0;
+        sut.OwnedChanged += _ => changed++;
+
+        // 확정은 스토어에 비동기로 반영된다 — 직후의 조회가 같은 주문을 아직 미확정으로 돌려줄 수 있다.
+        store.PendingOnFetch.Add(order);
+        store.RaisePurchasesFetched();
+        await AwaitableTest.NextFrame();
+
+        Assert.AreEqual(1, fulfillment.Calls.Count, "확정한 주문을 다시 지급했다");
+        Assert.IsTrue(sut.IsOwned("remove_ads"), "확정이 반영되기 전의 조회 결과로 소유를 회수했다");
+        Assert.AreEqual(0, changed);
+    });
 }
