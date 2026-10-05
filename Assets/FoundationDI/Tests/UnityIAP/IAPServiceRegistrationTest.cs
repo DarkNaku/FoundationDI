@@ -3,7 +3,7 @@ using NUnit.Framework;
 using Reflex.Core;
 using UnityEngine.Purchasing;
 
-public class UnityIAPServiceRegistrationTest
+public class IAPServiceRegistrationTest
 {
     private System.Func<IIAPFulfillment, IReceiptValidator, IEntitlementStorage, bool, IIAPService> _original;
 
@@ -29,7 +29,7 @@ public class UnityIAPServiceRegistrationTest
             _verboseLogging = verboseLogging;
 
             var store = new UnityIAPStoreHarness();
-            return new UnityIAPService(store.Store, store.Products, store.Purchases, new ProductDefinition[0],
+            return new IAPService(store.Store, store.Products, store.Purchases, new ProductDefinition[0],
                                        fulfillment, validator, entitlements, verboseLogging);
         };
     }
@@ -48,7 +48,7 @@ public class UnityIAPServiceRegistrationTest
         var first = container.Resolve<IIAPService>();
         var second = container.Resolve<IIAPService>();
 
-        Assert.IsInstanceOf<UnityIAPService>(first);
+        Assert.IsInstanceOf<IAPService>(first);
         Assert.AreSame(first, second, "싱글턴으로 등록되지 않았다");
         Assert.AreEqual(1, _created);
 

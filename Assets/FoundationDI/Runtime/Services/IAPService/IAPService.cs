@@ -8,7 +8,7 @@ namespace DarkNaku.FoundationDI
     // Unity IAP를 직접 호출하는 IIAPService 구현.
     // Unity IAP만으로는 매번 직접 맞춰야 하는 규율(검증 → 지급 → 확정, 소유 동기화, 복원 완료 시점,
     // 이중 처리 방지)을 여기 한 곳에 둔다.
-    public sealed class UnityIAPService : IIAPService
+    public sealed class IAPService : IIAPService
     {
         // 지급 실패는 스토어 실패와 구분되는 원인이지만 결과 enum을 늘리는 대신 에러 코드로 남긴다 —
         // 호출부가 분기할 이유가 없다(둘 다 "이번엔 못 줬다"이고 재시도는 스토어가 알아서 한다).
@@ -69,7 +69,7 @@ namespace DarkNaku.FoundationDI
 
         // 기본 경로. StoreController 하나가 세 인터페이스를 모두 구현하고, 상품은 Unity IAP Catalog
         // (Assets/Resources/IAPProductCatalog.json)에서 읽는다. 생성만으로는 스토어에 연결하지 않는다.
-        public UnityIAPService(IIAPFulfillment fulfillment = null,
+        public IAPService(IIAPFulfillment fulfillment = null,
                                IReceiptValidator validator = null,
                                IEntitlementStorage entitlements = null,
                                bool verboseLogging = false)
@@ -78,14 +78,14 @@ namespace DarkNaku.FoundationDI
         {
         }
 
-        private UnityIAPService(StoreController controller, IReadOnlyList<ProductDefinition> catalog,
+        private IAPService(StoreController controller, IReadOnlyList<ProductDefinition> catalog,
                                 IIAPFulfillment fulfillment, IReceiptValidator validator,
                                 IEntitlementStorage entitlements, bool verboseLogging)
             : this(controller, controller, controller, catalog, fulfillment, validator, entitlements, verboseLogging)
         {
         }
 
-        internal UnityIAPService(IStoreService store, IProductService products, IPurchaseService purchases,
+        internal IAPService(IStoreService store, IProductService products, IPurchaseService purchases,
                                  IReadOnlyList<ProductDefinition> catalog,
                                  IIAPFulfillment fulfillment, IReceiptValidator validator,
                                  IEntitlementStorage entitlements, bool verboseLogging)

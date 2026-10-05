@@ -44,6 +44,6 @@ namespace DarkNaku.FoundationDI
 
         private static IIAPService CreateDefault(IIAPFulfillment fulfillment, IReceiptValidator validator,
                                                  IEntitlementStorage entitlements, bool verboseLogging) =>
-            new UnityIAPService(fulfillment, validator, entitlements, verboseLogging);
+            new IAPService(fulfillment, validator, entitlements, verboseLogging);
     }
 }

@@ -7,7 +7,7 @@ using UnityEngine;
 using UnityEngine.Purchasing;
 using UnityEngine.TestTools;
 
-public class UnityIAPServiceTest
+public class IAPServiceTest
 {
     private static readonly ProductDefinition[] Catalog =
     {
@@ -15,12 +15,12 @@ public class UnityIAPServiceTest
         UnityIAPTestObjects.Definition("remove_ads", ProductType.NonConsumable, "remove_ads_store"),
     };
 
-    private static UnityIAPService NewService(UnityIAPStoreHarness store,
+    private static IAPService NewService(UnityIAPStoreHarness store,
                                               FakeFulfillment fulfillment = null,
                                               FakeReceiptValidator validator = null,
                                               FakeEntitlementStorage entitlements = null)
     {
-        return new UnityIAPService(store.Store, store.Products, store.Purchases, Catalog,
+        return new IAPService(store.Store, store.Products, store.Purchases, Catalog,
                                    fulfillment ?? new FakeFulfillment(),
                                    validator ?? new FakeReceiptValidator(),
                                    entitlements ?? new FakeEntitlementStorage(),
@@ -522,7 +522,7 @@ public class UnityIAPServiceTest
     {
         var store = new UnityIAPStoreHarness(Catalog);
         var fulfillment = new HeldFulfillment();
-        var sut = new UnityIAPService(store.Store, store.Products, store.Purchases, Catalog, fulfillment,
+        var sut = new IAPService(store.Store, store.Products, store.Purchases, Catalog, fulfillment,
                                       new FakeReceiptValidator(), new FakeEntitlementStorage(), false);
         await sut.InitializeAsync();
 
