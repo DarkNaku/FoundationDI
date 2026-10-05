@@ -1,30 +1,35 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Purchasing;
 
 namespace DarkNaku.FoundationDI
 {
-    // 정책 계층. provider가 무엇이든 여기서 검증 → 지급 → 확정 → 소유 기록 → 이벤트 순서가 지켜진다.
+    // Unity IAP를 직접 호출하는 IIAPService 구현.
+    // Unity IAP만으로는 매번 직접 맞춰야 하는 규율(검증 → 지급 → 확정, 소유 동기화, 복원 완료 시점,
+    // 이중 처리 방지)을 여기 한 곳에 둔다.
     public sealed class IAPService : IIAPService
     {
         // 지급 실패는 스토어 실패와 구분되는 원인이지만 결과 enum을 늘리는 대신 에러 코드로 남긴다 —
         // 호출부가 분기할 이유가 없다(둘 다 "이번엔 못 줬다"이고 재시도는 스토어가 알아서 한다).
         internal const int FulfillmentFailedCode = -1001;
-        internal const int PurchaseStartFailedCode = -1002;
         internal const int DisposedCode = -1003;
         internal const int NotInitializedCode = -1004;
         internal const int RestoreFailedCode = -1005;
+        internal const int RestoreInProgressCode = -1006;
 
-        private readonly IIAPProvider _provider;
+        private readonly IStoreService _store;
+        private readonly IProductService _productService;
+        private readonly IPurchaseService _purchaseService;
+        private readonly List<ProductDefinition> _catalog;
         private readonly IIAPFulfillment _fulfillment;
         private readonly IReceiptValidator _validator;
         private readonly IEntitlementStorage _entitlements;
         private readonly bool _verboseLogging;
 
-        // 공용 ID → 정의, 스토어 ID → 정의. 둘 다 필요하다 — 게임은 공용 ID로 부르고
-        // provider는 스토어 ID로 답하기 때문이다.
-        private readonly Dictionary<string, IAPProductDefinition> _byId = new();
-        private readonly Dictionary<string, IAPProductDefinition> _byStoreId = new();
+        // 조회된 상품. 게임 코드에 내보낼 값과 구매에 쓸 Unity 객체를 공용 ID로 함께 들고 있는다.
+        private readonly List<IAPProduct> _products = new();
+        private readonly Dictionary<string, Product> _unityProducts = new();
 
         // 진행 중인 초기화에 편승한 호출자들. Awaitable은 단일 사용이라 하나를 여럿이 await 할 수
         // 없으므로, 호출자마다 별도의 완료 소스를 만들어 두었다가 한꺼번에 같은 결과로 완료시킨다.
@@ -32,43 +37,73 @@ namespace DarkNaku.FoundationDI
         private bool _initializing;
 
         // 대기 중인 PurchaseAsync. 스토어 UI가 모달이라 동시에 두 개가 뜨는 일은 없고,
-        // provider 이벤트에는 "어느 호출의 결과인가"가 실려 오지 않으므로 하나만 허용한다.
+        // 주문 이벤트에는 "어느 호출의 결과인가"가 실려 오지 않으므로 하나만 허용한다.
         private AwaitableCompletionSource<IAPPurchaseResult> _pendingSource;
         private string _pendingProductId;
 
-        // RestoreAsync가 진행되는 동안 파이프라인을 통과한 복원 구매의 수.
+        // 지급이 진행 중인 주문(트랜잭션 ID). 그 사이 조회가 같은 주문을 미확정으로 또 실어 와도
+        // 두 번 지급하지 않는 기준이다. ProcessPendingOrdersOnPurchasesFetched(false)로 SDK의
+        // 같은 장치(세션 처리 목록)를 꺼 뒀기 때문에 직접 한다.
+        private readonly HashSet<string> _inFlight = new();
+
+        // 이번 세션에 확정한 트랜잭션. 확정은 스토어에 비동기로 반영되므로 직후의 조회가 같은 주문을
+        // 아직 미확정으로 돌려줄 수 있다 — 다시 지급하면 이중 지급이고, 소유 목록에서 빠지면 회수된다.
+        private readonly HashSet<string> _confirmedInSession = new();
+
+        // 복원. RestoreTransactions의 콜백과 뒤따르는 조회 결과가 둘 다 와야 끝난다 — 순서는 스토어마다
+        // 다를 수 있어서, 먼저 온 쪽을 기억해 두었다가 나중에 온 쪽에서 끝낸다.
+        private AwaitableCompletionSource<bool> _restoring;
+        private bool _restoreCallbackSucceeded;
+        private bool? _restoreFetchResult;
+
+        // RestoreAsync가 진행되는 동안 복원된 구매의 수 — 스토어가 확정 목록으로 돌려준 비소모성과
+        // 파이프라인을 통과한 미확정 구매를 합친다.
         private int _restoredCount;
+
+        private AwaitableCompletionSource<bool> _connecting;
+        private AwaitableCompletionSource<bool> _fetchingProducts;
+        private AwaitableCompletionSource<bool> _fetchingPurchases;
 
         private bool _subscribed;
         private bool _disposed;
 
-        public IAPService(IIAPProvider provider, IAPServiceOptions options,
-                          IIAPFulfillment fulfillment = null,
-                          IReceiptValidator validator = null,
-                          IEntitlementStorage entitlements = null)
+        // 기본 경로. StoreController 하나가 세 인터페이스를 모두 구현하고, 상품은 Unity IAP Catalog
+        // (Assets/Resources/IAPProductCatalog.json)에서 읽는다. 생성만으로는 스토어에 연결하지 않는다.
+        public IAPService(IIAPFulfillment fulfillment = null,
+                               IReceiptValidator validator = null,
+                               IEntitlementStorage entitlements = null,
+                               bool verboseLogging = false)
+            : this(UnityIAPServices.StoreController(), LoadCatalog(),
+                   fulfillment, validator, entitlements, verboseLogging)
         {
-            _provider = provider ?? throw new ArgumentNullException(nameof(provider));
+        }
+
+        private IAPService(StoreController controller, IReadOnlyList<ProductDefinition> catalog,
+                                IIAPFulfillment fulfillment, IReceiptValidator validator,
+                                IEntitlementStorage entitlements, bool verboseLogging)
+            : this(controller, controller, controller, catalog, fulfillment, validator, entitlements, verboseLogging)
+        {
+        }
+
+        internal IAPService(IStoreService store, IProductService products, IPurchaseService purchases,
+                                 IReadOnlyList<ProductDefinition> catalog,
+                                 IIAPFulfillment fulfillment, IReceiptValidator validator,
+                                 IEntitlementStorage entitlements, bool verboseLogging)
+        {
+            _store = store ?? throw new ArgumentNullException(nameof(store));
+            _productService = products ?? throw new ArgumentNullException(nameof(products));
+            _purchaseService = purchases ?? throw new ArgumentNullException(nameof(purchases));
+            _catalog = catalog != null ? new List<ProductDefinition>(catalog) : new List<ProductDefinition>();
             _fulfillment = fulfillment ?? new AutoConfirmFulfillment();
-            _validator = validator ?? new NoopReceiptValidator();
+            _validator = validator ?? new CrossPlatformReceiptValidator();
             _entitlements = entitlements ?? new PlayerPrefsEntitlementStorage();
-            _verboseLogging = options.VerboseLogging;
-
-            if (options.Products != null)
-            {
-                foreach (var definition in options.Products)
-                {
-                    if (string.IsNullOrEmpty(definition.Id)) continue;
-
-                    _byId[definition.Id] = definition;
-                    if (!string.IsNullOrEmpty(definition.StoreId)) _byStoreId[definition.StoreId] = definition;
-                }
-            }
+            _verboseLogging = verboseLogging;
         }
 
         public bool IsInitialized { get; private set; }
 
         public IReadOnlyList<IAPProduct> Products =>
-            IsInitialized ? _provider.Products : Array.Empty<IAPProduct>();
+            IsInitialized ? _products : Array.Empty<IAPProduct>();
 
         public event Action<IAPPurchase> Purchased;
         public event Action<string> OwnedChanged;
@@ -95,7 +130,7 @@ namespace DarkNaku.FoundationDI
 
             if (!IsInitialized || string.IsNullOrEmpty(productId)) return false;
 
-            foreach (var candidate in _provider.Products)
+            foreach (var candidate in _products)
             {
                 if (candidate.Id != productId) continue;
 
@@ -113,36 +148,36 @@ namespace DarkNaku.FoundationDI
         {
             if (_disposed || !IsInitialized) return IAPPurchaseResult.NotReady();
 
-            if (string.IsNullOrEmpty(productId) || !_byId.TryGetValue(productId, out var definition))
+            if (string.IsNullOrEmpty(productId) || !_unityProducts.TryGetValue(productId, out var product))
             {
                 Debug.LogWarning($"[IAPService] 카탈로그에 없는 상품을 구매하려 했다: {productId}");
                 return IAPPurchaseResult.NotReady();
             }
 
-            // 비소모성은 스토어가 "이미 소유"로 거절하기 전에 우리가 먼저 답한다.
+            // 비소모성은 스토어가 "이미 소유"로 거절하기 전에 먼저 답한다.
             // 스토어 시트를 띄웠다가 에러로 닫히는 것보다 낫다.
-            if (definition.Type == IAPProductType.NonConsumable && IsOwned(productId))
+            if (product.definition.type == ProductType.NonConsumable && IsOwned(productId))
             {
-                return IAPPurchaseResult.AlreadyOwned(OwnedPurchaseOf(definition));
+                return IAPPurchaseResult.AlreadyOwned(OwnedPurchaseOf(product));
             }
 
-            // 스토어 UI는 모달이라 동시에 두 개가 뜨지 않는다. provider 이벤트에 "어느 호출의
-            // 결과인가"가 실려 오지 않으므로, 겹치는 호출을 허용하면 결과를 잘못 짝지을 수 있다.
             if (_pendingSource != null) return IAPPurchaseResult.NotReady();
 
-            _pendingSource = new AwaitableCompletionSource<IAPPurchaseResult>();
+            // 지역 변수로 잡아 둔다. 스토어가 PurchaseProduct 안에서 곧바로 주문을 내면(에디터의 FakeStore)
+            // 완료 처리가 필드를 먼저 비운다.
+            var source = new AwaitableCompletionSource<IAPPurchaseResult>();
+            _pendingSource = source;
             _pendingProductId = productId;
 
-            if (!_provider.Purchase(definition.StoreId))
-            {
-                ClearPending();
-                return IAPPurchaseResult.Failed(
-                    new IAPError(PurchaseStartFailedCode, "구매를 시작하지 못했다"));
-            }
+            // 조회한 Product로 산다 — catalogListingId 규칙에 의존하지 않는다.
+            _purchaseService.PurchaseProduct(product);
 
-            return await _pendingSource.Awaitable;
+            return await source.Awaitable;
         }
 
+        // RestoreTransactions의 콜백은 복원 결과가 아니다. SDK는 성공하면 FetchPurchases()를 다시
+        // 부르고 곧바로 콜백을 부르므로(PurchaseService.RestoreTransactions), 복원된 구매는 콜백 뒤의
+        // OnPurchasesFetched로 온다.
         public async Awaitable<IAPRestoreResult> RestoreAsync()
         {
             if (_disposed || !IsInitialized)
@@ -150,13 +185,36 @@ namespace DarkNaku.FoundationDI
                 return IAPRestoreResult.Fail(new IAPError(NotInitializedCode, "초기화되지 않았다"));
             }
 
-            // 복원된 구매는 PurchasePending(IsRestored: true)로 들어와 같은 파이프라인을 탄다.
-            // 여기서는 그 사이에 몇 건이 지나갔는지만 센다.
+            if (_restoring != null)
+            {
+                Debug.LogWarning("[IAPService] 복원이 이미 진행 중이다.");
+                return IAPRestoreResult.Fail(new IAPError(RestoreInProgressCode, "복원이 이미 진행 중이다"));
+            }
+
             _restoredCount = 0;
+            _restoreCallbackSucceeded = false;
+            _restoreFetchResult = null;
 
-            var success = await _provider.RestoreAsync();
+            var source = new AwaitableCompletionSource<bool>();
+            _restoring = source;
 
-            if (!success)
+            _purchaseService.RestoreTransactions((success, error) =>
+            {
+                if (_restoring != source) return;
+
+                if (!success)
+                {
+                    Debug.LogWarning($"[IAPService] 복원에 실패했다: {error}");
+                    FinishRestore(false);
+                    return;
+                }
+
+                _restoreCallbackSucceeded = true;
+
+                if (_restoreFetchResult.HasValue) FinishRestore(_restoreFetchResult.Value);
+            });
+
+            if (!await source.Awaitable)
             {
                 return IAPRestoreResult.Fail(new IAPError(RestoreFailedCode, "복원에 실패했다"));
             }
@@ -171,52 +229,118 @@ namespace DarkNaku.FoundationDI
             _disposed = true;
             Unsubscribe();
 
-            // 대기 중인 구매가 있으면 영원히 매달리지 않게 끊어준다.
+            // 대기 중인 구매·복원이 영원히 매달리지 않게 끊어준다.
             CompletePending(IAPPurchaseResult.Failed(new IAPError(DisposedCode, "서비스가 해제됐다")));
-
-            _provider.Dispose();
+            FinishRestore(false);
+            CompleteInitWaiters(false);
         }
 
         private async Awaitable<bool> RunInitializeAsync()
         {
+            // 미확정 주문을 SDK가 임의로 재처리하지 않게 한다. 확정 시점은 이 서비스 소관이고,
+            // 재전달된 주문에는 "복원됨" 표시를 붙여야 하는데 자동 경로로는 그 구분이 사라진다.
+            _purchaseService.ProcessPendingOrdersOnPurchasesFetched(false);
+
             // Unity IAP는 Connect 전에 구독을 끝낼 것을 요구하고, 미확정 구매가 연결 직후에
-            // 재전달되기도 한다. 그래서 provider 초기화보다 구독이 먼저다.
+            // 재전달되기도 한다.
             Subscribe();
 
-            var success = await _provider.InitializeAsync(
-                new IAPProviderContext(BuildDefinitions(), _verboseLogging));
+            var success = await ConnectAsync() && await FetchProductsAsync();
+
+            if (success)
+            {
+                // 실패해도 치명적이지 않다 — 미확정 구매를 이번 실행에 못 찾을 뿐이고 다음 실행에 다시 시도한다.
+                await FetchPurchasesAsync();
+            }
+            else
+            {
+                Debug.LogError("[IAPService] Unity IAP 초기화에 실패했다.");
+            }
 
             IsInitialized = success;
             _initializing = false;
-
-            if (!success)
-            {
-                Debug.LogError($"[IAPService] {_provider.Name} provider 초기화에 실패했다.");
-                Unsubscribe();
-            }
-            else if (_verboseLogging)
-            {
-                Debug.Log($"[IAPService] {_provider.Name} 초기화 완료. 상품 {_provider.Products.Count}개.");
-            }
 
             CompleteInitWaiters(success);
             return success;
         }
 
-        private List<IAPProductDefinition> BuildDefinitions()
+        private static List<ProductDefinition> LoadCatalog()
         {
-            var definitions = new List<IAPProductDefinition>(_byId.Count);
-            foreach (var pair in _byId) definitions.Add(pair.Value);
-            return definitions;
+            var catalog = ProductCatalog.LoadDefaultCatalog();
+
+            UnityIAPCatalog.WarnIfCodelessAutoInitialization(catalog);
+
+            if (catalog.IsEmpty())
+            {
+                Debug.LogWarning("[IAPService] IAP Catalog가 비어 있다. Services > In-App Purchasing > IAP Catalog에서 상품을 추가할 것.");
+            }
+
+            return UnityIAPCatalog.ToDefinitions(catalog, CurrentStoreName());
+        }
+
+        // 에디터에서는 빌드 타깃을 따라간다 — 에디터 실행 중에도 현재 타깃의 스토어 ID가 나온다.
+        private static string CurrentStoreName()
+        {
+#if UNITY_ANDROID
+            return GooglePlay.Name;
+#elif UNITY_IOS
+            return AppleAppStore.Name;
+#else
+            return null;
+#endif
+        }
+
+        private void CompleteInitWaiters(bool success)
+        {
+            if (_initWaiters.Count == 0) return;
+
+            var waiters = new List<AwaitableCompletionSource<bool>>(_initWaiters);
+            _initWaiters.Clear();
+
+            foreach (var waiter in waiters) waiter.SetResult(success);
+        }
+
+        private Awaitable<bool> ConnectAsync()
+        {
+            _connecting = new AwaitableCompletionSource<bool>();
+
+            // Connect()가 돌려주는 Task를 직접 await 하지 않는다. 성공/실패가 모두
+            // OnStoreConnected/OnStoreDisconnected로 오기 때문에 이벤트 하나로 받는 편이
+            // 스레드 문맥에 대한 가정이 없다.
+            _ = _store.Connect();
+
+            return _connecting.Awaitable;
+        }
+
+        private Awaitable<bool> FetchProductsAsync()
+        {
+            _fetchingProducts = new AwaitableCompletionSource<bool>();
+            _productService.FetchProducts(new List<ProductDefinition>(_catalog));
+            return _fetchingProducts.Awaitable;
+        }
+
+        private Awaitable<bool> FetchPurchasesAsync()
+        {
+            _fetchingPurchases = new AwaitableCompletionSource<bool>();
+            _purchaseService.FetchPurchases();
+            return _fetchingPurchases.Awaitable;
         }
 
         private void Subscribe()
         {
             if (_subscribed) return;
 
-            _provider.PurchasePending += HandlePending;
-            _provider.PurchaseFailed += HandleFailed;
-            _provider.PurchaseDeferred += HandleDeferred;
+            _store.OnStoreConnected += HandleStoreConnected;
+            _store.OnStoreDisconnected += HandleStoreDisconnected;
+            _productService.OnProductsFetched += HandleProductsFetched;
+            _productService.OnProductsFetchFailed += HandleProductsFetchFailed;
+            _purchaseService.OnPurchasesFetched += HandlePurchasesFetched;
+            _purchaseService.OnPurchasePending += HandlePurchasePending;
+            _purchaseService.OnPurchaseConfirmed += HandlePurchaseConfirmed;
+            _purchaseService.OnPurchaseFailed += HandlePurchaseFailed;
+            _purchaseService.OnPurchaseDeferred += HandlePurchaseDeferred;
+            _purchaseService.OnPurchasesFetchFailed += HandlePurchasesFetchFailed;
+
             _subscribed = true;
         }
 
@@ -224,59 +348,225 @@ namespace DarkNaku.FoundationDI
         {
             if (!_subscribed) return;
 
-            _provider.PurchasePending -= HandlePending;
-            _provider.PurchaseFailed -= HandleFailed;
-            _provider.PurchaseDeferred -= HandleDeferred;
+            _store.OnStoreConnected -= HandleStoreConnected;
+            _store.OnStoreDisconnected -= HandleStoreDisconnected;
+            _productService.OnProductsFetched -= HandleProductsFetched;
+            _productService.OnProductsFetchFailed -= HandleProductsFetchFailed;
+            _purchaseService.OnPurchasesFetched -= HandlePurchasesFetched;
+            _purchaseService.OnPurchasePending -= HandlePurchasePending;
+            _purchaseService.OnPurchaseConfirmed -= HandlePurchaseConfirmed;
+            _purchaseService.OnPurchaseFailed -= HandlePurchaseFailed;
+            _purchaseService.OnPurchaseDeferred -= HandlePurchaseDeferred;
+            _purchaseService.OnPurchasesFetchFailed -= HandlePurchasesFetchFailed;
+
             _subscribed = false;
         }
 
-        private void HandleFailed(IAPPurchaseFailure failure)
+        private void HandleStoreConnected() => _connecting?.TrySetResult(true);
+
+        private void HandleStoreDisconnected(StoreConnectionFailureDescription failure)
         {
-            if (_disposed) return;
+            Debug.LogWarning($"[IAPService] 스토어 연결이 끊겼다: {failure?.message}");
 
-            if (!_byStoreId.TryGetValue(failure.StoreId ?? string.Empty, out var definition)) return;
+            // 연결 대기 중이었다면 실패로 끝낸다. 이미 연결된 뒤의 끊김은 SDK가 재연결을 맡는다.
+            _connecting?.TrySetResult(false);
+        }
 
-            // 취소는 에러가 아니다. 로그로 남기면 정상 동작이 매번 소음이 된다.
-            if (!failure.IsUserCancelled)
+        private void HandleProductsFetched(List<Product> products)
+        {
+            _products.Clear();
+            _unityProducts.Clear();
+
+            foreach (var product in products)
             {
-                Debug.LogWarning($"[IAPService] 구매에 실패했다: {definition.Id} {failure.Error}");
+                var id = product?.definition?.id;
+                if (string.IsNullOrEmpty(id)) continue;
+
+                _unityProducts[id] = product;
+                _products.Add(ToIAPProduct(product));
             }
 
-            CompletePendingFor(definition.Id, failure.IsUserCancelled
-                ? IAPPurchaseResult.UserCancelled()
-                : IAPPurchaseResult.Failed(failure.Error));
+            if (_verboseLogging) Debug.Log($"[IAPService] 상품 {_products.Count}개를 조회했다.");
+
+            _fetchingProducts?.TrySetResult(true);
         }
 
-        // iOS Ask-to-Buy 등. 승인되면 나중에 PurchasePending으로 들어와 같은 파이프라인을 탄다.
-        private void HandleDeferred(string storeId)
+        private void HandleProductsFetchFailed(ProductFetchFailed failure)
         {
-            if (_disposed) return;
+            Debug.LogError($"[IAPService] 상품 조회에 실패했다: {failure?.FailureReason}");
 
-            if (!_byStoreId.TryGetValue(storeId ?? string.Empty, out var definition)) return;
-
-            CompletePendingFor(definition.Id, IAPPurchaseResult.Deferred());
+            _fetchingProducts?.TrySetResult(false);
         }
 
-        // provider 이벤트 핸들러라 반환값을 기다릴 주체가 없다 — 예외는 전부 안에서 잡는다.
-        private async void HandlePending(IAPPendingPurchase pending)
+        private void HandlePurchasesFetched(Orders orders)
         {
-            if (_disposed) return;
+            var owned = new HashSet<string>();
 
-            if (!_byStoreId.TryGetValue(pending.StoreId ?? string.Empty, out var definition))
+            // 같은 조회에 미확정으로 실려 온 상품. 확정 목록에 없지만 지금 지급·확정 중이거나 막 끝났다 —
+            // 회수하면 방금 기록한 소유를 지우게 된다.
+            var pending = new HashSet<string>();
+
+            // 앱이 죽어 확정하지 못했던 구매들. 지급되지 않았을 수 있으므로 다시 흘려보낸다.
+            foreach (var order in orders.PendingOrders)
+            {
+                var pendingId = ProductOf(order)?.definition?.id;
+                if (!string.IsNullOrEmpty(pendingId)) pending.Add(pendingId);
+
+                var transactionId = order.Info?.TransactionID;
+
+                // 이번 세션에 확정했지만 스토어에 아직 반영되지 않은 주문 — 지급은 끝났으니 소유로 센다.
+                if (!string.IsNullOrEmpty(transactionId) && _confirmedInSession.Contains(transactionId))
+                {
+                    var productId = ProductOf(order)?.definition?.id;
+                    if (!string.IsNullOrEmpty(productId)) owned.Add(productId);
+                    continue;
+                }
+
+                ProcessPending(order, isRestored: true);
+            }
+
+            foreach (var order in orders.ConfirmedOrders)
+            {
+                var productId = ProductOf(order)?.definition?.id;
+                if (!string.IsNullOrEmpty(productId)) owned.Add(productId);
+            }
+
+            SyncOwnership(owned, pending);
+
+            _fetchingPurchases?.TrySetResult(true);
+            CompleteRestoreFetch(true);
+        }
+
+        // 스토어의 확정 목록이 진실이다. 목록에 있으면 소유(재설치·기기 변경), 없으면 회수(환불)한다.
+        // 이미 확정·지급된 구매이므로 지급 파이프라인을 다시 타지 않는다.
+        private void SyncOwnership(HashSet<string> owned, HashSet<string> pending)
+        {
+            foreach (var definition in _catalog)
+            {
+                if (definition.type != ProductType.NonConsumable) continue;
+
+                var isOwned = owned.Contains(definition.id);
+                if (isOwned && _restoring != null) _restoredCount++;
+
+                if (_entitlements.IsOwned(definition.id) == isOwned) continue;
+                if (!isOwned && pending.Contains(definition.id)) continue;
+
+                _entitlements.SetOwned(definition.id, isOwned);
+                OwnedChanged?.Invoke(definition.id);
+            }
+        }
+
+        private void HandlePurchasesFetchFailed(PurchasesFetchFailureDescription failure)
+        {
+            Debug.LogWarning($"[IAPService] 이전 구매 조회에 실패했다: {failure?.message}");
+
+            _fetchingPurchases?.TrySetResult(false);
+            CompleteRestoreFetch(false);
+        }
+
+        private void CompleteRestoreFetch(bool success)
+        {
+            if (_restoring == null) return;
+
+            if (_restoreCallbackSucceeded) FinishRestore(success);
+            else _restoreFetchResult = success;
+        }
+
+        private void FinishRestore(bool success)
+        {
+            var source = _restoring;
+            _restoring = null;
+            _restoreCallbackSucceeded = false;
+            _restoreFetchResult = null;
+
+            source?.TrySetResult(success);
+        }
+
+        private void HandlePurchasePending(PendingOrder order) => ProcessPending(order, isRestored: false);
+
+        // 확정 결과. 실패해도 할 일은 없다 — 스토어가 다음 실행에 같은 구매를 미확정으로 다시 주고,
+        // 그때 지급 핸들러가 TransactionId로 중복 지급을 막는다. 다만 조용히 넘기면 발견이 늦다.
+        private void HandlePurchaseConfirmed(Order order)
+        {
+            if (order is not FailedOrder failed) return;
+
+            Debug.LogWarning($"[IAPService] 구매 확정에 실패했다: {ProductOf(failed)?.definition?.id} " +
+                             $"{failed.FailureReason} {failed.Details}");
+        }
+
+        // iOS Ask-to-Buy 등. 승인되면 나중에 OnPurchasePending으로 들어와 같은 파이프라인을 탄다.
+        private void HandlePurchaseDeferred(DeferredOrder order)
+        {
+            var productId = ProductOf(order)?.definition?.id;
+            if (string.IsNullOrEmpty(productId)) return;
+
+            CompletePendingFor(productId, IAPPurchaseResult.Deferred());
+        }
+
+        private void HandlePurchaseFailed(FailedOrder order)
+        {
+            var productId = ProductOf(order)?.definition?.id;
+            if (string.IsNullOrEmpty(productId)) return;
+
+            var cancelled = order.FailureReason == PurchaseFailureReason.UserCancelled;
+
+            // 취소는 에러가 아니다. 로그로 남기면 정상 동작이 매번 소음이 된다.
+            if (cancelled)
+            {
+                CompletePendingFor(productId, IAPPurchaseResult.UserCancelled());
+                return;
+            }
+
+            var error = new IAPError((int)order.FailureReason, order.Details ?? order.FailureReason.ToString());
+            Debug.LogWarning($"[IAPService] 구매에 실패했다: {productId} {error}");
+
+            CompletePendingFor(productId, IAPPurchaseResult.Failed(error));
+        }
+
+        // 주문 이벤트 핸들러라 반환값을 기다릴 주체가 없다 — 예외는 전부 안에서 잡는다.
+        private async void ProcessPending(PendingOrder order, bool isRestored)
+        {
+            var product = ProductOf(order);
+            var productId = product?.definition?.id;
+            var transactionId = order.Info?.TransactionID;
+
+            if (!IsInCatalog(productId))
             {
                 // 확정해 버리면 이 구매는 영영 지급할 수 없다. 다음 버전의 카탈로그가
                 // 이 상품을 알게 될 수도 있으므로 미확정으로 남긴다.
-                Debug.LogWarning($"[IAPService] 카탈로그에 없는 상품의 구매가 도착했다: {pending.StoreId}. " +
+                Debug.LogWarning($"[IAPService] 카탈로그에 없는 상품의 구매가 도착했다: {productId}. " +
                                  "확정하지 않고 남겨둔다.");
                 return;
             }
 
-            var purchase = BuildPurchase(definition, pending);
+            if (string.IsNullOrEmpty(transactionId))
+            {
+                Debug.LogWarning($"[IAPService] 트랜잭션 ID가 없는 구매가 도착했다: {productId}. 확정할 수 없어 건너뛴다.");
+                return;
+            }
+
+            if (!_inFlight.Add(transactionId)) return;
+
+            try
+            {
+                await FulfillAndConfirmAsync(order, product, isRestored);
+            }
+            finally
+            {
+                _inFlight.Remove(transactionId);
+            }
+        }
+
+        private async Awaitable FulfillAndConfirmAsync(PendingOrder order, Product product, bool isRestored)
+        {
+            var productId = product.definition.id;
+
+            var purchase = BuildPurchase(product, order, isRestored);
 
             if (!_validator.Validate(purchase, out var validationError))
             {
                 Debug.LogError($"[IAPService] 영수증 검증에 실패했다: {purchase.ProductId} {validationError}");
-                CompletePendingFor(definition.Id, IAPPurchaseResult.InvalidReceipt(validationError));
+                CompletePendingFor(productId, IAPPurchaseResult.InvalidReceipt(validationError));
                 return;
             }
 
@@ -292,62 +582,53 @@ namespace DarkNaku.FoundationDI
                 fulfilled = false;
             }
 
+            // 지급을 기다리는 사이 해제됐다. 확정하지 않으면 스토어가 다음 실행에 다시 준다.
             if (_disposed) return;
 
             if (!fulfilled)
             {
                 // 확정하지 않는다 — 스토어가 다음 실행에 같은 구매를 다시 내려준다.
-                CompletePendingFor(definition.Id, IAPPurchaseResult.Failed(
+                CompletePendingFor(productId, IAPPurchaseResult.Failed(
                     new IAPError(FulfillmentFailedCode, "지급에 실패해 확정하지 않았다")));
                 return;
             }
 
-            _provider.Confirm(pending.TransactionId);
+            _confirmedInSession.Add(order.Info.TransactionID);
+            _purchaseService.ConfirmPurchase(order);
 
-            if (definition.Type == IAPProductType.NonConsumable && !_entitlements.IsOwned(definition.Id))
+            if (purchase.Type == IAPProductType.NonConsumable && !_entitlements.IsOwned(productId))
             {
-                _entitlements.SetOwned(definition.Id, true);
-                OwnedChanged?.Invoke(definition.Id);
+                _entitlements.SetOwned(productId, true);
+                OwnedChanged?.Invoke(productId);
             }
 
-            if (pending.IsRestored) _restoredCount++;
+            if (isRestored) _restoredCount++;
 
             Purchased?.Invoke(purchase);
 
-            CompletePendingFor(definition.Id, pending.IsRestored
-                ? IAPPurchaseResult.Restored(purchase)
-                : IAPPurchaseResult.Purchased(purchase));
+            CompletePendingFor(productId, IAPPurchaseResult.Purchased(purchase));
         }
 
-        private IAPPurchase BuildPurchase(IAPProductDefinition definition, IAPPendingPurchase pending)
+        private IAPPurchase BuildPurchase(Product product, Order order, bool isRestored)
         {
-            var price = 0.0;
-            var currency = string.Empty;
+            var definition = product.definition;
+            var metadata = product.metadata;
 
-            if (TryGetProduct(definition.Id, out var product))
-            {
-                price = product.Price;
-                currency = product.CurrencyCode;
-            }
-
-            return new IAPPurchase(definition.Id, definition.Type, pending.TransactionId,
-                                   pending.Receipt, price, currency, pending.IsRestored);
+            return new IAPPurchase(definition.id, ToProductType(definition.type),
+                                   order.Info?.TransactionID, order.Info?.Receipt,
+                                   metadata == null ? 0.0 : (double)metadata.localizedPrice,
+                                   metadata?.isoCurrencyCode ?? string.Empty, isRestored);
         }
 
         // 이미 소유한 상품을 다시 사려 할 때 돌려줄 페이로드. 거래 정보는 없다 —
         // 이번 세션에 일어난 거래가 아니기 때문이다.
-        private IAPPurchase OwnedPurchaseOf(IAPProductDefinition definition)
+        private static IAPPurchase OwnedPurchaseOf(Product product)
         {
-            var price = 0.0;
-            var currency = string.Empty;
+            var metadata = product.metadata;
 
-            if (TryGetProduct(definition.Id, out var product))
-            {
-                price = product.Price;
-                currency = product.CurrencyCode;
-            }
-
-            return new IAPPurchase(definition.Id, definition.Type, null, null, price, currency, true);
+            return new IAPPurchase(product.definition.id, ToProductType(product.definition.type), null, null,
+                                   metadata == null ? 0.0 : (double)metadata.localizedPrice,
+                                   metadata?.isoCurrencyCode ?? string.Empty, true);
         }
 
         // 대기 중인 구매의 상품과 일치할 때만 완료시킨다. 재전달·복원처럼 아무도 기다리지
@@ -364,29 +645,51 @@ namespace DarkNaku.FoundationDI
             var source = _pendingSource;
             if (source == null) return;
 
-            ClearPending();
+            _pendingSource = null;
+            _pendingProductId = null;
             source.SetResult(result);
         }
 
-        private void ClearPending()
+        private bool IsInCatalog(string productId)
         {
-            _pendingSource = null;
-            _pendingProductId = null;
+            if (string.IsNullOrEmpty(productId)) return false;
+
+            foreach (var definition in _catalog)
+            {
+                if (definition.id == productId) return true;
+            }
+
+            return false;
         }
 
-        private void CompleteInitWaiters(bool success)
+        private static Product ProductOf(Order order)
         {
-            if (_initWaiters.Count == 0) return;
+            var items = order?.CartOrdered?.Items();
+            if (items == null || items.Count == 0) return null;
 
-            var waiters = new List<AwaitableCompletionSource<bool>>(_initWaiters);
-            _initWaiters.Clear();
-
-            foreach (var waiter in waiters) waiter.SetResult(success);
+            return items[0]?.Product;
         }
 
-        private static Awaitable<bool> Completed(bool value)
+        private static IAPProduct ToIAPProduct(Product product)
         {
-            var source = new AwaitableCompletionSource<bool>();
+            var definition = product.definition;
+            var metadata = product.metadata;
+
+            return new IAPProduct(definition.id, definition.storeSpecificId, ToProductType(definition.type),
+                                  metadata?.localizedTitle,
+                                  metadata?.localizedDescription,
+                                  metadata?.localizedPriceString,
+                                  metadata == null ? 0.0 : (double)metadata.localizedPrice,
+                                  metadata?.isoCurrencyCode,
+                                  product.availableToPurchase);
+        }
+
+        private static IAPProductType ToProductType(ProductType type) =>
+            type == ProductType.NonConsumable ? IAPProductType.NonConsumable : IAPProductType.Consumable;
+
+        private static Awaitable<T> Completed<T>(T value)
+        {
+            var source = new AwaitableCompletionSource<T>();
             source.SetResult(value);
             return source.Awaitable;
         }

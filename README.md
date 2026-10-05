@@ -1,7 +1,7 @@
 # FoundationDI
 
 ![Unity](https://img.shields.io/badge/Unity-6000.3%2B-black?logo=unity)
-![Version](https://img.shields.io/badge/version-0.10.9-blue)
+![Version](https://img.shields.io/badge/version-0.11.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Author](https://img.shields.io/badge/author-DarkNaku-orange)
 
@@ -18,7 +18,7 @@ DI(의존성 주입) 기반 Unity 게임 개발 파운데이션 패키지입니�
 - **오브젝트 풀 / 사운드** — 키 기반 GameObject 풀링과 태그 기반 오디오. 사운드는 SFX/음악/플레이리스트/다이내믹 뮤직 빌더, AudioSource 풀링, 페이드·루프·콜백, AudioMixer Output 볼륨 영속화, 3D 오클루전, 전용 에디터 창(Audio Creator/Collection/Output Manager)을 제공
 - **햅틱** — iOS/Android 촉각 피드백. 시맨틱 프리셋(`Impact`/`Notification`/`Selection`, 옵트인 쿨다운) + `AnimationCurve` 커브·커스텀 패턴 재생(`Awaitable`, 단일 활성)과 플랫폼 케이퍼빌리티 폴백. 에디터/데스크톱은 Noop
 - **부트스트랩 초기화** — 초기화 단위를 SO(`InitializeItem`)로 정의하고 카탈로그 순서대로 순차 실행. 세션 내 중복 실행 방지, 실패 지점부터 재개
-- **수익화 3종** — 광고(`IAdService`)·분석(`IAnalyticsService`)·인앱결제(`IIAPService`). 세 서비스 모두 SDK를 옵셔널 어셈블리로 격리해 **코어는 어떤 3사 SDK도 참조하지 않으며**, SDK가 없으면 Dummy/Debug provider로 에디터에서 전체 플로우가 돌아갑니다
+- **수익화 3종** — 광고(`IAdService`)·분석(`IAnalyticsService`)·인앱결제(`IIAPService`). **코어는 어떤 3사 SDK도 참조하지 않습니다.** 광고·분석은 SDK를 옵셔널 어셈블리로 격리해 SDK가 없으면 Dummy/Debug provider로 에디터에서 전체 플로우가 돌아가고, 인앱결제는 Unity IAP를 직접 쓰는 헬퍼라 Unity IAP를 설치하면(`FOUNDATIONDI_UNITYIAP`) 켜집니다
 - **튜토리얼** — 게임 조건에 따라 나뉘어 발동하는 튜토리얼 진행 엔진(`ITutorialManager`). 시퀀스는 각자 `StartTrigger`로 발동하는 조건부 집합이고, 진행도는 시퀀스 ID로 영속화. 진행 규칙은 순수 C#이라 EditMode에서 전부 테스트됨
 - **UI 컴포넌트** — uGUI `Button`을 상속한 `UIButton`(클릭 SFX + 햅틱), 상태별 이미지/텍스트 스왑 `UIStateButton`, 호버 확대·누름 축소 `UIScaleButton`(스케일을 자식에만 걸어 히트 영역이 변하지 않는다). 사운드·햅틱 서비스는 선택적이라 등록하지 않으면 그 기능만 조용히 꺼진다
 - **씬 컴포넌트 DI** — 씬에 배치된 MonoBehaviour 주입은 Reflex의 `ContainerScope`가 직접 한다(실행 순서 `-1_000_000_000`, 어떤 `Awake`보다 먼저). `UIButton`/`MusicZone`/`OutputVolumeSlider`/`TutorialTarget` 등 패키지 컴포넌트는 서비스를 `[Inject]` 필드로 직접 받지 않고 `[Inject] Construct(IServiceResolver)` + `TryResolve`로 **선택 주입**한다 — 씬 주입에는 컴포넌트별 격리가 없어, 미등록 서비스를 요구하는 필드 하나가 그 뒤 순번 전체의 주입을 막기 때문이다
@@ -61,6 +61,29 @@ FoundationDI는 다음 패키지를 전제로 합니다. 먼저 설치되어 있
 
 심볼이 없으면 각각 Dummy/Debug provider로 폴백해 에디터에서 전체 플로우를 그대로 확인할 수 있습니다.
 
+## iOS 빌드 후처리
+
+Xcode 프로젝트가 생성된 뒤 패키지가 자동으로 손보는 것들입니다. **따로 설정할 것은 없습니다.**
+
+| 넣는 것 | 왜 |
+| --- | --- |
+| `ITSAppUsesNonExemptEncryption = false` | 없으면 TestFlight 업로드마다 App Store Connect가 "수출 규정 관리 문서 누락"을 띄우고, 웹에서 손으로 답하기 전까지 그 빌드를 제출도 외부 테스터 배포도 할 수 없습니다. |
+| `NSUserTrackingUsageDescription` | 없으면 iOS가 ATT 다이얼로그를 아예 띄우지 않습니다(심사 리젝 사유). `FOUNDATIONDI_IOSSUPPORT`가 켜졌을 때만. |
+| `GADDelayAppMeasurementInit = true` | AdMob이 ATT 다이얼로그가 떠 있는 동안 App Measurement를 자동 초기화하는 것을 막습니다. |
+| `CoreHaptics` / `AppTrackingTransparency` weak-link | iOS 13/14 미만에서 실행 시 죽지 않게. |
+
+### 수출 규정 신고를 끄려면
+
+`false`는 **"면제 대상 외 암호화를 쓰지 않는다"**는 신고입니다. HTTPS와 OS가 제공하는 암호화만 쓰는 앱에 해당하며 대부분의 게임이 여기 속합니다. 세이브 파일 AES 암호화처럼 **자체 암호화를 넣었다면 이 신고는 거짓**이므로 꺼야 합니다.
+
+```csharp
+using DarkNaku.FoundationDI.Editor;
+
+IosExportCompliance.Enabled = false;   // BuildPipeline.BuildPlayer 앞에서
+```
+
+정적 프로퍼티라 빌드 스크립트가 그대로 제어 지점이 됩니다. 끄면 이 키를 건드리지 않으므로, `true`와 애플이 발급한 `ITSEncryptionExportComplianceCode`는 프로젝트가 자기 후처리로 넣습니다. 이미 `Info.plist`에 이 키가 있으면 값과 무관하게 덮어쓰지 않습니다.
+
 ## 빠른 시작
 
 앱 수명 서비스는 프로젝트 루트 `IInstaller`에서 등록합니다. **UINavigator는 씬 수명이므로 씬 `IInstaller`에 따로 등록합니다** — 등록한 스코프가 그대로 캔버스·풀·프리젠터의 수명이 되기 때문입니다(씬이 언로드되면 함께 파괴). 등록 순서에도 주의합니다 — UINavigator는 프리팹 로드를 `IResourceService`에 위임하므로, `RegisterUINavigator`가 호출되는 시점에는 `IResourceService`가 (부모 스코프에서라도) 이미 등록되어 있어야 합니다.
@@ -86,7 +109,7 @@ public class RootInstaller : MonoBehaviour, IInstaller
         // builder.RegisterHapticService();
         // builder.RegisterAdService(_adSettings);
         // builder.RegisterAnalyticsService(_analyticsSettings);
-        // builder.RegisterIAPService(_iapSettings);
+        // builder.RegisterIAPService();   // Unity IAP 설치 시(FOUNDATIONDI_UNITYIAP). 상품은 IAP Catalog
     }
 }
 
@@ -169,7 +192,7 @@ DI 컨테이너가 **VContainer에서 Reflex 14.3.1로 바뀌었습니다.** 파
 | **InitializeService** | 게임 부트스트랩 순차 초기화. 초기화 단위를 `InitializeItem`(SO)로 정의하고 `InitializeCatalog`에 묶어 리스트 순서대로 직렬 실행. 세션 내 중복 실행 방지, 예외는 즉시 전파하고 실패 지점부터 재개. | [README](Assets/FoundationDI/Runtime/Services/InitializeService/README.md) |
 | **AdService** | 광고 네트워크 중립 서비스. `IAdService` 하나로 전면·보상·배너를 다루고, 정책 계층(재시도 백오프·보상 래치·자동 재로드·전면 쿨다운·광고제거 게이트)과 SDK 어댑터를 분리. `ShowAsync`는 `Awaitable<AdShowResult>`. 광고제거는 포맷별로 다르게 게이트한다(전면·배너 차단, 보상형은 계속 동작). | [README](Assets/FoundationDI/Runtime/Services/AdService/README.md) |
 | **AnalyticsService** | 다중 분석/MMP 팬아웃. 게임이 `IAnalyticsService` API를 한 번 호출하면 등록된 모든 provider로 브로드캐스트된다. 라우팅 규칙 없음(무엇을 무시할지는 어댑터가 결정), 초기화 전 이벤트는 순서 보존 버퍼링·유저 상태는 latest-wins, provider 예외는 격리. | [README](Assets/FoundationDI/Runtime/Services/AnalyticsService/README.md) |
-| **IAPService** | 모바일 인앱 구매(Google Play/App Store). 소모성·비소모성을 `IIAPService` 하나로 구매·복원. **지급을 저장한 뒤에만 확정**하는 규율을 `IIAPFulfillment` seam 하나로 접어, 신규 구매·재전달·복원이 전부 같은 메서드로 들어온다. 로컬 영수증 검증(Google Play)·상품 상수 생성기 포함. | [README](Assets/FoundationDI/Runtime/Services/IAPService/README.md) |
+| **IAPService** | 모바일 인앱 구매(Google Play/App Store). Unity IAP를 직접 쓰는 헬퍼로, 소모성·비소모성을 `IIAPService` 하나로 구매·복원. **지급을 저장한 뒤에만 확정**하는 규율을 `IIAPFulfillment` seam 하나로 접고, 비소모성 소유를 스토어 확정 목록으로 맞춘다(재설치 복구·환불 회수). 상품은 Unity IAP Catalog, 로컬 영수증 검증(Google Play)·상품 상수 생성기 포함. | [README](Assets/FoundationDI/Runtime/Services/IAPService/README.md) |
 | **TutorialManager** | 조건 기반 튜토리얼 진행 엔진. 시퀀스는 순차 리스트가 아니라 각자 `StartTrigger`(Auto/Manual/ButtonClick/`MessageTrigger<T>`)로 발동하는 **조건부 후보 집합**이고, 진행도는 인덱스가 아닌 **시퀀스 ID**로 영속화해 시퀀스를 추가·삭제해도 기존 유저 진행도가 어긋나지 않는다. 진행 규칙은 순수 C#(EditMode 테스트 가능) + 얇은 씬 오써링 어댑터로 분리. 연출은 `ITutorialModule` seam + 기본 2종. | [README](Assets/FoundationDI/Runtime/Managers/TutorialManager/README.md) |
 
 > 상세 문서가 아직 없는 구성 요소는 소스(`Assets/FoundationDI/Runtime/Services/<이름>/`)와 인터페이스(`IXxxService`)를 참고하세요.

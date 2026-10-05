@@ -97,14 +97,19 @@ DI 코어는 **Reflex 14.3.1**이다. `Assets/Scripts/Installers/RootInstaller.c
   - **`google-services.json`이 없어 Firebase 실전송은 미검증이고, Adjust SDK는 에디터에서 아무것도 하지 않아(`InitSdk`가 즉시 반환) 실기 빌드로만 검증된다.**
   - 상세: `Assets/FoundationDI/Runtime/Services/AnalyticsService/README.md`.
 
-- **IAPService** (`Services/IAPService/`): 모바일 인앱 구매 서비스. Google Play / App Store의 소모성·비소모성 상품을 `IIAPService` 하나로 다룬다.
-  - **3계층**: `Providers/`(SDK seam, `IIAPProvider`) → `IAPService`(정책: 검증→지급→확정→소유 기록→이벤트) → `IIAPService`(게임 표면). AdService와 같은 구조.
-  - **`IIAPFulfillment`이 핵심 seam**: 지급이 `true`를 반환해야 `ConfirmPurchase`가 호출된다. 저장 실패 시 확정하지 않아 스토어가 다음 실행에 재전달한다. **신규 구매·재전달·복원이 전부 이 한 메서드로 들어온다.** 미등록 시 `AutoConfirmFulfillment`로 폴백.
+- **IAPService** (`Services/IAPService/`): 모바일 인앱 구매. **Unity IAP를 직접 호출하는 헬퍼**다(0.11.0에서 provider 추상화·Dummy·자체 카탈로그를 걷어냈다 — 바꿔 끼울 SDK가 없고, 테스트되지 않던 번역 계층에서 버그가 몰려 나왔다).
+  - **활성화는 심볼로만**: `IAPService/` 폴더 전체가 `FOUNDATIONDI_UNITYIAP` 게이트의 `FoundationDI.UnityIAP` 어셈블리다. **Unity IAP가 없으면 `IIAPService` 타입 자체가 없다** — 호스트의 `RootInstaller`/`IAPServiceSmokeTest`가 `#if FOUNDATIONDI_UNITYIAP`로 감싸여 있는 이유다. 테스트도 같은 게이트의 `FoundationDI.UnityIAP.Tests`(`Tests/UnityIAP/`)에 있다. 상수 생성기는 `FoundationDI.UnityIAP.Editor`.
+  - **카탈로그는 Unity IAP Catalog**(`Assets/Resources/IAPProductCatalog.json`). 카탈로그 ID = 공용 ID, 스토어 ID는 `GetStoreID(GooglePlay.Name|AppleAppStore.Name)`이고 비면 공용 ID(`UnityIAPCatalog.ToDefinitions`). 구독은 경고 후 제외. **Codeless 자동 초기화(기본 켜짐)가 켜져 있으면 에러를 남긴다** — `CodelessIAPStoreListener`가 따로 연결해 구매를 처리하면 지급 후 확정 규율이 깨진다.
+  - **테스트 seam은 Unity의 public 인터페이스**: `StoreController`가 구현하는 `IStoreService`/`IProductService`/`IPurchaseService`를 internal 생성자로 받고, 테스트는 NSubstitute 하나로 셋을 대체한다(`UnityIAPStoreHarness`). 주문 객체는 public 생성자가 있지만 **`Product`/`ProductFetchFailed`는 생성자가 internal이라 `UnityIAPTestObjects`에서만 리플렉션으로 만들고**, `OrderInfo`는 internal 클래스라 `IOrderInfo`를 직접 구현한다(`FakeOrderInfo`).
+  - **에디트 모드에서는 `StoreController`를 만들 수 없다**(`Store Factory not present` — 스토어 팩토리가 런타임 초기화에서 등록된다). 등록 테스트는 `IAPServiceRegistration.ServiceFactory` seam을 바꿔 배선만 검증한다.
+  - **`IIAPFulfillment`이 핵심 seam**: 지급이 `true`를 반환해야 `ConfirmPurchase`가 호출된다. 저장 실패 시 확정하지 않아 스토어가 다음 실행에 재전달한다. **신규 구매와 미확정 구매의 재전달이 전부 이 한 메서드로 들어온다**(이미 확정된 구매의 복원은 소유 목록 경로로 온다). 미등록 시 `AutoConfirmFulfillment`로 폴백.
+  - **비소모성 소유의 진실은 스토어의 확정 목록이다.** `IsOwned`는 `IEntitlementStorage` 캐시를 보지만, 조회가 성공할 때마다(초기화·복원) `Orders.ConfirmedOrders`로 캐시를 맞춘다 — 재설치 후 복구, 환불 시 회수. 확정된 구매는 지급·`Purchased`를 다시 거치지 않는다. **같은 조회에 미확정으로 실려 온 상품은 회수하지 않는다**(지급·확정 직후 동기화가 방금 기록한 소유를 지우던 버그). **`RestoreTransactions` 콜백은 뒤따르는 `FetchPurchases` 결과보다 먼저 불리므로** 두 신호가 모두 와야 복원이 끝난다. `ProcessPendingOrdersOnPurchasesFetched(false)`로 SDK의 세션 중복 제거를 껐기 때문에 지급 중(`_inFlight`)·이번 세션 확정(`_confirmedInSession`) 주문의 재처리를 직접 막는다.
+  - **스토어가 `PurchaseProduct` 안에서 동기로 주문을 낼 수 있다**(에디터 FakeStore). 그래서 `PurchaseAsync`는 완료 소스를 지역 변수로 잡고 await한다 — 필드를 다시 읽으면 완료 처리가 먼저 비워 NRE가 난다(플레이 모드에서 실제로 났다).
+  - **에디터(FakeStore)**: 구매 확인 창이 Game 뷰에 뜨고, 복원은 지원되지 않으며(`OSXEditor is not a supported platform for the restore button`), **실행 사이에 구매가 남지 않아 다음 Play에서 소유가 회수된다**(동기화가 의도대로 동작하는 것).
   - **`PurchaseAsync`는 `Awaitable<IAPPurchaseResult>`**. 결과는 `Purchased/Restored/AlreadyOwned/UserCancelled/Deferred/NotReady/InvalidReceipt/Failed` 8종이며 `IsSuccess`가 앞 셋을 묶는다. 스토어 UI가 모달이라 동시 구매는 하나만 허용한다(두 번째는 `NotReady`).
   - **iOS 로컬 검증은 불가능하다** — Unity IAP 5는 StoreKit 2를 쓰고 OS가 이미 검증한다. 로컬 검증은 Google Play 전용(`CrossPlatformValidator` + Tangle)이며 `GooglePlayTangle`은 Assembly-CSharp에 생성되므로 리플렉션으로 찾는다. Tangle이 없으면 경고 후 통과(개발 빌드가 막히지 않게).
-  - **Unity IAP는 옵셔널 어셈블리**: `FOUNDATIONDI_UNITYIAP` 심볼이 걸린 `FoundationDI.UnityIAP`. 코어는 `com.unity.purchasing`를 참조하지 않는다. 에디터에서는 `ForceDummyInEditor`로 Dummy provider가 전체 플로우를 대신한다.
-  - **AdService/AnalyticsService 연동은 수동 배선** — `_ads.AdsRemoved = _iap.IsOwned(...)`, `_iap.Purchased += p => _analytics.LogPurchase(...)`.
-  - 상품 상수는 `Tools/FoundationDI/IAP/Generate Product Constants`가 `IAPProducts` 클래스로 생성한다(SoundService의 Generated/asmref 패턴).
+  - **AdService/AnalyticsService 연동은 수동 배선** — `_ads.AdsRemoved = _iap.IsOwned(...)`(환불 회수도 `OwnedChanged`로 오므로 `true`를 박지 말고 다시 읽는다), `_iap.Purchased += p => _analytics.LogPurchase(...)`.
+  - 상품 상수는 `Tools/FoundationDI/IAP/Generate Product Constants`가 IAP Catalog로 `IAPProducts` 클래스를 생성한다. 출력 폴더는 기억한 폴더(EditorPrefs, 프로젝트 GUID 키) → 이 도구가 만든 기존 `IAPProducts.cs` 폴더 → 폴더 선택 창 순서다. `.asmref`로 코어 `FoundationDI`에 합류한다(문자열뿐이라 심볼 없이도 컴파일된다).
   - 상세: `Assets/FoundationDI/Runtime/Services/IAPService/README.md`.
 
 - **PoolManager** (`Managers/PoolManager/`): 키 기반 GameObject 오브젝트 풀. **프리팹 로드는 `IResourceService`에 위임한다.** `ObjectPool<IPoolItem>` 기반이며 `PoolData`가 풀을, `PoolItem`(MonoBehaviour)이 풀 항목 생명주기 콜백(`OnGetItem`/`OnReleaseItem` 등)과 지연 반환(`Release(delay)`)을 담당. 풀 루트는 `DontDestroyOnLoad`가 아니라 씬 스코프에 귀속시켜 씬 언로드 시 함께 정리된다. 생성 시 계층 전체에 DI를 주입하며, **주입 실패는 인스턴스 단위로 격리**된다(격리가 없으면 생성 콜백이 반환하지 못해 인스턴스가 씬에 고아로 남는다).
@@ -165,7 +170,8 @@ DI 코어는 **Reflex 14.3.1**이다. `Assets/Scripts/Installers/RootInstaller.c
 
 코어는 옵셔널 어댑터 어셈블리를 참조할 수 없어(순환) 어댑터는 참조 그래프상 섬이 된다. IL2CPP
 링커는 닿지 않는 어셈블리를 통째로 걷어내므로, 그대로 두면 `[RuntimeInitializeOnLoadMethod]`
-등록이 실기 빌드에서 아예 일어나지 않아 세 서비스가 **조용히 Dummy provider로 떨어진다**.
+등록이 실기 빌드에서 아예 일어나지 않아 AdService·AnalyticsService가 **조용히 Dummy provider로 떨어진다**.
+(IAPService는 0.11.0부터 게임 코드가 직접 참조하는 어셈블리라 섬이 아니지만, SDK 어셈블리 보존을 위해 같은 표에 있다.)
 에디터에서는 재현되지 않는다.
 
 - **패키지에 link.xml 파일을 두는 방법은 통하지 않는다.** 에디터의 수집 지점은
@@ -182,6 +188,26 @@ DI 코어는 **Reflex 14.3.1**이다. `Assets/Scripts/Installers/RootInstaller.c
 - 표 누락은 `FoundationDILinkXmlTest`가 asmdef와 대조해 EditMode에서 잡는다(스트리핑 자체는
   EditMode에서 재현 불가).
 
+
+### iOS 빌드 후처리
+
+`Info.plist`와 Xcode 프로젝트를 만지는 `[PostProcessBuild]`가 셋이며, 같은 산출물을 각자 읽고
+쓰므로 우선순위로 줄을 세운다 — `FDI_HapticiOSPostProcess`(999) → `AttIosPostProcess`(1000) →
+`IosExportCompliance`(1001). **새 후처리를 추가하면 그 뒤 번호를 준다.**
+
+- `IosExportCompliance`(`Editor/Build/`)는 `ITSAppUsesNonExemptEncryption = false`를 넣는다.
+  이 키가 없으면 TestFlight 업로드마다 App Store Connect가 "수출 규정 관리 문서 누락"을 띄워
+  그 빌드를 제출도 외부 테스터 배포도 할 수 없다. 유니티 플레이어 설정에 자리가 없어 후처리로만
+  넣을 수 있다.
+- **끄는 스위치가 정적 프로퍼티(`IosExportCompliance.Enabled`)인 이유는 빌드 스크립트가 제어
+  지점이기 때문이다.** `BuildPipeline.BuildPlayer` 앞에 대입하면 같은 도메인에서 후처리까지
+  이어진다. 스크립팅 심볼이면 값을 바꿀 때마다 도메인 리로드를 기다려야 하고, 설정 에셋이면
+  로드·수정·저장을 거쳐야 한다.
+- `false`는 "면제 대상 외 암호화를 쓰지 않는다"는 **신고**다. 자체 암호화를 넣은 프로젝트에는
+  거짓이 되므로 `true` 경로는 일부러 열지 않았다 — 애플 발급 `ITSEncryptionExportComplianceCode`가
+  따로 필요하고, 그런 프로젝트는 스위치를 끄고 자기 후처리로 넣는다.
+- 이미 키가 있는 plist는 값과 무관하게 덮지 않는다(`ShouldDeclare`). 다른 후처리가 넣은 `true`를
+  `false`로 뒤집으면 조용히 허위 신고가 되고, 되돌아간 것처럼 보이지도 않아 발견이 늦다.
 
 ### 네임스페이스
 런타임 코드는 `DarkNaku.FoundationDI` 단일 네임스페이스로 통일한다(UIManager 리뉴얼로 구 `FoundationDI` 네임스페이스는 제거됨). 새 코드를 추가할 때 같은 디렉터리의 기존 파일이 쓰는 네임스페이스를 따른다.

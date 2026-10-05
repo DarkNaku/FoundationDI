@@ -1,3 +1,4 @@
+#if FOUNDATIONDI_UNITYIAP
 using DarkNaku.FoundationDI;
 using UnityEngine;
 using Reflex.Attributes;
@@ -66,3 +67,4 @@ public class IAPServiceSmokeTest : MonoBehaviour
         Debug.Log($"[Smoke] {_lastResult}");
     }
 }
+#endif

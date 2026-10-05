@@ -1,0 +1,22 @@
+{
+    "name": "FoundationDI.UnityIAP.Editor",
+    "rootNamespace": "",
+    "references": [
+        "FoundationDI",
+        "FoundationDI.UnityIAP",
+        "Unity.Purchasing"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "FOUNDATIONDI_UNITYIAP"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

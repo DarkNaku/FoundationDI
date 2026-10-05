@@ -4,4 +4,5 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("FoundationDI.Tests")]
 [assembly: InternalsVisibleTo("FoundationDI.Tests.Editor")]
 [assembly: InternalsVisibleTo("FoundationDI.Tests.Runtime")]
+[assembly: InternalsVisibleTo("FoundationDI.UnityIAP.Tests")]
 [assembly: InternalsVisibleTo("DynamicProxyGenAssembly2")]
