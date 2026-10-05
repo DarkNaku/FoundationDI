@@ -29,13 +29,7 @@ public class IAPProductConstantsGeneratorTest
     [Test]
     public void 생성된_소스가_상수를_담는다()
     {
-        var entries = new[]
-        {
-            new IAPProductEntry("remove_ads", IAPProductType.NonConsumable, default),
-            new IAPProductEntry("gems", IAPProductType.Consumable, default),
-        };
-
-        var source = IAPProductConstantsGenerator.BuildSource(entries);
+        var source = IAPProductConstantsGenerator.BuildSource(new[] { "remove_ads", "gems" });
 
         StringAssert.Contains("public static class IAPProducts", source);
         StringAssert.Contains("public const string RemoveAds = \"remove_ads\";", source);
@@ -46,14 +40,35 @@ public class IAPProductConstantsGeneratorTest
     [Test]
     public void 식별자가_충돌하면_하나만_남는다()
     {
-        var entries = new[]
-        {
-            new IAPProductEntry("remove_ads", IAPProductType.NonConsumable, default),
-            new IAPProductEntry("remove.ads", IAPProductType.NonConsumable, default),
-        };
-
-        var source = IAPProductConstantsGenerator.BuildSource(entries);
+        var source = IAPProductConstantsGenerator.BuildSource(new[] { "remove_ads", "remove.ads" });
 
         Assert.AreEqual(1, System.Text.RegularExpressions.Regex.Matches(source, "RemoveAds").Count);
+    }
+
+    [Test]
+    public void 출력_폴더는_기억한_폴더가_먼저다()
+    {
+        Assert.AreEqual("Assets/Game/Generated/",
+            IAPProductConstantsGenerator.ResolveOutputFolder("Assets/Game/Generated/", "Assets/Old/IAPProducts.cs"));
+    }
+
+    [Test]
+    public void 기억한_폴더가_없으면_기존_생성_파일의_폴더를_쓴다()
+    {
+        // 0.10.x가 설정 SO 옆에 만든 파일을 그대로 덮어 써야 게임 코드의 참조가 유지된다.
+        Assert.AreEqual("Assets/Settings/Generated/",
+            IAPProductConstantsGenerator.ResolveOutputFolder(null, "Assets/Settings/Generated/IAPProducts.cs"));
+    }
+
+    [Test]
+    public void 둘_다_없으면_null이다()
+    {
+        Assert.IsNull(IAPProductConstantsGenerator.ResolveOutputFolder("", null));
+    }
+
+    [Test]
+    public void Assets_밖의_폴더는_기억했어도_쓰지_않는다()
+    {
+        Assert.IsNull(IAPProductConstantsGenerator.ResolveOutputFolder("/Users/someone/Desktop/", null));
     }
 }
