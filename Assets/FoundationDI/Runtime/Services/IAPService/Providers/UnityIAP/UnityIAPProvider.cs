@@ -22,7 +22,13 @@ namespace DarkNaku.FoundationDI
         private readonly Dictionary<string, UnityProduct> _productsByStoreId = new();
 
         // 아직 확정하지 않은 주문. 정책 계층이 트랜잭션 ID로만 확정을 요청하기 때문에 여기서 되찾는다.
+        // 지급이 진행 중인 주문이 다음 조회에 또 실려 와도 두 번 발행하지 않는 기준이기도 하다.
         private readonly Dictionary<string, PendingOrder> _unconfirmed = new();
+
+        // 이번 세션에 확정한 트랜잭션. 확정은 스토어에 비동기로 반영되므로 직후의 조회가 같은 주문을
+        // 아직 미확정으로 돌려줄 수 있다 — 그대로 다시 발행하면 이중 지급이고, 소유 목록에서 빠지면 회수된다.
+        // ProcessPendingOrdersOnPurchasesFetched(false)로 SDK의 같은 장치(세션 처리 목록)를 꺼 뒀기 때문에 직접 한다.
+        private readonly HashSet<string> _confirmedInSession = new();
 
         private AwaitableCompletionSource<bool> _connecting;
         private AwaitableCompletionSource<bool> _fetchingProducts;
@@ -84,29 +90,45 @@ namespace DarkNaku.FoundationDI
             if (string.IsNullOrEmpty(transactionId)) return;
             if (!_unconfirmed.Remove(transactionId, out var order)) return;
 
+            _confirmedInSession.Add(transactionId);
             _controller.ConfirmPurchase(order);
         }
 
+        // RestoreTransactions의 콜백은 복원 결과가 아니다. SDK는 성공하면 FetchPurchases()를 다시
+        // 부르고 곧바로 콜백을 부르므로(PurchaseService.RestoreTransactions), 복원된 구매는 콜백 뒤의
+        // OnPurchasesFetched로 온다. 그래서 둘 다 도착해야 끝난다 — 순서는 스토어마다 다를 수 있다.
         public Awaitable<bool> RestoreAsync()
         {
             if (_disposed) return Completed(false);
 
-            _restoring = new AwaitableCompletionSource<bool>();
+            if (_restoring != null)
+            {
+                Debug.LogWarning("[IAPService] 복원이 이미 진행 중이다.");
+                return Completed(false);
+            }
 
-            // 복원으로 돌아온 주문은 OnPurchasePending으로 들어온다. 그때 IsRestored를 붙일 수
-            // 있도록 콜백이 끝나기 전까지를 "복원 구간"으로 본다.
-            _restoreInProgress = true;
+            var source = new AwaitableCompletionSource<bool>();
+            _restoring = source;
+            _restoreCallbackSucceeded = false;
+            _restoreFetchResult = null;
 
             _controller.RestoreTransactions((success, error) =>
             {
-                _restoreInProgress = false;
+                if (_restoring != source) return;
 
-                if (!success) Debug.LogWarning($"[IAPService] 복원에 실패했다: {error}");
+                if (!success)
+                {
+                    Debug.LogWarning($"[IAPService] 복원에 실패했다: {error}");
+                    FinishRestore(false);
+                    return;
+                }
 
-                _restoring?.TrySetResult(success);
+                _restoreCallbackSucceeded = true;
+
+                if (_restoreFetchResult.HasValue) FinishRestore(_restoreFetchResult.Value);
             });
 
-            return _restoring.Awaitable;
+            return source.Awaitable;
         }
 
         public void Dispose()
@@ -116,7 +138,10 @@ namespace DarkNaku.FoundationDI
             _disposed = true;
             Unsubscribe();
 
+            FinishRestore(false);
+
             _unconfirmed.Clear();
+            _confirmedInSession.Clear();
             _productsByStoreId.Clear();
             _products.Clear();
 
@@ -126,7 +151,9 @@ namespace DarkNaku.FoundationDI
             OwnedProductsFetched = null;
         }
 
-        private bool _restoreInProgress;
+        // 복원 중에 도착한 조회 결과. 콜백보다 먼저 오면 여기 담아 두었다가 콜백에서 끝낸다.
+        private bool? _restoreFetchResult;
+        private bool _restoreCallbackSucceeded;
 
         private Awaitable<bool> ConnectAsync()
         {
@@ -254,10 +281,36 @@ namespace DarkNaku.FoundationDI
 
         private void HandlePurchasesFetched(Orders orders)
         {
-            // 앱이 죽어 확정하지 못했던 구매들. 지급되지 않았을 수 있으므로 전부 다시 흘려보낸다.
-            foreach (var order in orders.PendingOrders) EmitPending(order, isRestored: true);
+            // 확정된 구매는 이미 지급됐다 — 소유 목록으로만 보고한다. 재설치·기기 변경·복원 후
+            // 비소모성 소유가 돌아오는 유일한 경로이고, 목록에서 빠진 것은 환불이다.
+            var owned = new List<string>();
+
+            foreach (var order in orders.ConfirmedOrders)
+            {
+                var storeId = StoreIdOf(order);
+                if (!string.IsNullOrEmpty(storeId)) owned.Add(storeId);
+            }
+
+            // 앱이 죽어 확정하지 못했던 구매들. 지급되지 않았을 수 있으므로 다시 흘려보낸다.
+            foreach (var order in orders.PendingOrders)
+            {
+                var transactionId = order.Info?.TransactionID;
+
+                // 이번 세션에 확정했지만 스토어에 아직 반영되지 않은 주문 — 지급은 끝났으니 소유로 센다.
+                if (!string.IsNullOrEmpty(transactionId) && _confirmedInSession.Contains(transactionId))
+                {
+                    var storeId = StoreIdOf(order);
+                    if (!string.IsNullOrEmpty(storeId)) owned.Add(storeId);
+                    continue;
+                }
+
+                EmitPending(order, isRestored: true);
+            }
+
+            OwnedProductsFetched?.Invoke(owned);
 
             _fetchingPurchases?.TrySetResult(true);
+            CompleteRestoreFetch(true);
         }
 
         private void HandlePurchasesFetchFailed(PurchasesFetchFailureDescription failure)
@@ -265,9 +318,29 @@ namespace DarkNaku.FoundationDI
             Debug.LogWarning($"[IAPService] 이전 구매 조회에 실패했다: {failure.message}");
 
             _fetchingPurchases?.TrySetResult(false);
+            CompleteRestoreFetch(false);
         }
 
-        private void HandlePurchasePending(PendingOrder order) => EmitPending(order, _restoreInProgress);
+        private void CompleteRestoreFetch(bool success)
+        {
+            if (_restoring == null) return;
+
+            if (_restoreCallbackSucceeded) FinishRestore(success);
+            else _restoreFetchResult = success;
+        }
+
+        private void FinishRestore(bool success)
+        {
+            var source = _restoring;
+            _restoring = null;
+            _restoreCallbackSucceeded = false;
+            _restoreFetchResult = null;
+
+            source?.TrySetResult(success);
+        }
+
+        // 복원 중에 들어온 주문도 살아 있는 결제다 — 복원된 구매는 OnPurchasesFetched로 온다.
+        private void HandlePurchasePending(PendingOrder order) => EmitPending(order, isRestored: false);
 
         private void HandlePurchaseFailed(FailedOrder order)
         {
@@ -300,6 +373,9 @@ namespace DarkNaku.FoundationDI
                 Debug.LogWarning($"[IAPService] 트랜잭션 ID가 없는 구매가 도착했다: {storeId}. 확정할 수 없어 건너뛴다.");
                 return;
             }
+
+            // 지급이 진행 중인 주문이 다음 조회에 또 실려 왔다. 다시 발행하면 이중 지급이다.
+            if (_unconfirmed.ContainsKey(transactionId)) return;
 
             _unconfirmed[transactionId] = order;
 
