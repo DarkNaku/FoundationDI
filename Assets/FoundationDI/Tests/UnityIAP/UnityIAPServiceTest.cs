@@ -111,4 +111,31 @@ public class UnityIAPServiceTest
         Assert.IsTrue(await sut.InitializeAsync());
         Assert.IsTrue(sut.IsInitialized);
     });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 초기화_전_구매는_NotReady다() => AwaitableTest.Run(async () =>
+    {
+        var store = new UnityIAPStoreHarness();
+        var sut = NewService(store);
+
+        Assert.AreEqual(IAPPurchaseOutcome.NotReady, (await sut.PurchaseAsync("gems")).Outcome);
+        Assert.IsEmpty(store.PurchaseCalls);
+    });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator InitializeAsync는_재진입해도_한_번만_연결한다() => AwaitableTest.Run(async () =>
+    {
+        var store = new UnityIAPStoreHarness();
+        var sut = NewService(store);
+
+        var first = sut.InitializeAsync();
+        var second = sut.InitializeAsync();
+
+        Assert.IsTrue(await first);
+        Assert.IsTrue(await second);
+        Assert.IsTrue(await sut.InitializeAsync());
+        Assert.AreEqual(1, store.Calls.Count(c => c == "Connect"));
+    });
 }

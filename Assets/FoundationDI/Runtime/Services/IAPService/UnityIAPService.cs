@@ -23,6 +23,11 @@ namespace DarkNaku.FoundationDI
         private readonly List<IAPProduct> _products = new();
         private readonly Dictionary<string, Product> _unityProducts = new();
 
+        // 진행 중인 초기화에 편승한 호출자들. Awaitable은 단일 사용이라 하나를 여럿이 await 할 수
+        // 없으므로, 호출자마다 별도의 완료 소스를 만들어 두었다가 한꺼번에 같은 결과로 완료시킨다.
+        private readonly List<AwaitableCompletionSource<bool>> _initWaiters = new();
+        private bool _initializing;
+
         private AwaitableCompletionSource<bool> _connecting;
         private AwaitableCompletionSource<bool> _fetchingProducts;
         private AwaitableCompletionSource<bool> _fetchingPurchases;
@@ -52,7 +57,22 @@ namespace DarkNaku.FoundationDI
         public event Action<IAPPurchase> Purchased;
         public event Action<string> OwnedChanged;
 
-        public async Awaitable<bool> InitializeAsync()
+        public Awaitable<bool> InitializeAsync()
+        {
+            if (IsInitialized) return Completed(true);
+
+            if (_initializing)
+            {
+                var waiter = new AwaitableCompletionSource<bool>();
+                _initWaiters.Add(waiter);
+                return waiter.Awaitable;
+            }
+
+            _initializing = true;
+            return RunInitializeAsync();
+        }
+
+        private async Awaitable<bool> RunInitializeAsync()
         {
             // 미확정 주문을 SDK가 임의로 재처리하지 않게 한다. 확정 시점은 이 서비스 소관이고,
             // 재전달된 주문에는 "복원됨" 표시를 붙여야 하는데 자동 경로로는 그 구분이 사라진다.
@@ -62,17 +82,23 @@ namespace DarkNaku.FoundationDI
             // 재전달되기도 한다.
             Subscribe();
 
-            if (!await ConnectAsync() || !await FetchProductsAsync())
+            var success = await ConnectAsync() && await FetchProductsAsync();
+
+            if (success)
+            {
+                // 실패해도 치명적이지 않다 — 미확정 구매를 이번 실행에 못 찾을 뿐이고 다음 실행에 다시 시도한다.
+                await FetchPurchasesAsync();
+            }
+            else
             {
                 Debug.LogError("[IAPService] Unity IAP 초기화에 실패했다.");
-                return false;
             }
 
-            // 실패해도 치명적이지 않다 — 미확정 구매를 이번 실행에 못 찾을 뿐이고 다음 실행에 다시 시도한다.
-            await FetchPurchasesAsync();
+            IsInitialized = success;
+            _initializing = false;
 
-            IsInitialized = true;
-            return true;
+            CompleteInitWaiters(success);
+            return success;
         }
 
         public bool TryGetProduct(string productId, out IAPProduct product)
@@ -102,6 +128,16 @@ namespace DarkNaku.FoundationDI
 
         public void Dispose()
         {
+        }
+
+        private void CompleteInitWaiters(bool success)
+        {
+            if (_initWaiters.Count == 0) return;
+
+            var waiters = new List<AwaitableCompletionSource<bool>>(_initWaiters);
+            _initWaiters.Clear();
+
+            foreach (var waiter in waiters) waiter.SetResult(success);
         }
 
         private Awaitable<bool> ConnectAsync()
