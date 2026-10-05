@@ -1,7 +1,7 @@
 # IAPService 재설계 — Unity IAP 직접 사용 헬퍼
 
 - 작성일: 2026-10-05
-- 상태: 승인됨 (미결 사항은 제안대로 결정, 2026-10-05)
+- 상태: 구현 완료 (미결 사항은 제안대로 결정, 2026-10-05)
 - 대체 대상: `2026-08-23-iapservice-design.md`의 "Unity IAP는 옵셔널 어셈블리", "카탈로그는 `IAPServiceSettings`" 결정
 - SDK: Unity In-App Purchasing `com.unity.purchasing` 5.4.2
 - 버전: 0.10.11 → **0.11.0** (하위 호환 깨짐)
@@ -165,10 +165,15 @@ builder.RegisterIAPService(verboseLogging: true);
 Dummy provider 대신 **Unity IAP의 FakeStore**를 쓴다. Unity IAP는 에디터에서 자동으로 FakeStore로
 연결된다.
 
-알려진 차이가 하나 있다. FakeStore는 실행 사이에 구매 기록을 유지하지 않는다고 알려져 있다.
-그렇다면 에디터에서는 매 실행마다 소유가 스토어 목록 기준으로 회수된다(소유 동기화가 의도대로
-동작하는 것이다). 실행을 넘어 소유를 유지하며 테스트해야 한다면 `IEntitlementStorage`를 교체한다.
-→ 구현 첫 단계에서 실제 동작을 확인하고 README에 적는다.
+플레이 모드에서 확인한 동작(2026-10-05):
+
+- 구매 확인 창이 Game 뷰에 뜬다(`UIFakeStore`). 창 없이 `PurchaseProduct` 안에서 **동기로** 주문을 내는 경우도
+  있다 — 이 경로에서 `PurchaseAsync`가 NRE를 내는 버그를 찾아 고쳤다(완료 소스를 지역 변수로 잡는다).
+- 복원은 지원되지 않는다: `OSXEditor is not a supported platform for the restore button`.
+- **실행 사이에 구매가 남지 않는다.** 다음 Play에서 확정 목록이 비어 소유가 회수된다. 소유 동기화가 의도대로
+  동작하는 것이며, 동기화가 스토어 목록을 따르므로 `IEntitlementStorage`를 바꿔도 피할 수 없다. 실행을 넘는
+  시나리오는 기기에서 확인한다.
+- SDK는 `OnPurchaseConfirmed` 구독이 없으면 확정마다 경고한다. 구독해서 확정 실패를 경고로 남기게 했다.
 
 ### 지우는 것
 

@@ -1,6 +1,6 @@
 # plan.md
 
-## 진행 중: IAPService를 Unity IAP 직접 사용 헬퍼로 바꾼다 (0.11.0)
+## 완료: IAPService를 Unity IAP 직접 사용 헬퍼로 바꾼다 (0.11.0)
 
 provider 추상화·Dummy·자체 카탈로그를 걷어내고 Unity IAP를 직접 호출한다. 활성화는 다른 서드파티처럼
 `FOUNDATIONDI_UNITYIAP` 심볼로만. SDK와 맞닿은 번역 계층까지 Unity 인터페이스 대체로 단위 테스트한다.
@@ -13,7 +13,7 @@ provider 추상화·Dummy·자체 카탈로그를 걷어내고 Unity IAP를 직�
 - [x] 3. [BEHAVIORAL] 등록을 UnityIAPService로 바꾸고 카탈로그를 IAP Catalog로 옮긴다
 - [x] 4. [STRUCTURAL] 옛 provider 계층·Dummy·설정 SO를 지우고 UnityIAPService를 IAPService로 바꾼다
 - [x] 5. [BEHAVIORAL] 상품 상수 생성기의 입력을 IAP Catalog로, 출력 위치를 기억·질문 방식으로 바꾼다
-- [ ] 6. [STRUCTURAL] 문서·호스트·버전 0.11.0
+- [x] 6. [STRUCTURAL] 문서·호스트·버전 0.11.0
 
 UnityIAPService 테스트
 - [x] 카탈로그를 공용 ID와 플랫폼 스토어 ID로 조회한다
@@ -55,6 +55,11 @@ UnityIAPService 테스트
 - [x] Dispose하면 구독이 풀리고 이후 구매는 NotReady다
 - [x] Dispose하면 대기 중인 구매·복원이 매달리지 않는다
 - [x] Codeless 자동 초기화가 켜진 카탈로그면 에러를 남긴다
+- [x] 스토어가 구매를 동기로 끝내도 결과를 돌려준다 (플레이 모드 확인 중 발견)
+- [x] 확정이 실패하면 경고를 남긴다 (플레이 모드 확인 중 발견)
+
+구현만 있고 단위 테스트가 없는 항목: 기본 생성자의 StoreController·카탈로그 로드(에디트 모드에서 StoreController를
+만들 수 없다 — 플레이 모드 스모크로 확인), 상수 생성기의 폴더 선택 창. 복원은 에디터 FakeStore가 지원하지 않아 기기 확인이 필요하다.
 
 ---
 
