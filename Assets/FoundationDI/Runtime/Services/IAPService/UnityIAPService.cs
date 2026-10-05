@@ -259,6 +259,17 @@ namespace DarkNaku.FoundationDI
             // 앱이 죽어 확정하지 못했던 구매들. 지급되지 않았을 수 있으므로 다시 흘려보낸다.
             foreach (var order in orders.PendingOrders) ProcessPending(order, isRestored: true);
 
+            // 확정된 구매는 이미 지급됐다 — 소유로만 반영한다. 재설치·기기 변경 후 비소모성 소유가
+            // 돌아오는 유일한 경로다.
+            foreach (var order in orders.ConfirmedOrders)
+            {
+                var productId = ProductOf(order)?.definition?.id;
+                if (!IsInCatalog(productId) || _entitlements.IsOwned(productId)) continue;
+
+                _entitlements.SetOwned(productId, true);
+                OwnedChanged?.Invoke(productId);
+            }
+
             _fetchingPurchases?.TrySetResult(true);
         }
 

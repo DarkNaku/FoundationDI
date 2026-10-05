@@ -435,4 +435,25 @@ public class UnityIAPServiceTest
         Assert.IsEmpty(fulfillment.Calls);
         Assert.IsEmpty(store.ConfirmCalls, "지급할 수 없는 구매를 확정하면 영영 되찾을 수 없다");
     });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 확정_주문의_비소모성이_소유로_기록되고_OwnedChanged가_발행된다() => AwaitableTest.Run(async () =>
+    {
+        // 재설치 후: 로컬 캐시는 비었지만 스토어는 이미 확정된 구매를 안다.
+        var store = new UnityIAPStoreHarness(Catalog);
+        store.ConfirmedOnFetch.Add(store.Confirmed("remove_ads"));
+        var fulfillment = new FakeFulfillment();
+        var sut = NewService(store, fulfillment);
+
+        string ownedChanged = null;
+        sut.OwnedChanged += id => ownedChanged = id;
+
+        await sut.InitializeAsync();
+
+        Assert.IsTrue(sut.IsOwned("remove_ads"), "스토어가 확인한 소유가 기록되지 않았다");
+        Assert.AreEqual("remove_ads", ownedChanged);
+        Assert.IsEmpty(fulfillment.Calls, "이미 확정된 구매를 다시 지급했다");
+        Assert.IsEmpty(store.ConfirmCalls, "이미 확정된 구매를 다시 확정했다");
+    });
 }
