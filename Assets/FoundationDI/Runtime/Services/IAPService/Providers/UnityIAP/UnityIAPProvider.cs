@@ -49,6 +49,7 @@ namespace DarkNaku.FoundationDI
         public event Action<IAPPendingPurchase> PurchasePending;
         public event Action<IAPPurchaseFailure> PurchaseFailed;
         public event Action<string> PurchaseDeferred;
+        public event Action<IReadOnlyCollection<string>> OwnedProductsFetched;
 
         public async Awaitable<bool> InitializeAsync(IAPProviderContext context)
         {
@@ -122,6 +123,7 @@ namespace DarkNaku.FoundationDI
             PurchasePending = null;
             PurchaseFailed = null;
             PurchaseDeferred = null;
+            OwnedProductsFetched = null;
         }
 
         private bool _restoreInProgress;

@@ -79,10 +79,12 @@ public class FakeIAPProvider : IIAPProvider
     public void RaisePending(IAPPendingPurchase pending) => PurchasePending?.Invoke(pending);
     public void RaiseFailed(IAPPurchaseFailure failure) => PurchaseFailed?.Invoke(failure);
     public void RaiseDeferred(string storeId) => PurchaseDeferred?.Invoke(storeId);
+    public void RaiseOwnedFetched(params string[] storeIds) => OwnedProductsFetched?.Invoke(storeIds);
 
     public event Action<IAPPendingPurchase> PurchasePending;
     public event Action<IAPPurchaseFailure> PurchaseFailed;
     public event Action<string> PurchaseDeferred;
+    public event Action<IReadOnlyCollection<string>> OwnedProductsFetched;
 
     private static Awaitable<bool> Completed(bool value)
     {

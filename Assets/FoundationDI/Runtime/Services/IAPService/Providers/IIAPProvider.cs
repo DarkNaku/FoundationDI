@@ -29,5 +29,11 @@ namespace DarkNaku.FoundationDI
         event Action<IAPPendingPurchase> PurchasePending;
         event Action<IAPPurchaseFailure> PurchaseFailed;
         event Action<string> PurchaseDeferred;   // storeId
+
+        // 스토어가 확정했다고 답한 비소모성의 스토어 ID 목록. 조회가 성공할 때마다(초기화, 복원) 온다.
+        // 목록 전체가 진실이다 — 여기 없는 상품은 소유하지 않았거나 환불된 것이다. 조회에 실패하면
+        // 오지 않으므로 오프라인에서는 정책 계층의 캐시가 그대로 답한다.
+        // 복원에서는 RestoreAsync가 끝나기 전에 와야 한다.
+        event Action<IReadOnlyCollection<string>> OwnedProductsFetched;
     }
 }

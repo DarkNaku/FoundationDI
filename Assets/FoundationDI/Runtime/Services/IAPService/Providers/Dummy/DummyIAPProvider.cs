@@ -42,6 +42,8 @@ namespace DarkNaku.FoundationDI
         public event Action<string> PurchaseDeferred;
 #pragma warning restore CS0414
 
+        public event Action<IReadOnlyCollection<string>> OwnedProductsFetched;
+
         public Awaitable<bool> InitializeAsync(IAPProviderContext context)
         {
             _products.Clear();
@@ -110,6 +112,7 @@ namespace DarkNaku.FoundationDI
             PurchasePending = null;
             PurchaseFailed = null;
             PurchaseDeferred = null;
+            OwnedProductsFetched = null;
         }
 
         // 지연이 0이면 동기적으로 끝난다 — 테스트가 프레임을 기다릴 필요가 없다.
