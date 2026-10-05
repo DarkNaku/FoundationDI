@@ -8,3 +8,5 @@ using UnityEngine.Scripting;
 //
 // FoundationDILinkXmlGenerator가 만드는 link.xml과 목적이 겹치지만 일부러 둘 다 둔다.
 [assembly: AlwaysLinkAssembly]
+
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("FoundationDI.iOSSupport.Tests")]

@@ -1,0 +1,28 @@
+{
+    "name": "FoundationDI.iOSSupport.Tests",
+    "rootNamespace": "",
+    "references": [
+        "FoundationDI",
+        "FoundationDI.iOSSupport",
+        "FoundationDI.Tests",
+        "FoundationDI.TestSupport",
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS",
+        "FOUNDATIONDI_IOSSUPPORT"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

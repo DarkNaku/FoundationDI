@@ -1,4 +1,3 @@
-using Unity.Advertisement.IosSupport;
 using UnityEngine;
 
 namespace DarkNaku.FoundationDI
@@ -29,24 +28,26 @@ namespace DarkNaku.FoundationDI
         private const float TimeoutSeconds = 60f;
 
         private readonly IAdDispatcher _dispatcher;
+        private readonly IAttBinding _binding;
 
         private AwaitableCompletionSource<TrackingAuthorizationStatus> _pending;
         private System.IDisposable _timeout;
         private System.IDisposable _poll;
 
         public AttTrackingAuthorization(IAdDispatcher dispatcher)
+            : this(dispatcher, new IosSupportAttBinding())
         {
-            _dispatcher = dispatcher;
         }
 
-        // 바인딩은 에디터·안드로이드에서 아무것도 하지 않는다 — GetAuthorizationTrackingStatus는
-        // 늘 NOT_DETERMINED를 돌려주고 RequestAuthorizationTracking은 네이티브를 부르지도
-        // 않는다. 그래서 실기에서만 지원한다고 답한다. 이 값이 false면 AdService는 요청을
-        // 건너뛴다.
-        public bool IsSupported => Application.platform == RuntimePlatform.IPhonePlayer;
+        internal AttTrackingAuthorization(IAdDispatcher dispatcher, IAttBinding binding)
+        {
+            _dispatcher = dispatcher;
+            _binding = binding;
+        }
 
-        public TrackingAuthorizationStatus Status =>
-            Map(ATTrackingStatusBinding.GetAuthorizationTrackingStatus());
+        public bool IsSupported => _binding.IsSupported;
+
+        public TrackingAuthorizationStatus Status => _binding.Status;
 
         public Awaitable<TrackingAuthorizationStatus> RequestAsync()
         {
@@ -58,7 +59,7 @@ namespace DarkNaku.FoundationDI
             // 끝낸다 — 여기서 대기시키면 아무도 깨워 주지 않는다.
             if (_dispatcher == null)
             {
-                ATTrackingStatusBinding.RequestAuthorizationTracking();
+                _binding.Request();
                 return Completed(Status);
             }
 
@@ -67,7 +68,7 @@ namespace DarkNaku.FoundationDI
             _pending = source;
             _timeout = _dispatcher.Delay(TimeoutSeconds, OnTimeout);
 
-            ATTrackingStatusBinding.RequestAuthorizationTracking();
+            _binding.Request();
 
             // 다음 프레임부터 본다. 같은 프레임에 보면 사용자가 아직 답하지 않은 것이
             // 당연하므로 한 번 헛돌 뿐이다.
@@ -128,26 +129,6 @@ namespace DarkNaku.FoundationDI
             var source = new AwaitableCompletionSource<TrackingAuthorizationStatus>();
             source.SetResult(status);
             return source.Awaitable;
-        }
-
-        // 값이 같아도 캐스팅하지 않는다. 패키지가 enum 순서를 바꾸면 조용히 어긋나는 대신
-        // 여기서 컴파일 에러가 나야 한다.
-        private static TrackingAuthorizationStatus Map(ATTrackingStatusBinding.AuthorizationTrackingStatus status)
-        {
-            switch (status)
-            {
-                case ATTrackingStatusBinding.AuthorizationTrackingStatus.AUTHORIZED:
-                    return TrackingAuthorizationStatus.Authorized;
-
-                case ATTrackingStatusBinding.AuthorizationTrackingStatus.DENIED:
-                    return TrackingAuthorizationStatus.Denied;
-
-                case ATTrackingStatusBinding.AuthorizationTrackingStatus.RESTRICTED:
-                    return TrackingAuthorizationStatus.Restricted;
-
-                default:
-                    return TrackingAuthorizationStatus.NotDetermined;
-            }
         }
     }
 }
