@@ -259,18 +259,33 @@ namespace DarkNaku.FoundationDI
             // 앱이 죽어 확정하지 못했던 구매들. 지급되지 않았을 수 있으므로 다시 흘려보낸다.
             foreach (var order in orders.PendingOrders) ProcessPending(order, isRestored: true);
 
-            // 확정된 구매는 이미 지급됐다 — 소유로만 반영한다. 재설치·기기 변경 후 비소모성 소유가
-            // 돌아오는 유일한 경로다.
+            var owned = new HashSet<string>();
+
             foreach (var order in orders.ConfirmedOrders)
             {
                 var productId = ProductOf(order)?.definition?.id;
-                if (!IsInCatalog(productId) || _entitlements.IsOwned(productId)) continue;
-
-                _entitlements.SetOwned(productId, true);
-                OwnedChanged?.Invoke(productId);
+                if (!string.IsNullOrEmpty(productId)) owned.Add(productId);
             }
 
+            SyncOwnership(owned);
+
             _fetchingPurchases?.TrySetResult(true);
+        }
+
+        // 스토어의 확정 목록이 진실이다. 목록에 있으면 소유(재설치·기기 변경), 없으면 회수(환불)한다.
+        // 이미 확정·지급된 구매이므로 지급 파이프라인을 다시 타지 않는다.
+        private void SyncOwnership(HashSet<string> owned)
+        {
+            foreach (var definition in _catalog)
+            {
+                if (definition.type != ProductType.NonConsumable) continue;
+
+                var isOwned = owned.Contains(definition.id);
+                if (_entitlements.IsOwned(definition.id) == isOwned) continue;
+
+                _entitlements.SetOwned(definition.id, isOwned);
+                OwnedChanged?.Invoke(definition.id);
+            }
         }
 
         private void HandlePurchasesFetchFailed(PurchasesFetchFailureDescription failure)

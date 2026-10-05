@@ -311,6 +311,7 @@ public class UnityIAPServiceTest
     public IEnumerator 이미_소유한_비소모성은_스토어를_거치지_않는다() => AwaitableTest.Run(async () =>
     {
         var store = new UnityIAPStoreHarness(Catalog);
+        store.ConfirmedOnFetch.Add(store.Confirmed("remove_ads"));   // 스토어도 소유로 본다
         var entitlements = new FakeEntitlementStorage();
         entitlements.Owned.Add("remove_ads");
         var sut = NewService(store, entitlements: entitlements);
@@ -455,5 +456,24 @@ public class UnityIAPServiceTest
         Assert.AreEqual("remove_ads", ownedChanged);
         Assert.IsEmpty(fulfillment.Calls, "이미 확정된 구매를 다시 지급했다");
         Assert.IsEmpty(store.ConfirmCalls, "이미 확정된 구매를 다시 확정했다");
+    });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 조회_결과에_없는_비소모성_소유는_회수된다() => AwaitableTest.Run(async () =>
+    {
+        // 환불: 캐시에는 남아 있지만 스토어는 더 이상 소유로 보지 않는다.
+        var store = new UnityIAPStoreHarness(Catalog);
+        var entitlements = new FakeEntitlementStorage();
+        entitlements.Owned.Add("remove_ads");
+        var sut = NewService(store, entitlements: entitlements);
+
+        string ownedChanged = null;
+        sut.OwnedChanged += id => ownedChanged = id;
+
+        await sut.InitializeAsync();
+
+        Assert.IsFalse(sut.IsOwned("remove_ads"), "환불된 소유가 회수되지 않았다");
+        Assert.AreEqual("remove_ads", ownedChanged);
     });
 }
