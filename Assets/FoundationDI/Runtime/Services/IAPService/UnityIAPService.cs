@@ -37,6 +37,11 @@ namespace DarkNaku.FoundationDI
         private AwaitableCompletionSource<IAPPurchaseResult> _pendingSource;
         private string _pendingProductId;
 
+        // 지급이 진행 중인 주문(트랜잭션 ID). 그 사이 조회가 같은 주문을 미확정으로 또 실어 와도
+        // 두 번 지급하지 않는 기준이다. ProcessPendingOrdersOnPurchasesFetched(false)로 SDK의
+        // 같은 장치(세션 처리 목록)를 꺼 뒀기 때문에 직접 한다.
+        private readonly HashSet<string> _inFlight = new();
+
         private AwaitableCompletionSource<bool> _connecting;
         private AwaitableCompletionSource<bool> _fetchingProducts;
         private AwaitableCompletionSource<bool> _fetchingPurchases;
@@ -347,6 +352,22 @@ namespace DarkNaku.FoundationDI
                 Debug.LogWarning($"[IAPService] 트랜잭션 ID가 없는 구매가 도착했다: {productId}. 확정할 수 없어 건너뛴다.");
                 return;
             }
+
+            if (!_inFlight.Add(transactionId)) return;
+
+            try
+            {
+                await FulfillAndConfirmAsync(order, product, isRestored);
+            }
+            finally
+            {
+                _inFlight.Remove(transactionId);
+            }
+        }
+
+        private async Awaitable FulfillAndConfirmAsync(PendingOrder order, Product product, bool isRestored)
+        {
+            var productId = product.definition.id;
 
             var purchase = BuildPurchase(product, order, isRestored);
 

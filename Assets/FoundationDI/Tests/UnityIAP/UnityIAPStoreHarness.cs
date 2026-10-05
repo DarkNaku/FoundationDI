@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using DarkNaku.FoundationDI;
 using NSubstitute;
+using UnityEngine;
 using UnityEngine.Purchasing;
 
 // StoreController가 구현하는 Unity 인터페이스 셋을 하나의 대체 객체로 흉내낸다.
@@ -152,5 +154,29 @@ public class UnityIAPStoreHarness
             Purchases.OnPurchasesFetchFailed += Raise.Event<Action<PurchasesFetchFailureDescription>>(
                 new PurchasesFetchFailureDescription(PurchasesFetchFailureReason.Unknown, "조회 실패"));
         }
+    }
+}
+
+// 테스트가 풀어 줄 때까지 지급을 붙잡아 둔다 — 지급이 진행 중인 동안 조회가 다시 오는 경우를 재현한다.
+public class HeldFulfillment : IIAPFulfillment
+{
+    public readonly List<IAPPurchase> Calls = new();
+    private readonly List<AwaitableCompletionSource<bool>> _held = new();
+
+    public Awaitable<bool> FulfillAsync(IAPPurchase purchase)
+    {
+        Calls.Add(purchase);
+
+        var source = new AwaitableCompletionSource<bool>();
+        _held.Add(source);
+        return source.Awaitable;
+    }
+
+    public void ReleaseAll(bool result = true)
+    {
+        var held = new List<AwaitableCompletionSource<bool>>(_held);
+        _held.Clear();
+
+        foreach (var source in held) source.SetResult(result);
     }
 }

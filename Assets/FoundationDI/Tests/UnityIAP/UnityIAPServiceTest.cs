@@ -515,4 +515,28 @@ public class UnityIAPServiceTest
         Assert.IsFalse(sut.IsOwned("unknown"));
         Assert.AreEqual(0, changed);
     });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 지급_중인_주문이_다음_조회에_또_와도_두_번_지급하지_않는다() => AwaitableTest.Run(async () =>
+    {
+        var store = new UnityIAPStoreHarness(Catalog);
+        var fulfillment = new HeldFulfillment();
+        var sut = new UnityIAPService(store.Store, store.Products, store.Purchases, Catalog, fulfillment,
+                                      new FakeReceiptValidator(), new FakeEntitlementStorage(), false);
+        await sut.InitializeAsync();
+
+        var order = store.Pending("gems", "tx-1");
+        store.RaisePending(order);
+
+        // 지급이 끝나기 전에 조회가 같은 주문을 미확정으로 다시 실어 온다(복원 등).
+        store.PendingOnFetch.Add(order);
+        store.RaisePurchasesFetched();
+
+        fulfillment.ReleaseAll();
+        await AwaitableTest.NextFrame();
+
+        Assert.AreEqual(1, fulfillment.Calls.Count, "지급 중인 주문을 또 지급했다");
+        Assert.AreEqual(1, store.ConfirmCalls.Count);
+    });
 }
