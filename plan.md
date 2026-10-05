@@ -1,5 +1,35 @@
 # plan.md
 
+## 진행 중: IAPService 소유 상태를 스토어 확정 목록으로 맞춘다
+
+비소모성 소유를 PlayerPrefs 캐시만 보고 판단했고, 어댑터는 `FetchPurchases`의 `PendingOrders`만
+읽고 `ConfirmedOrders`를 버렸다. 그래서 세 가지가 깨져 있었다.
+
+- **재설치·기기 변경 후 소유가 사라진다.** 이미 확정된 구매는 `ConfirmedOrders`로만 온다.
+- **복원 버튼이 아무것도 되살리지 못한다.** Unity IAP 5의 `RestoreTransactions`는 성공하면
+  `FetchPurchases()`를 다시 부르고 결과는 `OnPurchasesFetched`로 온다(`PurchaseService.cs:643`).
+  게다가 콜백이 조회 완료 전에 불려 `RestoreAsync`가 결과 도착 전에 끝났다.
+- **환불이 반영되지 않는다.** 캐시를 끄는 경로가 없었다.
+
+조회가 성공할 때마다 provider가 확정된 비소모성 목록을 `OwnedProductsFetched`로 보고하고,
+정책 계층은 그 목록을 진실로 삼아 캐시를 맞춘다(없는 것은 회수). iOS는 `Transaction.currentEntitlements`
+라 환불분이 빠지고, Google Play는 소비되지 않은 구매만 온다. 조회가 실패하면(오프라인) 이벤트가
+없으므로 캐시가 그대로 답한다. 확정된 구매는 지급을 다시 거치지 않는다 — 이미 지급했고, 소유는
+`IsOwned`/`OwnedChanged`로 전달된다.
+
+- [ ] 스토어가 확인한 비소모성 소유가 기록되고 OwnedChanged가 발행된다
+- [ ] 스토어 목록에 없는 비소모성 소유는 회수된다
+- [ ] 소유 상태가 그대로면 OwnedChanged를 발행하지 않는다
+- [ ] 소모성과 카탈로그에 없는 상품은 소유 목록에서 무시한다
+- [ ] 복원은 스토어가 확인한 비소모성 개수를 보고한다
+- [ ] Dummy는 초기화 때 확정된 비소모성 목록을 보고한다
+- [ ] Dummy 복원은 지급을 다시 거치지 않고 소유 목록을 보고한다
+
+구현만 있고 단위 테스트가 없는 항목(스모크로 검증): Unity IAP 어댑터의 `ConfirmedOrders` 보고,
+복원이 뒤따르는 조회까지 기다리기, 같은 세션에 이미 처리한 미확정 주문의 재발행 차단.
+
+---
+
 ## 진행 중: iOS 수출 규정 관리 문서를 빌드 후처리로 신고한다
 
 TestFlight에 올린 뒤 App Store Connect가 "수출 규정 관리 문서 누락"을 띄우면 그 빌드는
