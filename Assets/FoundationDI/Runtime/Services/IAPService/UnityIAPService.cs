@@ -106,35 +106,6 @@ namespace DarkNaku.FoundationDI
             return RunInitializeAsync();
         }
 
-        private async Awaitable<bool> RunInitializeAsync()
-        {
-            // 미확정 주문을 SDK가 임의로 재처리하지 않게 한다. 확정 시점은 이 서비스 소관이고,
-            // 재전달된 주문에는 "복원됨" 표시를 붙여야 하는데 자동 경로로는 그 구분이 사라진다.
-            _purchaseService.ProcessPendingOrdersOnPurchasesFetched(false);
-
-            // Unity IAP는 Connect 전에 구독을 끝낼 것을 요구하고, 미확정 구매가 연결 직후에
-            // 재전달되기도 한다.
-            Subscribe();
-
-            var success = await ConnectAsync() && await FetchProductsAsync();
-
-            if (success)
-            {
-                // 실패해도 치명적이지 않다 — 미확정 구매를 이번 실행에 못 찾을 뿐이고 다음 실행에 다시 시도한다.
-                await FetchPurchasesAsync();
-            }
-            else
-            {
-                Debug.LogError("[IAPService] Unity IAP 초기화에 실패했다.");
-            }
-
-            IsInitialized = success;
-            _initializing = false;
-
-            CompleteInitWaiters(success);
-            return success;
-        }
-
         public bool TryGetProduct(string productId, out IAPProduct product)
         {
             product = default;
@@ -241,6 +212,35 @@ namespace DarkNaku.FoundationDI
             CompletePending(IAPPurchaseResult.Failed(new IAPError(DisposedCode, "서비스가 해제됐다")));
             FinishRestore(false);
             CompleteInitWaiters(false);
+        }
+
+        private async Awaitable<bool> RunInitializeAsync()
+        {
+            // 미확정 주문을 SDK가 임의로 재처리하지 않게 한다. 확정 시점은 이 서비스 소관이고,
+            // 재전달된 주문에는 "복원됨" 표시를 붙여야 하는데 자동 경로로는 그 구분이 사라진다.
+            _purchaseService.ProcessPendingOrdersOnPurchasesFetched(false);
+
+            // Unity IAP는 Connect 전에 구독을 끝낼 것을 요구하고, 미확정 구매가 연결 직후에
+            // 재전달되기도 한다.
+            Subscribe();
+
+            var success = await ConnectAsync() && await FetchProductsAsync();
+
+            if (success)
+            {
+                // 실패해도 치명적이지 않다 — 미확정 구매를 이번 실행에 못 찾을 뿐이고 다음 실행에 다시 시도한다.
+                await FetchPurchasesAsync();
+            }
+            else
+            {
+                Debug.LogError("[IAPService] Unity IAP 초기화에 실패했다.");
+            }
+
+            IsInitialized = success;
+            _initializing = false;
+
+            CompleteInitWaiters(success);
+            return success;
         }
 
         private void CompleteInitWaiters(bool success)
