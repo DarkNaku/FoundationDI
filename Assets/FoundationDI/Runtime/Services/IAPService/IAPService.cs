@@ -217,6 +217,7 @@ namespace DarkNaku.FoundationDI
             _provider.PurchasePending += HandlePending;
             _provider.PurchaseFailed += HandleFailed;
             _provider.PurchaseDeferred += HandleDeferred;
+            _provider.OwnedProductsFetched += HandleOwnedFetched;
             _subscribed = true;
         }
 
@@ -227,6 +228,7 @@ namespace DarkNaku.FoundationDI
             _provider.PurchasePending -= HandlePending;
             _provider.PurchaseFailed -= HandleFailed;
             _provider.PurchaseDeferred -= HandleDeferred;
+            _provider.OwnedProductsFetched -= HandleOwnedFetched;
             _subscribed = false;
         }
 
@@ -255,6 +257,19 @@ namespace DarkNaku.FoundationDI
             if (!_byStoreId.TryGetValue(storeId ?? string.Empty, out var definition)) return;
 
             CompletePendingFor(definition.Id, IAPPurchaseResult.Deferred());
+        }
+
+        private void HandleOwnedFetched(IReadOnlyCollection<string> storeIds)
+        {
+            if (_disposed || storeIds == null) return;
+
+            foreach (var storeId in storeIds)
+            {
+                if (!_byStoreId.TryGetValue(storeId ?? string.Empty, out var definition)) continue;
+
+                _entitlements.SetOwned(definition.Id, true);
+                OwnedChanged?.Invoke(definition.Id);
+            }
         }
 
         // provider 이벤트 핸들러라 반환값을 기다릴 주체가 없다 — 예외는 전부 안에서 잡는다.

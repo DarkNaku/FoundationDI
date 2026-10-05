@@ -442,4 +442,25 @@ public class IAPServiceTest
 
         Assert.AreEqual(IAPPurchaseOutcome.Failed, (await task).Outcome);
     });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 스토어가_확인한_비소모성_소유가_기록되고_OwnedChanged가_발행된다() => AwaitableTest.Run(async () =>
+    {
+        var provider = new FakeIAPProvider();
+        var fulfillment = new FakeFulfillment();
+        var sut = NewService(provider, fulfillment);
+        await sut.InitializeAsync();
+
+        string ownedChanged = null;
+        sut.OwnedChanged += id => ownedChanged = id;
+
+        // 재설치 후: 로컬 캐시는 비었지만 스토어는 이미 확정된 구매를 안다.
+        provider.RaiseOwnedFetched("remove_ads_store");
+
+        Assert.IsTrue(sut.IsOwned("remove_ads"), "스토어가 확인한 소유가 기록되지 않았다");
+        Assert.AreEqual("remove_ads", ownedChanged);
+        Assert.IsEmpty(fulfillment.Calls, "이미 확정된 구매를 다시 지급했다");
+        Assert.IsEmpty(provider.ConfirmCalls, "이미 확정된 구매를 다시 확정했다");
+    });
 }
