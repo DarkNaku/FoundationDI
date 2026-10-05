@@ -13,6 +13,8 @@ namespace DarkNaku.FoundationDI
         // 지급 실패는 스토어 실패와 구분되는 원인이지만 결과 enum을 늘리는 대신 에러 코드로 남긴다 —
         // 호출부가 분기할 이유가 없다(둘 다 "이번엔 못 줬다"이고 재시도는 스토어가 알아서 한다).
         internal const int FulfillmentFailedCode = -1001;
+        internal const int NotInitializedCode = -1004;
+        internal const int RestoreFailedCode = -1005;
 
         private readonly IStoreService _store;
         private readonly IProductService _productService;
@@ -45,6 +47,16 @@ namespace DarkNaku.FoundationDI
         // 이번 세션에 확정한 트랜잭션. 확정은 스토어에 비동기로 반영되므로 직후의 조회가 같은 주문을
         // 아직 미확정으로 돌려줄 수 있다 — 다시 지급하면 이중 지급이고, 소유 목록에서 빠지면 회수된다.
         private readonly HashSet<string> _confirmedInSession = new();
+
+        // 복원. RestoreTransactions의 콜백과 뒤따르는 조회 결과가 둘 다 와야 끝난다 — 순서는 스토어마다
+        // 다를 수 있어서, 먼저 온 쪽을 기억해 두었다가 나중에 온 쪽에서 끝낸다.
+        private AwaitableCompletionSource<bool> _restoring;
+        private bool _restoreCallbackSucceeded;
+        private bool? _restoreFetchResult;
+
+        // RestoreAsync가 진행되는 동안 복원된 구매의 수 — 스토어가 확정 목록으로 돌려준 비소모성과
+        // 파이프라인을 통과한 미확정 구매를 합친다.
+        private int _restoredCount;
 
         private AwaitableCompletionSource<bool> _connecting;
         private AwaitableCompletionSource<bool> _fetchingProducts;
@@ -167,8 +179,46 @@ namespace DarkNaku.FoundationDI
             return await _pendingSource.Awaitable;
         }
 
-        public Awaitable<IAPRestoreResult> RestoreAsync() =>
-            Completed(IAPRestoreResult.Fail(default));
+        // RestoreTransactions의 콜백은 복원 결과가 아니다. SDK는 성공하면 FetchPurchases()를 다시
+        // 부르고 곧바로 콜백을 부르므로(PurchaseService.RestoreTransactions), 복원된 구매는 콜백 뒤의
+        // OnPurchasesFetched로 온다.
+        public async Awaitable<IAPRestoreResult> RestoreAsync()
+        {
+            if (!IsInitialized)
+            {
+                return IAPRestoreResult.Fail(new IAPError(NotInitializedCode, "초기화되지 않았다"));
+            }
+
+            _restoredCount = 0;
+            _restoreCallbackSucceeded = false;
+            _restoreFetchResult = null;
+
+            var source = new AwaitableCompletionSource<bool>();
+            _restoring = source;
+
+            _purchaseService.RestoreTransactions((success, error) =>
+            {
+                if (_restoring != source) return;
+
+                if (!success)
+                {
+                    Debug.LogWarning($"[IAPService] 복원에 실패했다: {error}");
+                    FinishRestore(false);
+                    return;
+                }
+
+                _restoreCallbackSucceeded = true;
+
+                if (_restoreFetchResult.HasValue) FinishRestore(_restoreFetchResult.Value);
+            });
+
+            if (!await source.Awaitable)
+            {
+                return IAPRestoreResult.Fail(new IAPError(RestoreFailedCode, "복원에 실패했다"));
+            }
+
+            return IAPRestoreResult.Ok(_restoredCount);
+        }
 
         public void Dispose()
         {
@@ -292,6 +342,7 @@ namespace DarkNaku.FoundationDI
             SyncOwnership(owned);
 
             _fetchingPurchases?.TrySetResult(true);
+            CompleteRestoreFetch(true);
         }
 
         // 스토어의 확정 목록이 진실이다. 목록에 있으면 소유(재설치·기기 변경), 없으면 회수(환불)한다.
@@ -303,6 +354,8 @@ namespace DarkNaku.FoundationDI
                 if (definition.type != ProductType.NonConsumable) continue;
 
                 var isOwned = owned.Contains(definition.id);
+                if (isOwned && _restoring != null) _restoredCount++;
+
                 if (_entitlements.IsOwned(definition.id) == isOwned) continue;
 
                 _entitlements.SetOwned(definition.id, isOwned);
@@ -315,6 +368,25 @@ namespace DarkNaku.FoundationDI
             Debug.LogWarning($"[IAPService] 이전 구매 조회에 실패했다: {failure?.message}");
 
             _fetchingPurchases?.TrySetResult(false);
+            CompleteRestoreFetch(false);
+        }
+
+        private void CompleteRestoreFetch(bool success)
+        {
+            if (_restoring == null) return;
+
+            if (_restoreCallbackSucceeded) FinishRestore(success);
+            else _restoreFetchResult = success;
+        }
+
+        private void FinishRestore(bool success)
+        {
+            var source = _restoring;
+            _restoring = null;
+            _restoreCallbackSucceeded = false;
+            _restoreFetchResult = null;
+
+            source?.TrySetResult(success);
         }
 
         private void HandlePurchasePending(PendingOrder order) => ProcessPending(order, isRestored: false);
@@ -423,6 +495,8 @@ namespace DarkNaku.FoundationDI
                 _entitlements.SetOwned(productId, true);
                 OwnedChanged?.Invoke(productId);
             }
+
+            if (isRestored) _restoredCount++;
 
             Purchased?.Invoke(purchase);
 

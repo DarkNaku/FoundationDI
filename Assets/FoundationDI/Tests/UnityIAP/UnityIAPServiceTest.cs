@@ -566,4 +566,38 @@ public class UnityIAPServiceTest
         Assert.IsTrue(sut.IsOwned("remove_ads"), "확정이 반영되기 전의 조회 결과로 소유를 회수했다");
         Assert.AreEqual(0, changed);
     });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 복원은_콜백과_뒤따르는_조회가_모두_도착해야_끝난다() => AwaitableTest.Run(async () =>
+    {
+        var store = new UnityIAPStoreHarness(Catalog);
+        var sut = NewService(store);
+        await sut.InitializeAsync();
+
+        // 실제 SDK처럼 콜백이 먼저 오고, 복원된 구매를 실은 조회 결과는 나중에 온다.
+        store.HoldRestoreFetch = true;
+        store.ConfirmedOnFetch.Add(store.Confirmed("remove_ads"));
+
+        var done = false;
+        IAPRestoreResult result = default;
+
+        async Awaitable Restore()
+        {
+            result = await sut.RestoreAsync();
+            done = true;
+        }
+
+        _ = Restore();
+        await AwaitableTest.NextFrame();
+
+        Assert.IsFalse(done, "조회 결과가 오기 전에 복원이 끝났다");
+
+        store.RaisePurchasesFetched();
+        await AwaitableTest.WaitUntil(() => done, 1f);
+
+        Assert.IsTrue(result.Success);
+        Assert.AreEqual(1, result.RestoredCount);
+        Assert.IsTrue(sut.IsOwned("remove_ads"));
+    });
 }
