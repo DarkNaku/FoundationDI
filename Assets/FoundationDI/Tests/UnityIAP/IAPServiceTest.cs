@@ -755,4 +755,23 @@ public class IAPServiceTest
         Assert.AreEqual(IAPPurchaseOutcome.Purchased, (await sut.PurchaseAsync("gems")).Outcome);
         Assert.AreEqual(IAPPurchaseOutcome.Purchased, (await sut.PurchaseAsync("gems")).Outcome);
     });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 확정이_실패하면_경고를_남긴다() => AwaitableTest.Run(async () =>
+    {
+        var store = new UnityIAPStoreHarness(Catalog);
+        var sut = NewService(store);
+        await sut.InitializeAsync();
+
+        // 확정 결과는 OnPurchaseConfirmed로 온다. 실패하면 스토어가 다음 실행에 다시 주므로 막지는 않지만
+        // 조용히 넘기면 "왜 같은 구매가 또 오지"가 늦게 발견된다.
+        LogAssert.Expect(LogType.Warning, new Regex("IAPService.*확정.*gems"));
+
+        store.RaiseConfirmed(UnityIAPTestObjects.Failed(store.Product("gems"), PurchaseFailureReason.Unknown, "boom"));
+
+        // 성공한 확정은 조용하다.
+        store.RaiseConfirmed(store.Confirmed("gems"));
+        LogAssert.NoUnexpectedReceived();
+    });
 }

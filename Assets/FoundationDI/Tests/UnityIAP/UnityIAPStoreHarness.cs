@@ -150,6 +150,9 @@ public class UnityIAPStoreHarness
         Purchases.OnPurchaseFailed += Raise.Event<Action<FailedOrder>>(
             UnityIAPTestObjects.Failed(Product(productId), reason, details));
 
+    public void RaiseConfirmed(Order order) =>
+        Purchases.OnPurchaseConfirmed += Raise.Event<Action<Order>>(order);
+
     public void RaiseDeferred(string productId) =>
         Purchases.OnPurchaseDeferred += Raise.Event<Action<DeferredOrder>>(
             UnityIAPTestObjects.Deferred(Product(productId)));

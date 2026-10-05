@@ -336,6 +336,7 @@ namespace DarkNaku.FoundationDI
             _productService.OnProductsFetchFailed += HandleProductsFetchFailed;
             _purchaseService.OnPurchasesFetched += HandlePurchasesFetched;
             _purchaseService.OnPurchasePending += HandlePurchasePending;
+            _purchaseService.OnPurchaseConfirmed += HandlePurchaseConfirmed;
             _purchaseService.OnPurchaseFailed += HandlePurchaseFailed;
             _purchaseService.OnPurchaseDeferred += HandlePurchaseDeferred;
             _purchaseService.OnPurchasesFetchFailed += HandlePurchasesFetchFailed;
@@ -353,6 +354,7 @@ namespace DarkNaku.FoundationDI
             _productService.OnProductsFetchFailed -= HandleProductsFetchFailed;
             _purchaseService.OnPurchasesFetched -= HandlePurchasesFetched;
             _purchaseService.OnPurchasePending -= HandlePurchasePending;
+            _purchaseService.OnPurchaseConfirmed -= HandlePurchaseConfirmed;
             _purchaseService.OnPurchaseFailed -= HandlePurchaseFailed;
             _purchaseService.OnPurchaseDeferred -= HandlePurchaseDeferred;
             _purchaseService.OnPurchasesFetchFailed -= HandlePurchasesFetchFailed;
@@ -481,6 +483,16 @@ namespace DarkNaku.FoundationDI
         }
 
         private void HandlePurchasePending(PendingOrder order) => ProcessPending(order, isRestored: false);
+
+        // 확정 결과. 실패해도 할 일은 없다 — 스토어가 다음 실행에 같은 구매를 미확정으로 다시 주고,
+        // 그때 지급 핸들러가 TransactionId로 중복 지급을 막는다. 다만 조용히 넘기면 발견이 늦다.
+        private void HandlePurchaseConfirmed(Order order)
+        {
+            if (order is not FailedOrder failed) return;
+
+            Debug.LogWarning($"[IAPService] 구매 확정에 실패했다: {ProductOf(failed)?.definition?.id} " +
+                             $"{failed.FailureReason} {failed.Details}");
+        }
 
         // iOS Ask-to-Buy 등. 승인되면 나중에 OnPurchasePending으로 들어와 같은 파이프라인을 탄다.
         private void HandlePurchaseDeferred(DeferredOrder order)
