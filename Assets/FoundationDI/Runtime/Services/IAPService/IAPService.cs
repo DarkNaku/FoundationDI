@@ -163,13 +163,16 @@ namespace DarkNaku.FoundationDI
 
             if (_pendingSource != null) return IAPPurchaseResult.NotReady();
 
-            _pendingSource = new AwaitableCompletionSource<IAPPurchaseResult>();
+            // 지역 변수로 잡아 둔다. 스토어가 PurchaseProduct 안에서 곧바로 주문을 내면(에디터의 FakeStore)
+            // 완료 처리가 필드를 먼저 비운다.
+            var source = new AwaitableCompletionSource<IAPPurchaseResult>();
+            _pendingSource = source;
             _pendingProductId = productId;
 
             // 조회한 Product로 산다 — catalogListingId 규칙에 의존하지 않는다.
             _purchaseService.PurchaseProduct(product);
 
-            return await _pendingSource.Awaitable;
+            return await source.Awaitable;
         }
 
         // RestoreTransactions의 콜백은 복원 결과가 아니다. SDK는 성공하면 FetchPurchases()를 다시

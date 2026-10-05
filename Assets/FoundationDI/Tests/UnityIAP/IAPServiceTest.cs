@@ -742,4 +742,17 @@ public class IAPServiceTest
         Assert.AreEqual(IAPPurchaseOutcome.Failed, (await purchase).Outcome);
         Assert.IsFalse((await restore).Success);
     });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 스토어가_구매를_동기로_끝내도_결과를_돌려준다() => AwaitableTest.Run(async () =>
+    {
+        // 에디터의 FakeStore는 확인 창이 없으면 PurchaseProduct 안에서 곧바로 주문을 낸다.
+        var store = new UnityIAPStoreHarness(Catalog) { CompletePurchaseSynchronously = true };
+        var sut = NewService(store);
+        await sut.InitializeAsync();
+
+        Assert.AreEqual(IAPPurchaseOutcome.Purchased, (await sut.PurchaseAsync("gems")).Outcome);
+        Assert.AreEqual(IAPPurchaseOutcome.Purchased, (await sut.PurchaseAsync("gems")).Outcome);
+    });
 }
