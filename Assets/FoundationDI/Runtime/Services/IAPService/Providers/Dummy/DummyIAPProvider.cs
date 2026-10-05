@@ -157,16 +157,16 @@ namespace DarkNaku.FoundationDI
                 return;
             }
 
-            Emit(definition, isRestored: false);
+            Emit(definition);
         }
 
-        private void Emit(IAPProductDefinition definition, bool isRestored)
+        private void Emit(IAPProductDefinition definition)
         {
             var transactionId = $"dummy-{definition.StoreId}-{_sequence++}";
             _unconfirmed[transactionId] = definition;
 
             PurchasePending?.Invoke(new IAPPendingPurchase(definition.StoreId, transactionId,
-                $"{{\"dummy\":\"{transactionId}\"}}", isRestored));
+                $"{{\"dummy\":\"{transactionId}\"}}", isRestored: false));
         }
     }
 }
