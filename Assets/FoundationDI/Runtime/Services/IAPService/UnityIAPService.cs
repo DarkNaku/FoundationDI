@@ -317,9 +317,16 @@ namespace DarkNaku.FoundationDI
         {
             var owned = new HashSet<string>();
 
+            // 같은 조회에 미확정으로 실려 온 상품. 확정 목록에 없지만 지금 지급·확정 중이거나 막 끝났다 —
+            // 회수하면 방금 기록한 소유를 지우게 된다.
+            var pending = new HashSet<string>();
+
             // 앱이 죽어 확정하지 못했던 구매들. 지급되지 않았을 수 있으므로 다시 흘려보낸다.
             foreach (var order in orders.PendingOrders)
             {
+                var pendingId = ProductOf(order)?.definition?.id;
+                if (!string.IsNullOrEmpty(pendingId)) pending.Add(pendingId);
+
                 var transactionId = order.Info?.TransactionID;
 
                 // 이번 세션에 확정했지만 스토어에 아직 반영되지 않은 주문 — 지급은 끝났으니 소유로 센다.
@@ -339,7 +346,7 @@ namespace DarkNaku.FoundationDI
                 if (!string.IsNullOrEmpty(productId)) owned.Add(productId);
             }
 
-            SyncOwnership(owned);
+            SyncOwnership(owned, pending);
 
             _fetchingPurchases?.TrySetResult(true);
             CompleteRestoreFetch(true);
@@ -347,7 +354,7 @@ namespace DarkNaku.FoundationDI
 
         // 스토어의 확정 목록이 진실이다. 목록에 있으면 소유(재설치·기기 변경), 없으면 회수(환불)한다.
         // 이미 확정·지급된 구매이므로 지급 파이프라인을 다시 타지 않는다.
-        private void SyncOwnership(HashSet<string> owned)
+        private void SyncOwnership(HashSet<string> owned, HashSet<string> pending)
         {
             foreach (var definition in _catalog)
             {
@@ -357,6 +364,7 @@ namespace DarkNaku.FoundationDI
                 if (isOwned && _restoring != null) _restoredCount++;
 
                 if (_entitlements.IsOwned(definition.id) == isOwned) continue;
+                if (!isOwned && pending.Contains(definition.id)) continue;
 
                 _entitlements.SetOwned(definition.id, isOwned);
                 OwnedChanged?.Invoke(definition.id);

@@ -600,4 +600,87 @@ public class UnityIAPServiceTest
         Assert.AreEqual(1, result.RestoredCount);
         Assert.IsTrue(sut.IsOwned("remove_ads"));
     });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 복원은_스토어가_확인한_비소모성_개수를_보고한다() => AwaitableTest.Run(async () =>
+    {
+        var store = new UnityIAPStoreHarness(Catalog);
+        var fulfillment = new FakeFulfillment();
+        var sut = NewService(store, fulfillment);
+        await sut.InitializeAsync();
+
+        // 조회가 콜백보다 먼저 오는 순서(하네스 기본값).
+        store.ConfirmedOnFetch.Add(store.Confirmed("remove_ads"));
+
+        var result = await sut.RestoreAsync();
+
+        Assert.IsTrue(result.Success);
+        Assert.AreEqual(1, result.RestoredCount);
+        Assert.IsTrue(sut.IsOwned("remove_ads"));
+        Assert.IsEmpty(fulfillment.Calls, "확정된 구매를 복원하면서 다시 지급했다");
+    });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 복원은_미확정_구매를_지급하고_개수에_포함한다() => AwaitableTest.Run(async () =>
+    {
+        var store = new UnityIAPStoreHarness(Catalog);
+        var fulfillment = new FakeFulfillment();
+        var sut = NewService(store, fulfillment);
+        await sut.InitializeAsync();
+
+        var pending = store.Pending("remove_ads", "tx-r");
+        store.PendingOnFetch.Add(pending);
+
+        var result = await sut.RestoreAsync();
+
+        Assert.IsTrue(result.Success);
+        Assert.AreEqual(1, result.RestoredCount);
+        Assert.IsTrue(sut.IsOwned("remove_ads"));
+        Assert.IsTrue(fulfillment.Calls[0].IsRestored);
+        CollectionAssert.AreEqual(new[] { pending }, store.ConfirmCalls);
+    });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 복원이_실패하면_Success가_거짓이다() => AwaitableTest.Run(async () =>
+    {
+        var store = new UnityIAPStoreHarness(Catalog);
+        var sut = NewService(store);
+        await sut.InitializeAsync();
+        store.RestoreSucceeds = false;
+
+        LogAssert.Expect(LogType.Warning, new Regex("IAPService"));
+
+        var result = await sut.RestoreAsync();
+
+        Assert.IsFalse(result.Success);
+        Assert.AreEqual(0, result.RestoredCount);
+    });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 복원_뒤의_조회가_실패하면_Success가_거짓이다() => AwaitableTest.Run(async () =>
+    {
+        var store = new UnityIAPStoreHarness(Catalog);
+        var sut = NewService(store);
+        await sut.InitializeAsync();
+        store.PurchasesFetchSucceeds = false;
+
+        LogAssert.Expect(LogType.Warning, new Regex("IAPService"));
+
+        Assert.IsFalse((await sut.RestoreAsync()).Success);
+    });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 초기화_전_복원은_실패한다() => AwaitableTest.Run(async () =>
+    {
+        var store = new UnityIAPStoreHarness(Catalog);
+        var sut = NewService(store);
+
+        Assert.IsFalse((await sut.RestoreAsync()).Success);
+        CollectionAssert.DoesNotContain(store.Calls, "Restore");
+    });
 }
