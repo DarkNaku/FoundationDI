@@ -259,15 +259,22 @@ namespace DarkNaku.FoundationDI
             CompletePendingFor(definition.Id, IAPPurchaseResult.Deferred());
         }
 
+        // 스토어의 확정 목록이 진실이다. 목록에 있으면 소유(재설치·기기 변경), 없으면 회수(환불)한다.
+        // 이미 확정·지급된 구매이므로 지급 파이프라인을 다시 타지 않는다.
         private void HandleOwnedFetched(IReadOnlyCollection<string> storeIds)
         {
             if (_disposed || storeIds == null) return;
 
-            foreach (var storeId in storeIds)
-            {
-                if (!_byStoreId.TryGetValue(storeId ?? string.Empty, out var definition)) continue;
+            var owned = new HashSet<string>(storeIds);
 
-                _entitlements.SetOwned(definition.Id, true);
+            foreach (var definition in _byId.Values)
+            {
+                if (definition.Type != IAPProductType.NonConsumable) continue;
+
+                var isOwned = owned.Contains(definition.StoreId);
+                if (_entitlements.IsOwned(definition.Id) == isOwned) continue;
+
+                _entitlements.SetOwned(definition.Id, isOwned);
                 OwnedChanged?.Invoke(definition.Id);
             }
         }

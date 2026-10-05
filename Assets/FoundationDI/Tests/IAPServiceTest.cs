@@ -463,4 +463,24 @@ public class IAPServiceTest
         Assert.IsEmpty(fulfillment.Calls, "이미 확정된 구매를 다시 지급했다");
         Assert.IsEmpty(provider.ConfirmCalls, "이미 확정된 구매를 다시 확정했다");
     });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 스토어_목록에_없는_비소모성_소유는_회수된다() => AwaitableTest.Run(async () =>
+    {
+        var provider = new FakeIAPProvider();
+        var entitlements = new FakeEntitlementStorage();
+        entitlements.Owned.Add("remove_ads");
+        var sut = NewService(provider, entitlements: entitlements);
+        await sut.InitializeAsync();
+
+        string ownedChanged = null;
+        sut.OwnedChanged += id => ownedChanged = id;
+
+        // 환불: 캐시에는 남아 있지만 스토어는 더 이상 소유로 보지 않는다.
+        provider.RaiseOwnedFetched();
+
+        Assert.IsFalse(sut.IsOwned("remove_ads"), "환불된 소유가 회수되지 않았다");
+        Assert.AreEqual("remove_ads", ownedChanged);
+    });
 }
