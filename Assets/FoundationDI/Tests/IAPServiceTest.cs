@@ -520,4 +520,21 @@ public class IAPServiceTest
         Assert.IsFalse(sut.IsOwned("gems"), "소모성이 소유로 기록됐다");
         Assert.AreEqual(0, changed);
     });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 복원은_스토어가_확인한_비소모성_개수를_보고한다() => AwaitableTest.Run(async () =>
+    {
+        var provider = new FakeIAPProvider { OwnedOnRestore = new[] { "remove_ads_store" } };
+        var fulfillment = new FakeFulfillment();
+        var sut = NewService(provider, fulfillment);
+        await sut.InitializeAsync();
+
+        var result = await sut.RestoreAsync();
+
+        Assert.IsTrue(result.Success);
+        Assert.AreEqual(1, result.RestoredCount, "확정된 구매의 복원이 개수에 잡히지 않았다");
+        Assert.IsTrue(sut.IsOwned("remove_ads"));
+        Assert.IsEmpty(fulfillment.Calls, "확정된 구매를 복원하면서 다시 지급했다");
+    });
 }

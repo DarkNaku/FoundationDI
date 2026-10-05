@@ -28,6 +28,10 @@ public class FakeIAPProvider : IIAPProvider
     // RestoreAsync 도중 발행할 복원 구매.
     public readonly List<IAPPendingPurchase> PendingOnRestore = new();
 
+    // RestoreAsync 도중 보고할 확정 소유 목록(스토어 ID). null이면 보고하지 않는다.
+    // Unity IAP는 복원 후 FetchPurchases를 다시 불러 확정 구매를 이 목록으로 돌려준다.
+    public string[] OwnedOnRestore;
+
     public IReadOnlyList<IAPProduct> Products => _products;
 
     public Awaitable<bool> InitializeAsync(IAPProviderContext context)
@@ -67,6 +71,7 @@ public class FakeIAPProvider : IIAPProvider
         if (RestoreResult)
         {
             foreach (var pending in PendingOnRestore) PurchasePending?.Invoke(pending);
+            if (OwnedOnRestore != null) OwnedProductsFetched?.Invoke(OwnedOnRestore);
         }
 
         return Completed(RestoreResult);

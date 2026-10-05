@@ -36,8 +36,10 @@ namespace DarkNaku.FoundationDI
         private AwaitableCompletionSource<IAPPurchaseResult> _pendingSource;
         private string _pendingProductId;
 
-        // RestoreAsync가 진행되는 동안 파이프라인을 통과한 복원 구매의 수.
+        // RestoreAsync가 진행되는 동안 복원된 구매의 수 — 파이프라인을 통과한 미확정 구매와
+        // 스토어가 확정 목록으로 돌려준 비소모성을 합친다.
         private int _restoredCount;
+        private bool _restoring;
 
         private bool _subscribed;
         private bool _disposed;
@@ -153,8 +155,18 @@ namespace DarkNaku.FoundationDI
             // 복원된 구매는 PurchasePending(IsRestored: true)로 들어와 같은 파이프라인을 탄다.
             // 여기서는 그 사이에 몇 건이 지나갔는지만 센다.
             _restoredCount = 0;
+            _restoring = true;
 
-            var success = await _provider.RestoreAsync();
+            bool success;
+
+            try
+            {
+                success = await _provider.RestoreAsync();
+            }
+            finally
+            {
+                _restoring = false;
+            }
 
             if (!success)
             {
@@ -272,6 +284,8 @@ namespace DarkNaku.FoundationDI
                 if (definition.Type != IAPProductType.NonConsumable) continue;
 
                 var isOwned = owned.Contains(definition.StoreId);
+                if (isOwned && _restoring) _restoredCount++;
+
                 if (_entitlements.IsOwned(definition.Id) == isOwned) continue;
 
                 _entitlements.SetOwned(definition.Id, isOwned);
