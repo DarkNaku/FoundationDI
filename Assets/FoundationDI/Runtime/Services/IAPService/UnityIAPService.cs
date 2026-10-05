@@ -139,6 +139,13 @@ namespace DarkNaku.FoundationDI
                 return IAPPurchaseResult.NotReady();
             }
 
+            // 비소모성은 스토어가 "이미 소유"로 거절하기 전에 먼저 답한다.
+            // 스토어 시트를 띄웠다가 에러로 닫히는 것보다 낫다.
+            if (product.definition.type == ProductType.NonConsumable && IsOwned(productId))
+            {
+                return IAPPurchaseResult.AlreadyOwned(OwnedPurchaseOf(product));
+            }
+
             _pendingSource = new AwaitableCompletionSource<IAPPurchaseResult>();
             _pendingProductId = productId;
 
@@ -331,6 +338,17 @@ namespace DarkNaku.FoundationDI
                                    order.Info?.TransactionID, order.Info?.Receipt,
                                    metadata == null ? 0.0 : (double)metadata.localizedPrice,
                                    metadata?.isoCurrencyCode ?? string.Empty, isRestored);
+        }
+
+        // 이미 소유한 상품을 다시 사려 할 때 돌려줄 페이로드. 거래 정보는 없다 —
+        // 이번 세션에 일어난 거래가 아니기 때문이다.
+        private static IAPPurchase OwnedPurchaseOf(Product product)
+        {
+            var metadata = product.metadata;
+
+            return new IAPPurchase(product.definition.id, ToProductType(product.definition.type), null, null,
+                                   metadata == null ? 0.0 : (double)metadata.localizedPrice,
+                                   metadata?.isoCurrencyCode ?? string.Empty, true);
         }
 
         // 대기 중인 구매의 상품과 일치할 때만 완료시킨다. 재전달·복원처럼 아무도 기다리지

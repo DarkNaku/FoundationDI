@@ -289,4 +289,38 @@ public class UnityIAPServiceTest
         Assert.AreEqual((int)PurchaseFailureReason.PaymentDeclined, result.Error.Code);
         StringAssert.Contains("declined", result.Error.Message);
     });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 다른_상품의_실패는_대기_중인_구매를_끝내지_않는다() => AwaitableTest.Run(async () =>
+    {
+        var store = new UnityIAPStoreHarness();
+        var sut = NewService(store);
+        await sut.InitializeAsync();
+
+        var task = sut.PurchaseAsync("gems");
+        store.RaiseFailed("remove_ads", PurchaseFailureReason.UserCancelled);
+
+        // 아직 끝나지 않았어야 한다 — 같은 상품의 이벤트가 와야 완료된다.
+        store.RaisePending(store.Pending("gems", "tx-a"));
+        Assert.AreEqual(IAPPurchaseOutcome.Purchased, (await task).Outcome);
+    });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 이미_소유한_비소모성은_스토어를_거치지_않는다() => AwaitableTest.Run(async () =>
+    {
+        var store = new UnityIAPStoreHarness();
+        var entitlements = new FakeEntitlementStorage();
+        entitlements.Owned.Add("remove_ads");
+        var sut = NewService(store, entitlements: entitlements);
+        await sut.InitializeAsync();
+
+        var result = await sut.PurchaseAsync("remove_ads");
+
+        Assert.AreEqual(IAPPurchaseOutcome.AlreadyOwned, result.Outcome);
+        Assert.IsTrue(result.IsSuccess);
+        Assert.AreEqual("remove_ads", result.Purchase.ProductId);
+        Assert.IsEmpty(store.PurchaseCalls, "이미 소유인데 스토어를 호출했다");
+    });
 }
