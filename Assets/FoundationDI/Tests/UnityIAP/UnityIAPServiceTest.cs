@@ -683,4 +683,25 @@ public class UnityIAPServiceTest
         Assert.IsFalse((await sut.RestoreAsync()).Success);
         CollectionAssert.DoesNotContain(store.Calls, "Restore");
     });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 복원이_진행_중이면_두_번째_복원은_즉시_실패한다() => AwaitableTest.Run(async () =>
+    {
+        var store = new UnityIAPStoreHarness(Catalog);
+        var sut = NewService(store);
+        await sut.InitializeAsync();
+        store.HoldRestoreFetch = true;
+
+        var first = sut.RestoreAsync();
+
+        LogAssert.Expect(LogType.Warning, new Regex("IAPService.*복원"));
+        var second = await sut.RestoreAsync();
+
+        Assert.IsFalse(second.Success);
+        Assert.AreEqual(1, store.Calls.Count(c => c == "Restore"), "진행 중인데 스토어에 또 복원을 요청했다");
+
+        store.RaisePurchasesFetched();
+        Assert.IsTrue((await first).Success, "두 번째 호출이 첫 번째 복원을 망가뜨렸다");
+    });
 }

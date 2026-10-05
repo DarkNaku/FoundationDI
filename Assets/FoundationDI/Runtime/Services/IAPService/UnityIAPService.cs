@@ -15,6 +15,7 @@ namespace DarkNaku.FoundationDI
         internal const int FulfillmentFailedCode = -1001;
         internal const int NotInitializedCode = -1004;
         internal const int RestoreFailedCode = -1005;
+        internal const int RestoreInProgressCode = -1006;
 
         private readonly IStoreService _store;
         private readonly IProductService _productService;
@@ -187,6 +188,12 @@ namespace DarkNaku.FoundationDI
             if (!IsInitialized)
             {
                 return IAPRestoreResult.Fail(new IAPError(NotInitializedCode, "초기화되지 않았다"));
+            }
+
+            if (_restoring != null)
+            {
+                Debug.LogWarning("[IAPService] 복원이 이미 진행 중이다.");
+                return IAPRestoreResult.Fail(new IAPError(RestoreInProgressCode, "복원이 이미 진행 중이다"));
             }
 
             _restoredCount = 0;
