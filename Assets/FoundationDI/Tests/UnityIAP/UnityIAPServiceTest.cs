@@ -476,4 +476,43 @@ public class UnityIAPServiceTest
         Assert.IsFalse(sut.IsOwned("remove_ads"), "환불된 소유가 회수되지 않았다");
         Assert.AreEqual("remove_ads", ownedChanged);
     });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 소유_상태가_그대로면_OwnedChanged를_발행하지_않는다() => AwaitableTest.Run(async () =>
+    {
+        var store = new UnityIAPStoreHarness(Catalog);
+        store.ConfirmedOnFetch.Add(store.Confirmed("remove_ads"));
+        var entitlements = new FakeEntitlementStorage();
+        entitlements.Owned.Add("remove_ads");
+        var sut = NewService(store, entitlements: entitlements);
+
+        var changed = 0;
+        sut.OwnedChanged += _ => changed++;
+
+        // 조회는 실행마다 온다. 매번 이벤트가 나가면 구독한 UI가 이유 없이 갱신된다.
+        await sut.InitializeAsync();
+
+        Assert.IsTrue(sut.IsOwned("remove_ads"));
+        Assert.AreEqual(0, changed);
+    });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 소모성과_카탈로그에_없는_상품은_소유_목록에서_무시한다() => AwaitableTest.Run(async () =>
+    {
+        var store = new UnityIAPStoreHarness(Catalog);
+        store.ConfirmedOnFetch.Add(store.Confirmed("gems"));
+        store.ConfirmedOnFetch.Add(store.Confirmed("unknown"));
+        var sut = NewService(store);
+
+        var changed = 0;
+        sut.OwnedChanged += _ => changed++;
+
+        await sut.InitializeAsync();
+
+        Assert.IsFalse(sut.IsOwned("gems"), "소모성이 소유로 기록됐다");
+        Assert.IsFalse(sut.IsOwned("unknown"));
+        Assert.AreEqual(0, changed);
+    });
 }
