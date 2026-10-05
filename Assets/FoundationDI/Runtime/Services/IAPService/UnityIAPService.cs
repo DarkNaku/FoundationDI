@@ -212,6 +212,7 @@ namespace DarkNaku.FoundationDI
             _purchaseService.OnPurchasesFetched += HandlePurchasesFetched;
             _purchaseService.OnPurchasePending += HandlePurchasePending;
             _purchaseService.OnPurchaseFailed += HandlePurchaseFailed;
+            _purchaseService.OnPurchaseDeferred += HandlePurchaseDeferred;
             _purchaseService.OnPurchasesFetchFailed += HandlePurchasesFetchFailed;
 
             _subscribed = true;
@@ -263,6 +264,15 @@ namespace DarkNaku.FoundationDI
         }
 
         private void HandlePurchasePending(PendingOrder order) => ProcessPending(order, isRestored: false);
+
+        // iOS Ask-to-Buy 등. 승인되면 나중에 OnPurchasePending으로 들어와 같은 파이프라인을 탄다.
+        private void HandlePurchaseDeferred(DeferredOrder order)
+        {
+            var productId = ProductOf(order)?.definition?.id;
+            if (string.IsNullOrEmpty(productId)) return;
+
+            CompletePendingFor(productId, IAPPurchaseResult.Deferred());
+        }
 
         private void HandlePurchaseFailed(FailedOrder order)
         {

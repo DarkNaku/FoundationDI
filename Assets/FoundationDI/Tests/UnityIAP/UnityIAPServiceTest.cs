@@ -374,4 +374,29 @@ public class UnityIAPServiceTest
         Assert.IsEmpty(fulfillment.Calls);
         Assert.IsEmpty(store.ConfirmCalls);
     });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 보류된_구매는_지급하지_않고_Deferred를_반환한다() => AwaitableTest.Run(async () =>
+    {
+        var store = new UnityIAPStoreHarness();
+        var fulfillment = new FakeFulfillment();
+        var sut = NewService(store, fulfillment);
+        await sut.InitializeAsync();
+
+        var task = sut.PurchaseAsync("gems");
+        store.RaiseDeferred("gems");
+        var result = await task;
+
+        Assert.AreEqual(IAPPurchaseOutcome.Deferred, result.Outcome);
+        Assert.IsEmpty(fulfillment.Calls);
+
+        // 나중에 승인되면 같은 파이프라인으로 들어와 지급된다.
+        var late = store.Pending("gems", "tx-late");
+        store.RaisePending(late);
+        await AwaitableTest.NextFrame();
+
+        Assert.AreEqual(1, fulfillment.Calls.Count);
+        CollectionAssert.AreEqual(new[] { late }, store.ConfirmCalls);
+    });
 }
