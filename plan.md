@@ -1,6 +1,6 @@
 # plan.md
 
-## 진행 중: iOS ATT 요청이 Inactive 구간에서 무시되는 문제를 고친다
+## 완료: iOS ATT 요청이 Inactive 구간에서 무시되는 문제를 고친다
 
 App Review 2.1 리젝(iOS 27에서 ATT 요청을 찾을 수 없음). iOS 15+는 앱이 Active가 아닐 때의 요청을 팝업 없이
 무시하는데, Unity 6.3 UIScene 트램펄린은 첫 씬을 Inactive 구간에서 로드한다(`sceneDidBecomeActive`보다 앞).
@@ -10,7 +10,7 @@ App Review 2.1 리젝(iOS 27에서 ATT 요청을 찾을 수 없음). iOS 15+는 
 - [x] 1. [STRUCTURAL] 호스트에 ios-support 1.0.1을 설치하고 바인딩 호출을 `IAttBinding` seam으로 뺀다 + 심볼 게이트 테스트 어셈블리
 - [x] 2. [BEHAVIORAL] 네이티브 헬퍼(`FDI_Att_IsApplicationActive`/`FDI_Att_ResignActiveCount`) + `IAppActivity` seam
 - [x] 3. [BEHAVIORAL] 요청 흐름을 Active 대기 → 안정화 → 요청 → 무시 판정·재요청으로 바꾼다 (아래 목록)
-- [ ] 4. [STRUCTURAL] README 6장·CLAUDE.md
+- [x] 4. [STRUCTURAL] README 6장·CLAUDE.md
 
 AttTrackingAuthorization 테스트
 - [x] 지원하지 않으면 묻지 않고 현재 상태로 즉시 답한다
