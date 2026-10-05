@@ -103,7 +103,7 @@ public class DummyIAPProviderTest
 
     [UnityTest]
     [Timeout(5000)]
-    public IEnumerator 확정한_비소모성만_복원된다() => AwaitableTest.Run(async () =>
+    public IEnumerator 복원은_지급을_다시_거치지_않고_확정한_비소모성만_보고한다() => AwaitableTest.Run(async () =>
     {
         var provider = NewProvider();
         await provider.InitializeAsync(Context());
@@ -129,10 +129,15 @@ public class DummyIAPProviderTest
         var replayed = new List<IAPPendingPurchase>();
         restored.PurchasePending += p => replayed.Add(p);
 
+        IReadOnlyCollection<string> owned = null;
+        restored.OwnedProductsFetched += ids => owned = ids;
+
         Assert.IsTrue(await restored.RestoreAsync());
-        Assert.AreEqual(1, replayed.Count, "소모성이 복원됐거나 비소모성이 복원되지 않았다");
-        Assert.AreEqual("remove_ads_store", replayed[0].StoreId);
-        Assert.IsTrue(replayed[0].IsRestored);
+
+        // 실제 스토어처럼 확정된 구매는 미확정으로 되돌아오지 않는다 — 이미 지급됐기 때문이다.
+        Assert.IsEmpty(replayed, "확정된 구매가 지급 파이프라인으로 다시 들어왔다");
+        Assert.IsNotNull(owned, "복원에서 소유 목록을 보고하지 않았다");
+        CollectionAssert.AreEquivalent(new[] { "remove_ads_store" }, owned, "소모성이 복원됐거나 비소모성이 복원되지 않았다");
 
         restored.Dispose();
     });

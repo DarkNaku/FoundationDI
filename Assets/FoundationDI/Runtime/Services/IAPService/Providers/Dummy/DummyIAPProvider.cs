@@ -8,7 +8,7 @@ namespace DarkNaku.FoundationDI
     //
     // 실제 스토어와 맞춘 두 가지 규율이 있다.
     //  1) 확정(Confirm)되기 전에는 소유로 기록하지 않는다.
-    //  2) 이미 확정된 구매는 다음 실행에 재전달하지 않는다 — 복원(RestoreAsync)으로만 되돌아온다.
+    //  2) 이미 확정된 구매는 다음 실행에 재전달하지 않는다 — 초기화·복원 때 소유 목록으로만 보고한다.
     public sealed class DummyIAPProvider : IIAPProvider
     {
         private const string OwnedKeyPrefix = "FoundationDI.IAP.Dummy.Owned.";
@@ -91,17 +91,10 @@ namespace DarkNaku.FoundationDI
             }
         }
 
+        // 확정된 구매는 미확정으로 되돌아오지 않는다 — 이미 지급됐다. 실제 스토어처럼 소유 목록만 다시 보고한다.
         public Awaitable<bool> RestoreAsync()
         {
-            foreach (var pair in _byStoreId)
-            {
-                var definition = pair.Value;
-
-                if (definition.Type != IAPProductType.NonConsumable) continue;
-                if (PlayerPrefs.GetInt(OwnedKeyPrefix + definition.StoreId, 0) == 0) continue;
-
-                Emit(definition, isRestored: true);
-            }
+            if (!_disposed) OwnedProductsFetched?.Invoke(CollectOwned());
 
             var source = new AwaitableCompletionSource<bool>();
             source.SetResult(true);
