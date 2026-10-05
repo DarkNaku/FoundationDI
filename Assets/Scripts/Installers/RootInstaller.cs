@@ -16,11 +16,6 @@ public class RootInstaller : MonoBehaviour, IInstaller
     // 인스펙터에서 Assets/Settings/AnalyticsServiceSettings.asset 을 연결한다.
     [SerializeField] private AnalyticsServiceSettings _analyticsServiceSettings;
 
-#if FOUNDATIONDI_UNITYIAP
-    // 인스펙터에서 Assets/Settings/IAPServiceSettings.asset 을 연결한다.
-    [SerializeField] private IAPServiceSettings _iapServiceSettings;
-#endif
-
     public void InstallBindings(ContainerBuilder builder)
     {
         // 프리팹 로드는 Resources 백엔드 ResourceService에 위임한다.
@@ -40,7 +35,8 @@ public class RootInstaller : MonoBehaviour, IInstaller
         builder.RegisterAdService(_adServiceSettings);
         builder.RegisterAnalyticsService(_analyticsServiceSettings);
 #if FOUNDATIONDI_UNITYIAP
-        builder.RegisterIAPService(_iapServiceSettings);
+        // 상품은 Unity IAP Catalog(Assets/Resources/IAPProductCatalog.json)에서 읽는다.
+        builder.RegisterIAPService();
 #endif
 
         // RegisterTutorialManager는 SceneInstaller로 내려갔다.

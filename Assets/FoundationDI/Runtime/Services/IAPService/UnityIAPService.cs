@@ -67,6 +67,24 @@ namespace DarkNaku.FoundationDI
         private bool _subscribed;
         private bool _disposed;
 
+        // 기본 경로. StoreController 하나가 세 인터페이스를 모두 구현하고, 상품은 Unity IAP Catalog
+        // (Assets/Resources/IAPProductCatalog.json)에서 읽는다. 생성만으로는 스토어에 연결하지 않는다.
+        public UnityIAPService(IIAPFulfillment fulfillment = null,
+                               IReceiptValidator validator = null,
+                               IEntitlementStorage entitlements = null,
+                               bool verboseLogging = false)
+            : this(UnityIAPServices.StoreController(), LoadCatalog(),
+                   fulfillment, validator, entitlements, verboseLogging)
+        {
+        }
+
+        private UnityIAPService(StoreController controller, IReadOnlyList<ProductDefinition> catalog,
+                                IIAPFulfillment fulfillment, IReceiptValidator validator,
+                                IEntitlementStorage entitlements, bool verboseLogging)
+            : this(controller, controller, controller, catalog, fulfillment, validator, entitlements, verboseLogging)
+        {
+        }
+
         internal UnityIAPService(IStoreService store, IProductService products, IPurchaseService purchases,
                                  IReadOnlyList<ProductDefinition> catalog,
                                  IIAPFulfillment fulfillment, IReceiptValidator validator,
@@ -241,6 +259,32 @@ namespace DarkNaku.FoundationDI
 
             CompleteInitWaiters(success);
             return success;
+        }
+
+        private static List<ProductDefinition> LoadCatalog()
+        {
+            var catalog = ProductCatalog.LoadDefaultCatalog();
+
+            UnityIAPCatalog.WarnIfCodelessAutoInitialization(catalog);
+
+            if (catalog.IsEmpty())
+            {
+                Debug.LogWarning("[IAPService] IAP Catalog가 비어 있다. Services > In-App Purchasing > IAP Catalog에서 상품을 추가할 것.");
+            }
+
+            return UnityIAPCatalog.ToDefinitions(catalog, CurrentStoreName());
+        }
+
+        // 에디터에서는 빌드 타깃을 따라간다 — 에디터 실행 중에도 현재 타깃의 스토어 ID가 나온다.
+        private static string CurrentStoreName()
+        {
+#if UNITY_ANDROID
+            return GooglePlay.Name;
+#elif UNITY_IOS
+            return AppleAppStore.Name;
+#else
+            return null;
+#endif
         }
 
         private void CompleteInitWaiters(bool success)

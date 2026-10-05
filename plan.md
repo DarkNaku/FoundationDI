@@ -10,7 +10,7 @@ provider 추상화·Dummy·자체 카탈로그를 걷어내고 Unity IAP를 직�
 단계
 - [x] 1. [STRUCTURAL] IAP 코드·테스트를 심볼 게이트 어셈블리로 옮긴다
 - [x] 2. [BEHAVIORAL] UnityIAPService를 TDD로 만든다 (아래 목록)
-- [ ] 3. [BEHAVIORAL] 등록을 UnityIAPService로 바꾸고 카탈로그를 IAP Catalog로 옮긴다
+- [x] 3. [BEHAVIORAL] 등록을 UnityIAPService로 바꾸고 카탈로그를 IAP Catalog로 옮긴다
 - [ ] 4. [STRUCTURAL] 옛 provider 계층·Dummy·설정 SO를 지우고 UnityIAPService를 IAPService로 바꾼다
 - [ ] 5. [BEHAVIORAL] 상품 상수 생성기의 입력을 IAP Catalog로, 출력 위치를 기억·질문 방식으로 바꾼다
 - [ ] 6. [STRUCTURAL] 문서·호스트·버전 0.11.0
