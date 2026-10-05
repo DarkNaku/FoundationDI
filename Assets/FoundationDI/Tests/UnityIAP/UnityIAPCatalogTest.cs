@@ -50,4 +50,20 @@ public class UnityIAPCatalogTest
 
         CollectionAssert.AreEqual(new[] { "gems" }, definitions.Select(d => d.id).ToArray());
     }
+
+    [Test]
+    public void Codeless_자동_초기화가_켜진_카탈로그면_에러를_남긴다()
+    {
+        var catalog = Catalog(Item("gems", ProductType.Consumable));
+        catalog.enableCodelessAutoInitialization = true;
+
+        LogAssert.Expect(LogType.Error, new Regex("IAPService.*Codeless"));
+
+        UnityIAPCatalog.WarnIfCodelessAutoInitialization(catalog);
+
+        // 끄면 조용하다.
+        catalog.enableCodelessAutoInitialization = false;
+        UnityIAPCatalog.WarnIfCodelessAutoInitialization(catalog);
+        LogAssert.NoUnexpectedReceived();
+    }
 }

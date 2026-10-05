@@ -724,4 +724,22 @@ public class UnityIAPServiceTest
         Assert.AreEqual(IAPPurchaseOutcome.NotReady, (await sut.PurchaseAsync("gems")).Outcome);
         Assert.IsFalse((await sut.RestoreAsync()).Success);
     });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator Dispose하면_대기_중인_구매와_복원이_매달리지_않는다() => AwaitableTest.Run(async () =>
+    {
+        var store = new UnityIAPStoreHarness(Catalog);
+        var sut = NewService(store);
+        await sut.InitializeAsync();
+        store.HoldRestoreFetch = true;
+
+        var purchase = sut.PurchaseAsync("gems");
+        var restore = sut.RestoreAsync();
+
+        sut.Dispose();
+
+        Assert.AreEqual(IAPPurchaseOutcome.Failed, (await purchase).Outcome);
+        Assert.IsFalse((await restore).Success);
+    });
 }

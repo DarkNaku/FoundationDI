@@ -32,5 +32,16 @@ namespace DarkNaku.FoundationDI
 
             return definitions;
         }
+
+        // Codeless 자동 초기화가 켜져 있으면 CodelessIAPStoreListener가 따로 스토어에 연결해 구매를
+        // 처리한다. 이 서비스가 지급을 저장할 때까지 확정을 미루는 동안 다른 경로가 처리하면 그 규율이
+        // 깨진다. 기본값이 true라 카탈로그를 처음 만들면 이 상태다 — 막지는 않고 크게 알린다.
+        public static void WarnIfCodelessAutoInitialization(ProductCatalog catalog)
+        {
+            if (catalog == null || !catalog.enableCodelessAutoInitialization || catalog.IsEmpty()) return;
+
+            Debug.LogError("[IAPService] IAP Catalog의 Codeless 자동 초기화(Automatically initialize UnityPurchasing)가 " +
+                           "켜져 있다. IAPService와 함께 쓰면 구매가 두 경로로 처리된다 — IAP Catalog 창에서 끌 것.");
+        }
     }
 }
