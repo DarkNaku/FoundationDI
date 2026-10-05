@@ -307,6 +307,15 @@ namespace DarkNaku.FoundationDI
             var productId = product?.definition?.id;
             var transactionId = order.Info?.TransactionID;
 
+            if (!IsInCatalog(productId))
+            {
+                // 확정해 버리면 이 구매는 영영 지급할 수 없다. 다음 버전의 카탈로그가
+                // 이 상품을 알게 될 수도 있으므로 미확정으로 남긴다.
+                Debug.LogWarning($"[IAPService] 카탈로그에 없는 상품의 구매가 도착했다: {productId}. " +
+                                 "확정하지 않고 남겨둔다.");
+                return;
+            }
+
             if (string.IsNullOrEmpty(transactionId))
             {
                 Debug.LogWarning($"[IAPService] 트랜잭션 ID가 없는 구매가 도착했다: {productId}. 확정할 수 없어 건너뛴다.");
@@ -387,6 +396,18 @@ namespace DarkNaku.FoundationDI
             _pendingSource = null;
             _pendingProductId = null;
             source.SetResult(result);
+        }
+
+        private bool IsInCatalog(string productId)
+        {
+            if (string.IsNullOrEmpty(productId)) return false;
+
+            foreach (var definition in _catalog)
+            {
+                if (definition.id == productId) return true;
+            }
+
+            return false;
         }
 
         private static Product ProductOf(Order order)

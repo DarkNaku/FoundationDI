@@ -417,4 +417,22 @@ public class UnityIAPServiceTest
         Assert.IsTrue(fulfillment.Calls[0].IsRestored, "재전달된 구매에 복원 표시가 없다");
         CollectionAssert.AreEqual(new[] { old }, store.ConfirmCalls);
     });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 카탈로그에_없는_상품의_미확정_구매는_확정하지_않고_경고한다() => AwaitableTest.Run(async () =>
+    {
+        var store = new UnityIAPStoreHarness(Catalog);
+        var fulfillment = new FakeFulfillment();
+        var sut = NewService(store, fulfillment);
+        await sut.InitializeAsync();
+
+        LogAssert.Expect(LogType.Warning, new Regex("IAPService.*unknown"));
+
+        store.RaisePending(store.Pending("unknown", "tx-x"));
+        await AwaitableTest.NextFrame();
+
+        Assert.IsEmpty(fulfillment.Calls);
+        Assert.IsEmpty(store.ConfirmCalls, "지급할 수 없는 구매를 확정하면 영영 되찾을 수 없다");
+    });
 }
