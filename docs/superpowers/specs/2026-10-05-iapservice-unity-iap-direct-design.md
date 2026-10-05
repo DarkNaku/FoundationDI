@@ -1,7 +1,7 @@
 # IAPService 재설계 — Unity IAP 직접 사용 헬퍼
 
 - 작성일: 2026-10-05
-- 상태: 검토 대기
+- 상태: 승인됨 (미결 사항은 제안대로 결정, 2026-10-05)
 - 대체 대상: `2026-08-23-iapservice-design.md`의 "Unity IAP는 옵셔널 어셈블리", "카탈로그는 `IAPServiceSettings`" 결정
 - SDK: Unity In-App Purchasing `com.unity.purchasing` 5.4.2
 - 버전: 0.10.11 → **0.11.0** (하위 호환 깨짐)
@@ -189,7 +189,14 @@ Dummy provider 대신 **Unity IAP의 FakeStore**를 쓴다. Unity IAP는 에디�
 IAP Catalog로 바꾼다. 출력(`IAPProducts` 클래스, `Generated/` + `.asmref`)은 그대로라 게임 코드의
 `IAPProducts.RemoveAds`는 바뀌지 않는다.
 
-출력 위치는 지금 "설정 SO 옆"이다. SO가 없어지므로 새 위치를 정해야 한다 → 미결 사항 1.
+출력 위치는 지금 "설정 SO 옆"이다. SO가 없어지므로 다음 순서로 정한다(결정 1).
+
+1. EditorPrefs(프로젝트별 키)에 기억한 폴더가 있으면 그 폴더.
+2. 없으면 프로젝트에 이미 있는 `IAPProducts.cs`의 폴더(0.10.x에서 생성한 파일을 그대로 덮어 쓴다).
+3. 그것도 없으면 폴더 선택 창을 띄우고, 고른 폴더(반드시 `Assets/` 아래)를 기억한다.
+
+생성 파일이 어느 어셈블리에 들어갈지는 지금처럼 `.asmref`로 정한다. 대상은 코어 `FoundationDI`다 —
+상수는 문자열뿐이라 Unity IAP 없이도 컴파일되고, 게임 코드는 어느 쪽 어셈블리든 참조할 수 있다.
 
 ## 테스트
 
@@ -318,12 +325,19 @@ README에 둘 내용이다.
 | 심볼이 없는 프로젝트에서 IAP 참조 코드가 컴파일 실패 | 다른 서드파티와 같은 규칙. README에 명시 |
 | 테스트가 Unity 인터페이스의 이벤트 시그니처에 묶인다 | 의도된 것이다. SDK가 바뀌면 테스트가 먼저 알려 준다 |
 
-## 미결 사항
+## 결정된 사항
 
-1. **상수 생성기의 출력 위치.** 지금은 설정 SO 옆이다. 후보: (a) `Assets/Resources/` 옆
-   (IAP Catalog 옆)은 Resources라 부적절, (b) 고정 경로 `Assets/FoundationDI.Generated/IAP/`,
-   (c) 처음 생성할 때 폴더를 묻고 EditorPrefs에 기억. **제안: (c).** SoundService의 `<DataRoot>/Generated/`와
-   비슷하게 프로젝트가 위치를 정한다.
-2. **기존 `IAPServiceSettings` 자동 이전 도구.** 0.11.0이 되면 SO 타입이 사라져 에셋을 읽을 수 없다.
-   0.10.x 마지막 버전에 "IAP Catalog로 내보내기" 메뉴를 넣을지, README 수동 안내로 끝낼지.
-   **제안: 수동 안내.** 이 패키지의 IAP 사용처가 적고, 상품 수도 보통 한 자릿수다.
+1. **상수 생성기의 출력 위치**: 기억한 폴더 → 기존 `IAPProducts.cs` 폴더 → 폴더 선택 창 순서. 위 "상품 상수 생성기" 참고.
+2. **기존 `IAPServiceSettings` 자동 이전 도구**: 만들지 않는다. README의 수동 이전 안내로 끝낸다.
+   이 패키지의 IAP 사용처가 적고 상품 수도 보통 한 자릿수다.
+
+## 구현 중 발견해 반영한 제약
+
+- 코어의 `ProviderDiagnostics`는 `internal`이고 옛 `IAPProviderFactory`가 쓴다. 1단계(어셈블리 이동)에서는
+  코어 `AssemblyInfo`에 `InternalsVisibleTo("FoundationDI.UnityIAP")`를 임시로 두고, 옛 코드를 지우는
+  4단계에서 함께 지운다.
+- 옮겨 간 IAP 어셈블리는 테스트 어셈블리에 internal을 열어 줘야 한다(`FoundationDI.UnityIAP.Tests`,
+  NSubstitute용 `DynamicProxyGenAssembly2`). 에디터 어셈블리도 같은 테스트 어셈블리에 연다.
+  테스트 어셈블리는 에디터 전용(`includePlatforms: Editor`) 하나로 런타임·에디터 IAP 코드를 함께 시험한다.
+- 새 클래스는 옛 `IAPService`와 공존해야 하므로 `UnityIAPService`라는 이름으로 만들고, 4단계에서 옛 클래스를
+  지운 뒤 `IAPService`로 이름을 바꾼다(구조 변경 커밋).
