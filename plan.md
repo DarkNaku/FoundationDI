@@ -8,22 +8,23 @@ App Review 2.1 리젝(iOS 27에서 ATT 요청을 찾을 수 없음). iOS 15+는 
 
 단계
 - [x] 1. [STRUCTURAL] 호스트에 ios-support 1.0.1을 설치하고 바인딩 호출을 `IAttBinding` seam으로 뺀다 + 심볼 게이트 테스트 어셈블리
-- [ ] 2. [BEHAVIORAL] 네이티브 헬퍼(`FDI_Att_IsApplicationActive`/`FDI_Att_ResignActiveCount`) + `IAppActivity` seam
-- [ ] 3. [BEHAVIORAL] 요청 흐름을 Active 대기 → 안정화 → 요청 → 무시 판정·재요청으로 바꾼다 (아래 목록)
+- [x] 2. [BEHAVIORAL] 네이티브 헬퍼(`FDI_Att_IsApplicationActive`/`FDI_Att_ResignActiveCount`) + `IAppActivity` seam
+- [x] 3. [BEHAVIORAL] 요청 흐름을 Active 대기 → 안정화 → 요청 → 무시 판정·재요청으로 바꾼다 (아래 목록)
 - [ ] 4. [STRUCTURAL] README 6장·CLAUDE.md
 
 AttTrackingAuthorization 테스트
 - [x] 지원하지 않으면 묻지 않고 현재 상태로 즉시 답한다
 - [x] 진행 중에 다시 부르면 현재 상태로 즉시 답한다
-- [ ] Inactive 동안에는 요청하지 않는다
-- [ ] Active가 되고 안정화 대기를 거친 뒤에 요청한다
-- [ ] 안정화 대기 중 다시 Inactive가 되면 요청하지 않고 Active를 다시 기다린다
-- [ ] 확정 상태가 되면 즉시 완료하고 더 요청하지 않는다
-- [ ] 팝업 없이 NotDetermined가 유지되면 점증 간격으로 재요청한다
-- [ ] 재요청은 3회까지만 하고 그 뒤 무시되면 현재 상태로 완료한다
-- [ ] Inactive를 거쳐 Active로 돌아왔는데도 NotDetermined면 재요청한다
-- [ ] 팝업이 떠 있는(Inactive) 동안에는 무시로 판정하지 않는다
-- [ ] 전체 타임아웃이 지나면 현재 상태로 완료한다
+- [x] Inactive 동안에는 요청하지 않는다
+- [x] Active가 되고 안정화 대기를 거친 뒤에 요청한다
+- [x] 안정화 대기 중 다시 Inactive가 되면 요청하지 않고 Active를 다시 기다린다
+- [x] 이미 확정된 상태면 Active를 기다리지 않고 완료한다
+- [x] 확정 상태가 되면 즉시 완료하고 더 요청하지 않는다
+- [x] 팝업 없이 NotDetermined가 유지되면 점증 간격으로 재요청한다
+- [x] 재요청은 3회까지만 하고 그 뒤 무시되면 현재 상태로 완료한다
+- [x] Inactive를 거쳐 Active로 돌아왔는데도 NotDetermined면 재요청한다
+- [x] 팝업이 떠 있는(Inactive) 동안에는 무시로 판정하지 않는다
+- [x] 전체 타임아웃이 지나면 현재 상태로 완료한다
 
 ## 완료: IAPService를 Unity IAP 직접 사용 헬퍼로 바꾼다 (0.11.0)
 
