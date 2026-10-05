@@ -241,4 +241,52 @@ public class UnityIAPServiceTest
         Assert.IsEmpty(fulfillment.Calls, "검증에 실패했는데 지급했다");
         Assert.IsEmpty(store.ConfirmCalls);
     });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 비소모성은_확정_후_소유로_기록되고_소모성은_아니다() => AwaitableTest.Run(async () =>
+    {
+        var store = new UnityIAPStoreHarness();
+        var sut = NewService(store);
+        await sut.InitializeAsync();
+
+        string ownedChanged = null;
+        sut.OwnedChanged += id => ownedChanged = id;
+
+        var nonConsumable = sut.PurchaseAsync("remove_ads");
+        store.RaisePending(store.Pending("remove_ads", "tx-6"));
+        await nonConsumable;
+
+        Assert.IsTrue(sut.IsOwned("remove_ads"));
+        Assert.AreEqual("remove_ads", ownedChanged);
+
+        var consumable = sut.PurchaseAsync("gems");
+        store.RaisePending(store.Pending("gems", "tx-7"));
+        await consumable;
+
+        Assert.IsFalse(sut.IsOwned("gems"), "소모성이 소유로 기록됐다");
+    });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 사용자_취소와_그_외_실패를_구분한다() => AwaitableTest.Run(async () =>
+    {
+        var store = new UnityIAPStoreHarness();
+        var sut = NewService(store);
+        await sut.InitializeAsync();
+
+        var cancelling = sut.PurchaseAsync("gems");
+        store.RaiseFailed("gems", PurchaseFailureReason.UserCancelled);
+        Assert.AreEqual(IAPPurchaseOutcome.UserCancelled, (await cancelling).Outcome);
+
+        LogAssert.Expect(LogType.Warning, new Regex("IAPService"));
+
+        var failing = sut.PurchaseAsync("gems");
+        store.RaiseFailed("gems", PurchaseFailureReason.PaymentDeclined, "declined");
+        var result = await failing;
+
+        Assert.AreEqual(IAPPurchaseOutcome.Failed, result.Outcome);
+        Assert.AreEqual((int)PurchaseFailureReason.PaymentDeclined, result.Error.Code);
+        StringAssert.Contains("declined", result.Error.Message);
+    });
 }

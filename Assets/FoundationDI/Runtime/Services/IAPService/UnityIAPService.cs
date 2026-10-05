@@ -127,7 +127,8 @@ namespace DarkNaku.FoundationDI
             return false;
         }
 
-        public bool IsOwned(string productId) => false;
+        public bool IsOwned(string productId) =>
+            !string.IsNullOrEmpty(productId) && _entitlements.IsOwned(productId);
 
         public async Awaitable<IAPPurchaseResult> PurchaseAsync(string productId)
         {
@@ -200,6 +201,7 @@ namespace DarkNaku.FoundationDI
             _productService.OnProductsFetchFailed += HandleProductsFetchFailed;
             _purchaseService.OnPurchasesFetched += HandlePurchasesFetched;
             _purchaseService.OnPurchasePending += HandlePurchasePending;
+            _purchaseService.OnPurchaseFailed += HandlePurchaseFailed;
             _purchaseService.OnPurchasesFetchFailed += HandlePurchasesFetchFailed;
 
             _subscribed = true;
@@ -252,6 +254,26 @@ namespace DarkNaku.FoundationDI
 
         private void HandlePurchasePending(PendingOrder order) => ProcessPending(order, isRestored: false);
 
+        private void HandlePurchaseFailed(FailedOrder order)
+        {
+            var productId = ProductOf(order)?.definition?.id;
+            if (string.IsNullOrEmpty(productId)) return;
+
+            var cancelled = order.FailureReason == PurchaseFailureReason.UserCancelled;
+
+            // 취소는 에러가 아니다. 로그로 남기면 정상 동작이 매번 소음이 된다.
+            if (cancelled)
+            {
+                CompletePendingFor(productId, IAPPurchaseResult.UserCancelled());
+                return;
+            }
+
+            var error = new IAPError((int)order.FailureReason, order.Details ?? order.FailureReason.ToString());
+            Debug.LogWarning($"[IAPService] 구매에 실패했다: {productId} {error}");
+
+            CompletePendingFor(productId, IAPPurchaseResult.Failed(error));
+        }
+
         // 주문 이벤트 핸들러라 반환값을 기다릴 주체가 없다 — 예외는 전부 안에서 잡는다.
         private async void ProcessPending(PendingOrder order, bool isRestored)
         {
@@ -288,6 +310,12 @@ namespace DarkNaku.FoundationDI
             }
 
             _purchaseService.ConfirmPurchase(order);
+
+            if (purchase.Type == IAPProductType.NonConsumable && !_entitlements.IsOwned(productId))
+            {
+                _entitlements.SetOwned(productId, true);
+                OwnedChanged?.Invoke(productId);
+            }
 
             Purchased?.Invoke(purchase);
 
