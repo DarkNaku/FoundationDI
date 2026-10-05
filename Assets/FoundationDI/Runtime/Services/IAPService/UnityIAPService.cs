@@ -10,6 +10,10 @@ namespace DarkNaku.FoundationDI
     // 이중 처리 방지)을 여기 한 곳에 둔다.
     public sealed class UnityIAPService : IIAPService
     {
+        // 지급 실패는 스토어 실패와 구분되는 원인이지만 결과 enum을 늘리는 대신 에러 코드로 남긴다 —
+        // 호출부가 분기할 이유가 없다(둘 다 "이번엔 못 줬다"이고 재시도는 스토어가 알아서 한다).
+        internal const int FulfillmentFailedCode = -1001;
+
         private readonly IStoreService _store;
         private readonly IProductService _productService;
         private readonly IPurchaseService _purchaseService;
@@ -256,9 +260,32 @@ namespace DarkNaku.FoundationDI
 
             var purchase = BuildPurchase(product, order, isRestored);
 
-            _validator.Validate(purchase, out _);
+            if (!_validator.Validate(purchase, out var validationError))
+            {
+                Debug.LogError($"[IAPService] 영수증 검증에 실패했다: {purchase.ProductId} {validationError}");
+                CompletePendingFor(productId, IAPPurchaseResult.InvalidReceipt(validationError));
+                return;
+            }
 
-            await _fulfillment.FulfillAsync(purchase);
+            bool fulfilled;
+
+            try
+            {
+                fulfilled = await _fulfillment.FulfillAsync(purchase);
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[IAPService] 지급 핸들러가 예외를 던졌다. 확정하지 않는다: {e}");
+                fulfilled = false;
+            }
+
+            if (!fulfilled)
+            {
+                // 확정하지 않는다 — 스토어가 다음 실행에 같은 구매를 다시 내려준다.
+                CompletePendingFor(productId, IAPPurchaseResult.Failed(
+                    new IAPError(FulfillmentFailedCode, "지급에 실패해 확정하지 않았다")));
+                return;
+            }
 
             _purchaseService.ConfirmPurchase(order);
 

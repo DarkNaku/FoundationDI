@@ -174,4 +174,71 @@ public class UnityIAPServiceTest
         CollectionAssert.AreEqual(new[] { order }, store.ConfirmCalls, "지급 후 같은 주문을 확정해야 한다");
         Assert.AreEqual(1, published.Count, "확정 후 Purchased 이벤트가 발행되지 않았다");
     });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 지급이_실패하면_확정하지_않는다() => AwaitableTest.Run(async () =>
+    {
+        var store = new UnityIAPStoreHarness();
+        var sut = NewService(store, new FakeFulfillment { Result = false });
+        await sut.InitializeAsync();
+
+        var published = 0;
+        sut.Purchased += _ => published++;
+
+        var task = sut.PurchaseAsync("remove_ads");
+        store.RaisePending(store.Pending("remove_ads", "tx-2"));
+        var result = await task;
+
+        Assert.AreEqual(IAPPurchaseOutcome.Failed, result.Outcome);
+        Assert.IsEmpty(store.ConfirmCalls, "지급에 실패했는데 확정했다");
+        Assert.IsFalse(sut.IsOwned("remove_ads"), "지급에 실패했는데 소유로 기록했다");
+        Assert.AreEqual(0, published);
+    });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 지급이_예외를_던져도_확정하지_않고_서비스가_살아있다() => AwaitableTest.Run(async () =>
+    {
+        var store = new UnityIAPStoreHarness();
+        var fulfillment = new FakeFulfillment { Throw = true };
+        var sut = NewService(store, fulfillment);
+        await sut.InitializeAsync();
+
+        LogAssert.Expect(LogType.Error, new Regex("IAPService"));
+
+        var task = sut.PurchaseAsync("gems");
+        store.RaisePending(store.Pending("gems", "tx-3"));
+        var result = await task;
+
+        Assert.AreEqual(IAPPurchaseOutcome.Failed, result.Outcome);
+        Assert.IsEmpty(store.ConfirmCalls);
+
+        // 다음 구매가 정상으로 흐른다.
+        fulfillment.Throw = false;
+        var retry = sut.PurchaseAsync("gems");
+        store.RaisePending(store.Pending("gems", "tx-4"));
+        Assert.AreEqual(IAPPurchaseOutcome.Purchased, (await retry).Outcome);
+    });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 영수증_검증에_실패하면_지급도_확정도_하지_않는다() => AwaitableTest.Run(async () =>
+    {
+        var store = new UnityIAPStoreHarness();
+        var fulfillment = new FakeFulfillment();
+        var sut = NewService(store, fulfillment, new FakeReceiptValidator { Result = false });
+        await sut.InitializeAsync();
+
+        LogAssert.Expect(LogType.Error, new Regex("IAPService"));
+
+        var task = sut.PurchaseAsync("gems");
+        store.RaisePending(store.Pending("gems", "tx-5", "bad"));
+        var result = await task;
+
+        Assert.AreEqual(IAPPurchaseOutcome.InvalidReceipt, result.Outcome);
+        Assert.AreEqual(-1, result.Error.Code);
+        Assert.IsEmpty(fulfillment.Calls, "검증에 실패했는데 지급했다");
+        Assert.IsEmpty(store.ConfirmCalls);
+    });
 }
