@@ -254,7 +254,13 @@ namespace DarkNaku.FoundationDI
             _fetchingProducts?.TrySetResult(false);
         }
 
-        private void HandlePurchasesFetched(Orders orders) => _fetchingPurchases?.TrySetResult(true);
+        private void HandlePurchasesFetched(Orders orders)
+        {
+            // 앱이 죽어 확정하지 못했던 구매들. 지급되지 않았을 수 있으므로 다시 흘려보낸다.
+            foreach (var order in orders.PendingOrders) ProcessPending(order, isRestored: true);
+
+            _fetchingPurchases?.TrySetResult(true);
+        }
 
         private void HandlePurchasesFetchFailed(PurchasesFetchFailureDescription failure)
         {

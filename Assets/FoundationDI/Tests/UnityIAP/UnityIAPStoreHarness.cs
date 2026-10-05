@@ -30,9 +30,16 @@ public class UnityIAPStoreHarness
     public List<ProductDefinition> FetchedDefinitions;
 
     private readonly Dictionary<string, Product> _products = new();
+    private readonly Dictionary<string, ProductDefinition> _catalog = new();
 
-    public UnityIAPStoreHarness()
+    // 카탈로그를 알아야 초기화 전에 만든 주문(재전달 구매)의 상품이 조회 결과와 같은 정의를 갖는다.
+    public UnityIAPStoreHarness(IEnumerable<ProductDefinition> catalog = null)
     {
+        if (catalog != null)
+        {
+            foreach (var definition in catalog) _catalog[definition.id] = definition;
+        }
+
         var substitute = Substitute.For<IStoreService, IProductService, IPurchaseService>();
         Store = substitute;
         Products = (IProductService)substitute;
@@ -108,10 +115,14 @@ public class UnityIAPStoreHarness
         return product;
     }
 
-    public Product Product(string id) =>
-        _products.TryGetValue(id, out var product)
-            ? product
-            : Product(UnityIAPTestObjects.Definition(id, ProductType.Consumable));
+    public Product Product(string id)
+    {
+        if (_products.TryGetValue(id, out var product)) return product;
+
+        return Product(_catalog.TryGetValue(id, out var definition)
+            ? definition
+            : UnityIAPTestObjects.Definition(id, ProductType.Consumable));
+    }
 
     public PendingOrder Pending(string productId, string transactionId, string receipt = "receipt") =>
         UnityIAPTestObjects.Pending(Product(productId), transactionId, receipt);

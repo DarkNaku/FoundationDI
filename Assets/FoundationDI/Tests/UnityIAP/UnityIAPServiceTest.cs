@@ -31,7 +31,7 @@ public class UnityIAPServiceTest
     [Timeout(5000)]
     public IEnumerator 구독을_끝낸_뒤_연결_상품_조회_구매_조회_순서로_초기화한다() => AwaitableTest.Run(async () =>
     {
-        var store = new UnityIAPStoreHarness();
+        var store = new UnityIAPStoreHarness(Catalog);
         var sut = NewService(store);
 
         // 하네스는 Connect 안에서 OnStoreConnected를 동기로 쏜다 — 구독이 늦으면 초기화가 끝나지 않는다.
@@ -48,7 +48,7 @@ public class UnityIAPServiceTest
     [Timeout(5000)]
     public IEnumerator 초기화하면_조회된_상품이_노출된다() => AwaitableTest.Run(async () =>
     {
-        var store = new UnityIAPStoreHarness();
+        var store = new UnityIAPStoreHarness(Catalog);
         var sut = NewService(store);
 
         await sut.InitializeAsync();
@@ -71,7 +71,7 @@ public class UnityIAPServiceTest
     [Timeout(5000)]
     public IEnumerator 연결이_끊기면_초기화가_실패한다() => AwaitableTest.Run(async () =>
     {
-        var store = new UnityIAPStoreHarness { ConnectSucceeds = false };
+        var store = new UnityIAPStoreHarness(Catalog) { ConnectSucceeds = false };
         var sut = NewService(store);
 
         LogAssert.Expect(LogType.Warning, new Regex("IAPService"));
@@ -87,7 +87,7 @@ public class UnityIAPServiceTest
     [Timeout(5000)]
     public IEnumerator 상품_조회가_실패하면_초기화가_실패한다() => AwaitableTest.Run(async () =>
     {
-        var store = new UnityIAPStoreHarness { ProductsFetchSucceeds = false };
+        var store = new UnityIAPStoreHarness(Catalog) { ProductsFetchSucceeds = false };
         var sut = NewService(store);
 
         LogAssert.Expect(LogType.Error, new Regex("IAPService.*조회"));
@@ -102,7 +102,7 @@ public class UnityIAPServiceTest
     [Timeout(5000)]
     public IEnumerator 구매_조회가_실패해도_초기화는_성공한다() => AwaitableTest.Run(async () =>
     {
-        var store = new UnityIAPStoreHarness { PurchasesFetchSucceeds = false };
+        var store = new UnityIAPStoreHarness(Catalog) { PurchasesFetchSucceeds = false };
         var sut = NewService(store);
 
         LogAssert.Expect(LogType.Warning, new Regex("IAPService"));
@@ -116,7 +116,7 @@ public class UnityIAPServiceTest
     [Timeout(5000)]
     public IEnumerator 초기화_전_구매는_NotReady다() => AwaitableTest.Run(async () =>
     {
-        var store = new UnityIAPStoreHarness();
+        var store = new UnityIAPStoreHarness(Catalog);
         var sut = NewService(store);
 
         Assert.AreEqual(IAPPurchaseOutcome.NotReady, (await sut.PurchaseAsync("gems")).Outcome);
@@ -127,7 +127,7 @@ public class UnityIAPServiceTest
     [Timeout(5000)]
     public IEnumerator InitializeAsync는_재진입해도_한_번만_연결한다() => AwaitableTest.Run(async () =>
     {
-        var store = new UnityIAPStoreHarness();
+        var store = new UnityIAPStoreHarness(Catalog);
         var sut = NewService(store);
 
         var first = sut.InitializeAsync();
@@ -143,7 +143,7 @@ public class UnityIAPServiceTest
     [Timeout(5000)]
     public IEnumerator 구매가_검증_지급_확정_순서로_진행된다() => AwaitableTest.Run(async () =>
     {
-        var store = new UnityIAPStoreHarness();
+        var store = new UnityIAPStoreHarness(Catalog);
         var fulfillment = new FakeFulfillment();
         var validator = new FakeReceiptValidator();
         var sut = NewService(store, fulfillment, validator);
@@ -179,7 +179,7 @@ public class UnityIAPServiceTest
     [Timeout(5000)]
     public IEnumerator 지급이_실패하면_확정하지_않는다() => AwaitableTest.Run(async () =>
     {
-        var store = new UnityIAPStoreHarness();
+        var store = new UnityIAPStoreHarness(Catalog);
         var sut = NewService(store, new FakeFulfillment { Result = false });
         await sut.InitializeAsync();
 
@@ -200,7 +200,7 @@ public class UnityIAPServiceTest
     [Timeout(5000)]
     public IEnumerator 지급이_예외를_던져도_확정하지_않고_서비스가_살아있다() => AwaitableTest.Run(async () =>
     {
-        var store = new UnityIAPStoreHarness();
+        var store = new UnityIAPStoreHarness(Catalog);
         var fulfillment = new FakeFulfillment { Throw = true };
         var sut = NewService(store, fulfillment);
         await sut.InitializeAsync();
@@ -225,7 +225,7 @@ public class UnityIAPServiceTest
     [Timeout(5000)]
     public IEnumerator 영수증_검증에_실패하면_지급도_확정도_하지_않는다() => AwaitableTest.Run(async () =>
     {
-        var store = new UnityIAPStoreHarness();
+        var store = new UnityIAPStoreHarness(Catalog);
         var fulfillment = new FakeFulfillment();
         var sut = NewService(store, fulfillment, new FakeReceiptValidator { Result = false });
         await sut.InitializeAsync();
@@ -246,7 +246,7 @@ public class UnityIAPServiceTest
     [Timeout(5000)]
     public IEnumerator 비소모성은_확정_후_소유로_기록되고_소모성은_아니다() => AwaitableTest.Run(async () =>
     {
-        var store = new UnityIAPStoreHarness();
+        var store = new UnityIAPStoreHarness(Catalog);
         var sut = NewService(store);
         await sut.InitializeAsync();
 
@@ -271,7 +271,7 @@ public class UnityIAPServiceTest
     [Timeout(5000)]
     public IEnumerator 사용자_취소와_그_외_실패를_구분한다() => AwaitableTest.Run(async () =>
     {
-        var store = new UnityIAPStoreHarness();
+        var store = new UnityIAPStoreHarness(Catalog);
         var sut = NewService(store);
         await sut.InitializeAsync();
 
@@ -294,7 +294,7 @@ public class UnityIAPServiceTest
     [Timeout(5000)]
     public IEnumerator 다른_상품의_실패는_대기_중인_구매를_끝내지_않는다() => AwaitableTest.Run(async () =>
     {
-        var store = new UnityIAPStoreHarness();
+        var store = new UnityIAPStoreHarness(Catalog);
         var sut = NewService(store);
         await sut.InitializeAsync();
 
@@ -310,7 +310,7 @@ public class UnityIAPServiceTest
     [Timeout(5000)]
     public IEnumerator 이미_소유한_비소모성은_스토어를_거치지_않는다() => AwaitableTest.Run(async () =>
     {
-        var store = new UnityIAPStoreHarness();
+        var store = new UnityIAPStoreHarness(Catalog);
         var entitlements = new FakeEntitlementStorage();
         entitlements.Owned.Add("remove_ads");
         var sut = NewService(store, entitlements: entitlements);
@@ -328,7 +328,7 @@ public class UnityIAPServiceTest
     [Timeout(5000)]
     public IEnumerator 구매가_진행_중이면_두_번째_호출은_즉시_NotReady다() => AwaitableTest.Run(async () =>
     {
-        var store = new UnityIAPStoreHarness();
+        var store = new UnityIAPStoreHarness(Catalog);
         var sut = NewService(store);
         await sut.InitializeAsync();
 
@@ -346,7 +346,7 @@ public class UnityIAPServiceTest
     [Timeout(5000)]
     public IEnumerator 카탈로그에_없는_상품_구매는_NotReady다() => AwaitableTest.Run(async () =>
     {
-        var store = new UnityIAPStoreHarness();
+        var store = new UnityIAPStoreHarness(Catalog);
         var sut = NewService(store);
         await sut.InitializeAsync();
 
@@ -360,7 +360,7 @@ public class UnityIAPServiceTest
     [Timeout(5000)]
     public IEnumerator 트랜잭션_ID가_없는_주문은_건너뛴다() => AwaitableTest.Run(async () =>
     {
-        var store = new UnityIAPStoreHarness();
+        var store = new UnityIAPStoreHarness(Catalog);
         var fulfillment = new FakeFulfillment();
         var sut = NewService(store, fulfillment);
         await sut.InitializeAsync();
@@ -379,7 +379,7 @@ public class UnityIAPServiceTest
     [Timeout(5000)]
     public IEnumerator 보류된_구매는_지급하지_않고_Deferred를_반환한다() => AwaitableTest.Run(async () =>
     {
-        var store = new UnityIAPStoreHarness();
+        var store = new UnityIAPStoreHarness(Catalog);
         var fulfillment = new FakeFulfillment();
         var sut = NewService(store, fulfillment);
         await sut.InitializeAsync();
@@ -398,5 +398,23 @@ public class UnityIAPServiceTest
 
         Assert.AreEqual(1, fulfillment.Calls.Count);
         CollectionAssert.AreEqual(new[] { late }, store.ConfirmCalls);
+    });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 미확정_구매는_초기화_때_지급되고_확정된다() => AwaitableTest.Run(async () =>
+    {
+        var store = new UnityIAPStoreHarness(Catalog);
+        var old = store.Pending("gems", "tx-old");
+        store.PendingOnFetch.Add(old);
+        var fulfillment = new FakeFulfillment();
+        var sut = NewService(store, fulfillment);
+
+        await sut.InitializeAsync();
+        await AwaitableTest.NextFrame();   // async void 핸들러가 끝날 틈을 준다
+
+        Assert.AreEqual(1, fulfillment.Calls.Count, "재전달된 구매가 지급되지 않았다");
+        Assert.IsTrue(fulfillment.Calls[0].IsRestored, "재전달된 구매에 복원 표시가 없다");
+        CollectionAssert.AreEqual(new[] { old }, store.ConfirmCalls);
     });
 }
