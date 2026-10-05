@@ -17,6 +17,7 @@ namespace DarkNaku.FoundationDI
         bool TryGetProduct(string productId, out IAPProduct product);
 
         // 비소모성 소유 여부. 로컬 캐시를 보므로 오프라인에서도 답한다.
+        // 캐시는 초기화·복원 때 스토어의 확정 목록으로 맞춰진다(재설치 후 복구, 환불 시 회수).
         bool IsOwned(string productId);
 
         Awaitable<IAPPurchaseResult> PurchaseAsync(string productId);
@@ -28,7 +29,8 @@ namespace DarkNaku.FoundationDI
         //   _iap.Purchased += p => _analytics.LogPurchase(new PurchaseInfo(p.ProductId, p.Price, p.CurrencyCode));
         event Action<IAPPurchase> Purchased;
 
-        // 비소모성 소유 상태가 바뀌었다(신규 구매 또는 복원). 인자는 상품 ID.
+        // 비소모성 소유 상태가 바뀌었다(신규 구매, 복원, 환불로 인한 회수). 인자는 상품 ID.
+        // 회수도 같은 이벤트로 오므로 값은 IsOwned로 다시 읽는다.
         event Action<string> OwnedChanged;
     }
 }

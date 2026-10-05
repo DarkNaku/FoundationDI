@@ -1,6 +1,6 @@
 # plan.md
 
-## 진행 중: IAPService 소유 상태를 스토어 확정 목록으로 맞춘다
+## 완료: IAPService 소유 상태를 스토어 확정 목록으로 맞춘다
 
 비소모성 소유를 PlayerPrefs 캐시만 보고 판단했고, 어댑터는 `FetchPurchases`의 `PendingOrders`만
 읽고 `ConfirmedOrders`를 버렸다. 그래서 세 가지가 깨져 있었다.

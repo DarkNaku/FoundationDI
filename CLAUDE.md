@@ -99,7 +99,8 @@ DI 코어는 **Reflex 14.3.1**이다. `Assets/Scripts/Installers/RootInstaller.c
 
 - **IAPService** (`Services/IAPService/`): 모바일 인앱 구매 서비스. Google Play / App Store의 소모성·비소모성 상품을 `IIAPService` 하나로 다룬다.
   - **3계층**: `Providers/`(SDK seam, `IIAPProvider`) → `IAPService`(정책: 검증→지급→확정→소유 기록→이벤트) → `IIAPService`(게임 표면). AdService와 같은 구조.
-  - **`IIAPFulfillment`이 핵심 seam**: 지급이 `true`를 반환해야 `ConfirmPurchase`가 호출된다. 저장 실패 시 확정하지 않아 스토어가 다음 실행에 재전달한다. **신규 구매·재전달·복원이 전부 이 한 메서드로 들어온다.** 미등록 시 `AutoConfirmFulfillment`로 폴백.
+  - **`IIAPFulfillment`이 핵심 seam**: 지급이 `true`를 반환해야 `ConfirmPurchase`가 호출된다. 저장 실패 시 확정하지 않아 스토어가 다음 실행에 재전달한다. **신규 구매와 미확정 구매의 재전달이 전부 이 한 메서드로 들어온다**(이미 확정된 구매의 복원은 아래 소유 목록 경로로 온다). 미등록 시 `AutoConfirmFulfillment`로 폴백.
+  - **비소모성 소유의 진실은 스토어의 확정 목록이다.** `IsOwned`는 `IEntitlementStorage` 캐시를 보지만, 조회가 성공할 때마다(초기화·복원) provider가 `OwnedProductsFetched`로 확정된 비소모성 목록을 보고하고 서비스가 캐시를 거기 맞춘다 — 재설치 후 복구, 환불 시 회수. 확정된 구매는 지급·`Purchased`를 다시 거치지 않는다. Unity IAP 5에서 확정 구매는 `Orders.ConfirmedOrders`로만 오며(예전에는 이걸 버려 재설치·복원 후 소유가 돌아오지 않았다), **`RestoreTransactions` 콜백은 뒤따르는 `FetchPurchases` 결과보다 먼저 불리므로** 어댑터가 두 신호를 모두 기다린 뒤 복원을 끝낸다. `ProcessPendingOrdersOnPurchasesFetched(false)`로 SDK의 세션 중복 제거를 껐기 때문에 어댑터가 처리 중·이번 세션 확정 주문의 재발행을 직접 막는다.
   - **`PurchaseAsync`는 `Awaitable<IAPPurchaseResult>`**. 결과는 `Purchased/Restored/AlreadyOwned/UserCancelled/Deferred/NotReady/InvalidReceipt/Failed` 8종이며 `IsSuccess`가 앞 셋을 묶는다. 스토어 UI가 모달이라 동시 구매는 하나만 허용한다(두 번째는 `NotReady`).
   - **iOS 로컬 검증은 불가능하다** — Unity IAP 5는 StoreKit 2를 쓰고 OS가 이미 검증한다. 로컬 검증은 Google Play 전용(`CrossPlatformValidator` + Tangle)이며 `GooglePlayTangle`은 Assembly-CSharp에 생성되므로 리플렉션으로 찾는다. Tangle이 없으면 경고 후 통과(개발 빌드가 막히지 않게).
   - **Unity IAP는 옵셔널 어셈블리**: `FOUNDATIONDI_UNITYIAP` 심볼이 걸린 `FoundationDI.UnityIAP`. 코어는 `com.unity.purchasing`를 참조하지 않는다. 에디터에서는 `ForceDummyInEditor`로 Dummy provider가 전체 플로우를 대신한다.

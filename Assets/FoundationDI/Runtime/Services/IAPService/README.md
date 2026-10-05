@@ -93,14 +93,36 @@ public class MyFulfillment : IIAPFulfillment
 }
 ```
 
-**신규 구매·앱 재시작 때 발견된 미확정 구매·복원이 전부 이 한 메서드로 들어온다.**
+**신규 구매와 아직 확정되지 않은 구매(앱 재시작·복원 때 발견된 것)가 전부 이 한 메서드로 들어온다.**
 그래서 지급 로직을 한 곳에만 쓰면 된다. 재전달을 대비해 `purchase.TransactionId`로 중복 지급을 막을 것.
+
+**이미 확정된 구매는 여기로 다시 들어오지 않는다** — 재설치나 복원으로 돌아온 비소모성은 지급이 아니라
+소유(`IsOwned`/`OwnedChanged`)로 전달된다. 그래서 비소모성의 효과(광고 제거 등)는 지급 핸들러가 아니라
+`IsOwned`를 보고 켜야 한다. 아래 "소유 상태" 절 참고.
 
 등록하지 않으면 `AutoConfirmFulfillment`(지급 없이 즉시 확정)로 폴백한다.
 소모성 재화를 파는 순간부터는 반드시 자기 구현으로 교체해야 한다.
 
 전체 순서: **검증 → 지급 → 확정 → 소유 기록 → `Purchased` 이벤트 → `PurchaseAsync` 완료**.
 검증에 실패하면 지급도 확정도 하지 않는다.
+
+---
+
+### 소유 상태
+
+`IsOwned`는 로컬 캐시(`IEntitlementStorage`)를 본다. 그래서 오프라인에서도 답한다.
+캐시를 채우고 고치는 것은 **스토어의 확정 목록**이다. 초기화와 복원 때 스토어 조회가 성공하면 provider가
+확정된 비소모성 목록을 보고하고, 서비스가 캐시를 그 목록에 맞춘다.
+
+| 상황 | 결과 |
+| --- | --- |
+| 재설치·기기 변경 후 초기화 | 스토어 목록에 있으므로 소유로 돌아온다 + `OwnedChanged` |
+| 환불 | 목록에서 빠지므로 **회수된다** + `OwnedChanged` |
+| 오프라인(조회 실패) | 목록이 오지 않는다. 캐시가 그대로 답한다 |
+| 상태가 그대로 | 이벤트 없음 |
+
+확정된 구매는 지급을 다시 거치지 않고 `Purchased` 이벤트도 발행하지 않는다(매출이 아니다).
+`RestoreResult.RestoredCount`는 스토어가 확인한 비소모성 수와 복원 중에 지급된 미확정 구매 수의 합이다.
 
 ---
 
@@ -161,7 +183,11 @@ IAPService는 AdService/AnalyticsService를 모른다. 호스트가 붙인다.
 ```csharp
 // 광고 제거
 _ads.AdsRemoved = _iap.IsOwned(IAPProducts.RemoveAds);
-_iap.OwnedChanged += id => { if (id == IAPProducts.RemoveAds) _ads.AdsRemoved = true; };
+_iap.OwnedChanged += id =>
+{
+    // true를 박지 말고 다시 읽는다 — 환불되면 같은 이벤트로 회수가 온다.
+    if (id == IAPProducts.RemoveAds) _ads.AdsRemoved = _iap.IsOwned(id);
+};
 
 // 매출 분석
 _iap.Purchased += p => _analytics.LogPurchase(new PurchaseInfo(p.ProductId, p.Price, p.CurrencyCode));
@@ -191,7 +217,7 @@ Google Play 검증을 켜려면 **Services > In-App Purchasing > Receipt Validat
 에디터에서 스토어 없이 구매 플로우 전체를 돌린다. 실제 스토어와 두 가지 규율을 맞췄다.
 
 1. 확정되기 전에는 소유로 기록하지 않는다.
-2. 이미 확정된 구매는 다음 실행에 재전달하지 않는다 — `RestoreAsync`로만 되돌아온다.
+2. 이미 확정된 구매는 다음 실행에 재전달하지 않는다 — 초기화·복원 때 확정 소유 목록으로만 보고한다.
 
 `AlwaysFail` / `AlwaysCancel`로 실패·취소 경로를 재현할 수 있다.
 Dummy가 기록한 소유는 `FoundationDI.IAP.Dummy.Owned.<storeId>` PlayerPrefs 키에 남는다(테스트 초기화 시 삭제).
