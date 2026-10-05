@@ -28,6 +28,11 @@ namespace DarkNaku.FoundationDI
         private readonly List<AwaitableCompletionSource<bool>> _initWaiters = new();
         private bool _initializing;
 
+        // 대기 중인 PurchaseAsync. 스토어 UI가 모달이라 동시에 두 개가 뜨는 일은 없고,
+        // 주문 이벤트에는 "어느 호출의 결과인가"가 실려 오지 않으므로 하나만 허용한다.
+        private AwaitableCompletionSource<IAPPurchaseResult> _pendingSource;
+        private string _pendingProductId;
+
         private AwaitableCompletionSource<bool> _connecting;
         private AwaitableCompletionSource<bool> _fetchingProducts;
         private AwaitableCompletionSource<bool> _fetchingPurchases;
@@ -120,8 +125,23 @@ namespace DarkNaku.FoundationDI
 
         public bool IsOwned(string productId) => false;
 
-        public Awaitable<IAPPurchaseResult> PurchaseAsync(string productId) =>
-            Completed(IAPPurchaseResult.NotReady());
+        public async Awaitable<IAPPurchaseResult> PurchaseAsync(string productId)
+        {
+            if (!IsInitialized) return IAPPurchaseResult.NotReady();
+
+            if (string.IsNullOrEmpty(productId) || !_unityProducts.TryGetValue(productId, out var product))
+            {
+                return IAPPurchaseResult.NotReady();
+            }
+
+            _pendingSource = new AwaitableCompletionSource<IAPPurchaseResult>();
+            _pendingProductId = productId;
+
+            // 조회한 Product로 산다 — catalogListingId 규칙에 의존하지 않는다.
+            _purchaseService.PurchaseProduct(product);
+
+            return await _pendingSource.Awaitable;
+        }
 
         public Awaitable<IAPRestoreResult> RestoreAsync() =>
             Completed(IAPRestoreResult.Fail(default));
@@ -175,6 +195,7 @@ namespace DarkNaku.FoundationDI
             _productService.OnProductsFetched += HandleProductsFetched;
             _productService.OnProductsFetchFailed += HandleProductsFetchFailed;
             _purchaseService.OnPurchasesFetched += HandlePurchasesFetched;
+            _purchaseService.OnPurchasePending += HandlePurchasePending;
             _purchaseService.OnPurchasesFetchFailed += HandlePurchasesFetchFailed;
 
             _subscribed = true;
@@ -223,6 +244,58 @@ namespace DarkNaku.FoundationDI
             Debug.LogWarning($"[IAPService] 이전 구매 조회에 실패했다: {failure?.message}");
 
             _fetchingPurchases?.TrySetResult(false);
+        }
+
+        private void HandlePurchasePending(PendingOrder order) => ProcessPending(order, isRestored: false);
+
+        // 주문 이벤트 핸들러라 반환값을 기다릴 주체가 없다 — 예외는 전부 안에서 잡는다.
+        private async void ProcessPending(PendingOrder order, bool isRestored)
+        {
+            var product = ProductOf(order);
+            var productId = product?.definition?.id;
+
+            var purchase = BuildPurchase(product, order, isRestored);
+
+            _validator.Validate(purchase, out _);
+
+            await _fulfillment.FulfillAsync(purchase);
+
+            _purchaseService.ConfirmPurchase(order);
+
+            Purchased?.Invoke(purchase);
+
+            CompletePendingFor(productId, IAPPurchaseResult.Purchased(purchase));
+        }
+
+        private IAPPurchase BuildPurchase(Product product, Order order, bool isRestored)
+        {
+            var definition = product.definition;
+            var metadata = product.metadata;
+
+            return new IAPPurchase(definition.id, ToProductType(definition.type),
+                                   order.Info?.TransactionID, order.Info?.Receipt,
+                                   metadata == null ? 0.0 : (double)metadata.localizedPrice,
+                                   metadata?.isoCurrencyCode ?? string.Empty, isRestored);
+        }
+
+        // 대기 중인 구매의 상품과 일치할 때만 완료시킨다. 재전달·복원처럼 아무도 기다리지
+        // 않는 구매는 조용히 지나간다.
+        private void CompletePendingFor(string productId, IAPPurchaseResult result)
+        {
+            if (_pendingSource == null || _pendingProductId != productId) return;
+
+            var source = _pendingSource;
+            _pendingSource = null;
+            _pendingProductId = null;
+            source.SetResult(result);
+        }
+
+        private static Product ProductOf(Order order)
+        {
+            var items = order?.CartOrdered?.Items();
+            if (items == null || items.Count == 0) return null;
+
+            return items[0]?.Product;
         }
 
         private static IAPProduct ToIAPProduct(Product product)

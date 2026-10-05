@@ -138,4 +138,40 @@ public class UnityIAPServiceTest
         Assert.IsTrue(await sut.InitializeAsync());
         Assert.AreEqual(1, store.Calls.Count(c => c == "Connect"));
     });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 구매가_검증_지급_확정_순서로_진행된다() => AwaitableTest.Run(async () =>
+    {
+        var store = new UnityIAPStoreHarness();
+        var fulfillment = new FakeFulfillment();
+        var validator = new FakeReceiptValidator();
+        var sut = NewService(store, fulfillment, validator);
+        await sut.InitializeAsync();
+
+        var published = new System.Collections.Generic.List<IAPPurchase>();
+        sut.Purchased += p => published.Add(p);
+
+        var task = sut.PurchaseAsync("gems");
+
+        Assert.AreEqual(1, store.PurchaseCalls.Count);
+        Assert.AreSame(store.Product("gems"), store.PurchaseCalls[0], "조회한 Product로 사야 한다");
+
+        var order = store.Pending("gems", "tx-1", "receipt-1");
+        store.RaisePending(order);
+        var result = await task;
+
+        Assert.AreEqual(IAPPurchaseOutcome.Purchased, result.Outcome);
+        Assert.AreEqual("gems", result.Purchase.ProductId);
+        Assert.AreEqual("tx-1", result.Purchase.TransactionId);
+        Assert.AreEqual("receipt-1", result.Purchase.Receipt);
+        Assert.AreEqual(0.99, result.Purchase.Price, 0.0001);
+        Assert.AreEqual("USD", result.Purchase.CurrencyCode);
+        Assert.IsFalse(result.Purchase.IsRestored);
+
+        Assert.AreEqual(1, validator.CallCount);
+        Assert.AreEqual(1, fulfillment.Calls.Count);
+        CollectionAssert.AreEqual(new[] { order }, store.ConfirmCalls, "지급 후 같은 주문을 확정해야 한다");
+        Assert.AreEqual(1, published.Count, "확정 후 Purchased 이벤트가 발행되지 않았다");
+    });
 }
