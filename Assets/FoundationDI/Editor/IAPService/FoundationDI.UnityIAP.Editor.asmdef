@@ -1,13 +1,14 @@
 {
-    "name": "FoundationDI.UnityIAP",
+    "name": "FoundationDI.UnityIAP.Editor",
     "rootNamespace": "",
     "references": [
         "FoundationDI",
-        "Unity.Purchasing",
-        "Unity.Purchasing.Security",
-        "Unity.Purchasing.SecurityCore"
+        "FoundationDI.UnityIAP",
+        "Unity.Purchasing"
     ],
-    "includePlatforms": [],
+    "includePlatforms": [
+        "Editor"
+    ],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
     "overrideReferences": false,

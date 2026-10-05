@@ -8,7 +8,7 @@ provider 추상화·Dummy·자체 카탈로그를 걷어내고 Unity IAP를 직�
 스펙: `docs/superpowers/specs/2026-10-05-iapservice-unity-iap-direct-design.md`
 
 단계
-- [ ] 1. [STRUCTURAL] IAP 코드·테스트를 심볼 게이트 어셈블리로 옮긴다
+- [x] 1. [STRUCTURAL] IAP 코드·테스트를 심볼 게이트 어셈블리로 옮긴다
 - [ ] 2. [BEHAVIORAL] UnityIAPService를 TDD로 만든다 (아래 목록)
 - [ ] 3. [BEHAVIORAL] 등록을 UnityIAPService로 바꾸고 카탈로그를 IAP Catalog로 옮긴다
 - [ ] 4. [STRUCTURAL] 옛 provider 계층·Dummy·설정 SO를 지우고 UnityIAPService를 IAPService로 바꾼다

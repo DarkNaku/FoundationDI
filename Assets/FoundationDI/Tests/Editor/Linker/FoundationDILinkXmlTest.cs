@@ -21,6 +21,7 @@ public class FoundationDILinkXmlTest
         public string[] references;
         public string[] precompiledReferences;
         public string[] defineConstraints;
+        public string[] includePlatforms;
     }
 
     private class AdapterAsmdef
@@ -35,6 +36,7 @@ public class FoundationDILinkXmlTest
     private static List<AdapterAsmdef> CollectAdapterAsmdefs()
     {
         var adapters = new List<AdapterAsmdef>();
+        var coreReferences = CoreReferences();
 
         foreach (var guid in AssetDatabase.FindAssets("t:AssemblyDefinitionAsset"))
         {
@@ -52,13 +54,18 @@ public class FoundationDILinkXmlTest
             if (!json.name.StartsWith("FoundationDI.")) continue;
             if (json.defineConstraints == null || json.defineConstraints.Length == 0) continue;
 
+            // 에디터 전용 어셈블리는 플레이어 빌드에 들어가지 않는다 — 링커가 볼 일이 없다.
+            if (json.includePlatforms != null && json.includePlatforms.SequenceEqual(new[] { "Editor" })) continue;
+
             var thirdParty = new List<string>();
 
             if (json.references != null)
             {
                 thirdParty.AddRange(json.references
                     .Select(ResolveReference)
-                    .Where(r => !string.IsNullOrEmpty(r) && r != "FoundationDI"));
+                    .Where(r => !string.IsNullOrEmpty(r) && r != "FoundationDI")
+                    // 코어도 참조하는 어셈블리(Reflex 등)는 코어를 통해 링커가 이미 닿는다.
+                    .Where(r => !coreReferences.Contains(r)));
             }
 
             // overrideReferences를 켠 어댑터(Firebase)는 서드파티가 references가 아니라
@@ -79,6 +86,22 @@ public class FoundationDILinkXmlTest
         }
 
         return adapters;
+    }
+
+    private static HashSet<string> CoreReferences()
+    {
+        foreach (var guid in AssetDatabase.FindAssets("t:AssemblyDefinitionAsset FoundationDI"))
+        {
+            var asset = AssetDatabase.LoadAssetAtPath<AssemblyDefinitionAsset>(AssetDatabase.GUIDToAssetPath(guid));
+            if (asset == null) continue;
+
+            var json = JsonUtility.FromJson<AsmdefJson>(asset.text);
+            if (json?.name != "FoundationDI") continue;
+
+            return new HashSet<string>((json.references ?? new string[0]).Select(ResolveReference));
+        }
+
+        return new HashSet<string>();
     }
 
     // asmdef가 "Use GUIDs"로 저장되면 참조가 "GUID:..." 꼴이 된다. 이름으로 되돌려 놓지 않으면
