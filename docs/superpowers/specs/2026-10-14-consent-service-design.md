@@ -82,8 +82,7 @@ public interface IConsentService : IDisposable
     void AcceptPolicy();                                // 기존 유저 자동 동의용
     void SetPolicyContent(PolicyAgreementContent content); // 런타임 문구(현지화)
 
-    bool CanRequestAds { get; }                         // UMP canRequestAds. UMP 미사용 시 true
-    AnalyticsConsent AnalyticsConsent { get; }          // Granted / Denied / Unknown
+    ConsentResult Current { get; }                      // 현재 상태를 매번 다시 읽는다
     bool IsPrivacyOptionsRequired { get; }              // 설정 화면 버튼 표시 조건
     Awaitable ShowPrivacyOptionsAsync();
 
@@ -98,6 +97,7 @@ public readonly struct ConsentResult
     public bool CanRequestAds { get; }
     public AnalyticsConsent AnalyticsConsent { get; }
     public TrackingAuthorizationStatus TrackingStatus { get; }
+    public TcfSignals Tcf { get; }                      // IABTCF_gdprApplies, IABTCF_PurposeConsents
 }
 
 public enum AnalyticsConsent { Unknown, Granted, Denied }
@@ -119,12 +119,11 @@ builder.RegisterConsentService(settings, prompt: myPrompt);  // 커스텀 UI
 | `IUmpConsent` | UMP 네이티브 호출과 TCF 저장소 읽기 | `AndroidUmpConsent` / `IosUmpConsent` | `UnsupportedUmpConsent`(에디터·미설정) |
 | `ITrackingAuthorization` | ATT(기존) | `AttTrackingAuthorization` | `UnsupportedTrackingAuthorization` |
 | `IConsentPrerequisite` | UMP 시작 전에 끝나야 하는 작업 | AnalyticsService 등록이 제공 | 테스트 |
-| `IMainThreadDispatcher` | 메인 스레드 마샬링·지연·프레임 | `UnityMainThreadDispatcher` | 가짜 시계 |
-| `IAppActivity` | iOS 앱 Active 상태 | `FDI_Att.mm` 기반(기존) | 테스트 |
+| `IMainThreadDispatcher` | 메인 스레드 마샬링·지연·프레임 | `UnityAdDispatcher` | 가짜 시계 |
 
 ### 4.4 공용으로 끌어올리는 것 (STRUCTURAL)
-- `IAdDispatcher`·`UnityAdDispatcher`를 `IMainThreadDispatcher`·`UnityMainThreadDispatcher`로 이름을 바꾸고 `Runtime/Common/`으로 옮긴다. ConsentService가 ATT 재요청 지연과 UMP 콜백 마샬링에 쓴다.
-- `IAppActivity`를 iOSSupport 내부에서 꺼내 UMP iOS 브리지도 쓸 수 있게 한다.
+- `IMainThreadDispatcher`(Post/Delay/NextFrames)를 `Runtime/Common/`에 새로 두고 `IAdDispatcher : IMainThreadDispatcher`로 만든다. 기존 이름은 바꾸지 않는다 — 호스트에서 컴파일되지 않는 LevelPlay·AppLovin 어댑터가 `IAdDispatcher`를 쓴다. ConsentService가 ATT 재요청 지연과 UMP 콜백 마샬링에 쓴다.
+- UMP iOS 브리지는 Active 판정 함수(`FDI_Ump_IsApplicationActive`)를 자체로 가진다. `IAppActivity`는 옮기지 않는다.
 - 각 이동은 동작 변경 없이 별도 커밋으로 한다.
 
 ## 5. 초기화 흐름
@@ -142,26 +141,29 @@ RequestAsync()
 - ①이 UMP보다 먼저인 이유: 약관 수락 전에 데이터 처리 동의를 묻는 것은 순서가 맞지 않는다. 두 참고 게임도 같다.
 - ②가 필요한 이유: Google은 consent mode를 쓰려면 "UMP 시작 전에 Firebase를 초기화하라"고 요구한다(https://developers.google.com/admob/android/privacy/consent-mode). 이 순서를 문서가 아니라 구조로 강제한다. prerequisite는 SDK 초기화까지만 기다리고 동의는 기다리지 않으므로 교착이 없다.
 - ④: UMP의 IDFA 설명 메시지가 ATT를 이미 띄웠다면 상태가 NotDetermined가 아니므로 건너뛴다. 기존 Active 대기·재요청 로직(`AttTrackingAuthorization`)을 그대로 쓴다. 옵션을 끄면 게임이 원하는 시점에 `TrackingAuthorization.RequestAsync()`를 직접 부른다(기존 `RequestTrackingAuthorization = false`의 이관).
-- 한 세션에서 이미 완료된 뒤의 `RequestAsync`는 ③만 다시 수행한다(지역·동의 재판정). 약관은 이미 수락했고 ATT는 한 번만 묻기 때문이다.
+- 직전 결과가 `PolicyAccepted && CanRequestAds && AnalyticsConsent != Unknown`이면 `RequestAsync`는 그 결과를 즉시 돌려준다. 아니면 ③만 다시 수행한다(지역·동의 재판정). 약관은 이미 수락했고 ATT는 한 번만 묻기 때문이다.
 
 ### 5.1 약관 단계
 - 거절 버튼은 없다. 수락해야 진행한다.
 - 모든 신규 유저에게 표시한다(지역 무관).
 - 설정의 `Policy Version`을 올리면 약관 변경으로 보고 다시 묻는다.
 - 기존 유저 자동 동의는 게임이 판단한다. 예를 들어 세이브가 있으면 `RequestAsync` 전에 `AcceptPolicy()`를 부른다.
+- `Policy Version`이 0이면 약관 단계를 쓰지 않는다(항상 수락으로 본다).
 
 ### 5.2 실패 처리 — 게임을 막지 않는다
 - UMP 업데이트·폼 로드 실패, 예외, 네이티브 클래스나 포드가 없는 경우: 경고 로그를 남기고 진행한다. `CanRequestAds`는 UMP가 캐시한 이전 세션 값을 다시 읽는다.
 - iOS UMP 폼은 ATT와 같은 이유로 앱이 Active일 때까지 기다렸다가 띄운다. 첫 씬 Awake가 Inactive 구간이기 때문이다.
-- 전체 타임아웃은 30초다. 초과하면 현재 상태로 완료한다.
+- UMP 정보 갱신(네트워크)에만 타임아웃(기본 10초)을 둔다. 폼 표시 중에는 사용자가 읽는 시간이라 타임아웃을 두지 않는다(Android에서는 폼이 떠 있어도 플레이어 루프가 돈다). ATT는 기존 60초 상한을 그대로 쓴다.
 - 진행 중 재호출은 waiter 목록에 편승한다(AdService 초기화와 같은 패턴).
 - Dispose되면 진행 중인 대기자를 현재 상태로 완료한다.
 - 약관 창 표시 중 Dispose되면 창을 정리하고 `PolicyAccepted = false`로 완료한다.
+- 기본 UI 프리팹이 비어 있으면 `ShowAsync`가 예외를 던지고 `PolicyAccepted = false`로 완료한다(조용히 수락 처리하지 않는다).
 
 ## 6. AdService 연동 (공개 API 파괴)
 
 - 생성자가 `ITrackingAuthorization` 대신 `IConsentService`를 받는다.
-- `InitializeAsync`: `await consent.RequestAsync()` → `CanRequestAds == false`면 provider를 초기화하지 않고 `false`를 반환한다. 게임이 다시 부르면 UMP 재판정부터 재시도한다.
+- `InitializeAsync`: `await consent.RequestAsync()` → `PolicyAccepted && CanRequestAds`가 아니면 provider를 초기화하지 않고 `false`를 반환한다. 게임이 다시 부르면 UMP 재판정부터 재시도한다.
+- `IConsentService`가 등록되지 않았으면 `RegisterAdService`가 경고를 남기고 약관·UMP 없이 ATT만 묻는 `ConsentService.CreateTrackingOnly`로 동작한다(0.11 동작 보존).
 - `AdProviderContext.TrackingStatus`에는 `ConsentResult.TrackingStatus`를 싣는다. `LevelPlayAdProvider.ApplyPrivacy`(ATT 거부 → 제한)는 유지한다.
 - 제거: `IAdService.Consent`, `IAdService.TrackingAuthorization`, `IAdProvider.Consent`, `IAdConsent`, `NoopAdConsent`, `AdServiceOptions.RequestTrackingAuthorization`, `AdServiceSettings._requestTrackingAuthorization`.
 - `TrackingAuthorizationRegistry`와 `UnsupportedTrackingAuthorization`은 ConsentService 쪽으로 옮긴다.
@@ -197,12 +199,14 @@ RequestAsync()
 AnalyticsService.InitializeAsync()
   provider SDK 초기화            ← ConsentService의 IConsentPrerequisite로도 등록
   await consent.RequestAsync()
-  provider.ApplyConsent(result)  ← Adjust: DMA 번역 / Firebase: 수집 on/off
+  IAnalyticsConsentAware.ApplyConsent(result)  ← Adjust: DMA 번역
+  게이트 적용(SetCollectionEnabled)            ← Firebase 수집 on/off
   게이트 규칙에 따라 버퍼 flush 또는 폐기
   IAnalyticsFlushHook.OnBufferedStateFlushed  ← Adjust EndFirstSessionDelay
 ```
 
-- `IAnalyticsProvider`에 `ApplyConsent(ConsentResult)`를 추가한다. 동의 개념이 없는 provider(Debug)는 빈 구현이다.
+- 번역이 필요한 provider만 선택 seam `IAnalyticsConsentAware.ApplyConsent(ConsentResult)`를 구현한다(Adjust). `IAnalyticsProvider`는 바꾸지 않는다.
+- provider SDK 초기화는 `AnalyticsProviderInitializer : IConsentPrerequisite`가 맡아 ConsentService가 UMP 전에 기다린다.
 - Adjust의 `Delay First Session`이 꺼져 있으면 DMA 값이 인스톨 레코드에 빠진다. README에 켜기를 권장한다고 적는다.
 - TCF → DMA 매핑: `eea` ← `IABTCF_gdprApplies`, `ad_user_data` ← Purpose 1·7, `ad_personalization` ← Purpose 3·4. Google 매핑을 따른 이 서비스의 해석이며 Adjust가 정한 규칙은 아니다.
 
@@ -278,8 +282,8 @@ public readonly struct PolicyAgreementContent
 - Policy: `Policy Version`(int), 기본 문구(`PolicyAgreementContent` 필드들), `Prompt Prefab`
 - UMP: `Use UMP`, `AdMob App Id (Android/iOS)`, `Debug Geography`, `Test Device Hashed Ids`, `Tag For Under Age Of Consent`
 - ATT: `Request Tracking Authorization`(기본 true)
-- Analytics: `Gate Analytics Collection`(기본 true)
-- 타임아웃: `Request Timeout Seconds`(기본 30)
+- 타임아웃: `Ump Update Timeout Seconds`(기본 10)
+- 분석 게이트는 `AnalyticsServiceSettings.Wait For Consent`(기본 true)에 둔다.
 
 ### 10.2 UMP Dependencies.xml 생성
 - `Use UMP`를 켜면 `Assets/FoundationDI.Data/Editor/FoundationDIUmpDependencies.xml`을 생성하고, 끄면 삭제한다.
@@ -292,7 +296,7 @@ public readonly struct PolicyAgreementContent
 - iOS: `[PostProcessBuild(1002)]`(기존 999 → 1000 → 1001 다음 번호). Android: Gradle 프로젝트 후처리.
 - AdMob 앱 ID(`com.google.android.gms.ads.APPLICATION_ID` / `GADApplicationIdentifier`)를 **키가 없을 때만** 넣는다. LevelPlay AdMob 어댑터가 넣은 값을 덮지 않는다(`IosExportCompliance.ShouldDeclare`와 같은 규칙).
 - `Use UMP`가 켜져 있는데 앱 ID가 비어 있고 키도 없으면 빌드 에러로 멈춘다. UMP는 앱 ID 없이 동작하지 않는다.
-- `Gate Analytics Collection`이 켜져 있고 Firebase 어댑터가 활성이면 `firebase_analytics_collection_enabled=false` / `FIREBASE_ANALYTICS_COLLECTION_ENABLED=NO`를 같은 규칙으로 넣는다.
+- `Wait For Consent`가 켜진 `AnalyticsServiceSettings`가 있고 `FOUNDATIONDI_FIREBASE`가 정의돼 있으면 `firebase_analytics_collection_enabled=false` / `FIREBASE_ANALYTICS_COLLECTION_ENABLED=NO`를 같은 규칙으로 넣는다.
 - 판정은 순수 함수(`ShouldInject`)로 분리해 EditMode에서 검증한다.
 
 ## 11. 테스트
