@@ -303,3 +303,37 @@ public static class ConsentResults
     public static ConsentResult PolicyNotAccepted() =>
         new(false, false, AnalyticsConsent.Unknown, TrackingAuthorizationStatus.NotDetermined, TcfSignals.None);
 }
+
+// ConsentService를 조립하는 테스트 픽스처. 기본값은 "약관 v1, UMP 사용, ATT 사용"이지만
+// ATT 대역은 IsSupported=false로 시작한다 — ATT를 다루지 않는 테스트가 Respond를 기다리며
+// 멈추지 않게 하기 위해서다.
+public class ConsentFixture
+{
+    public readonly List<string> Log = new();
+    public readonly FakePolicyPrompt Prompt;
+    public readonly FakePolicyStorage Storage = new();
+    public readonly FakeUmpConsent Ump;
+    public readonly FakeTrackingAuthorization Tracking;
+    public readonly FakeAdDispatcher Dispatcher = new();
+    public readonly List<IConsentPrerequisite> Prerequisites = new();
+
+    public int PolicyVersion = 1;
+    public bool UseUmp = true;
+    public bool RequestTracking = true;
+    public float UpdateTimeout = 10f;
+    public UmpRequestOptions UmpRequest = new(UmpDebugGeography.Disabled, new List<string>(), false);
+    public PolicyAgreementContent Content = new("약관", "본문", "동의", "이용약관", "https://t", "개인정보처리방침", "https://p");
+
+    public ConsentFixture()
+    {
+        Prompt = new FakePolicyPrompt(Log);
+        Ump = new FakeUmpConsent(Log);
+        Tracking = new FakeTrackingAuthorization(Log) { IsSupported = false };
+    }
+
+    public ConsentServiceOptions Options =>
+        new(PolicyVersion, Content, UseUmp, UmpRequest, RequestTracking, UpdateTimeout);
+
+    public ConsentService Build() =>
+        new(Options, Prompt, Storage, Ump, Tracking, Dispatcher, Prerequisites);
+}
