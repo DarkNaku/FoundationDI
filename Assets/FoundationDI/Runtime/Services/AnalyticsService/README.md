@@ -420,7 +420,7 @@ SDK에게 맡기고 개발자에게만 알립니다. Firebase가 규칙 위반 �
 | `Android App Token` / `iOS App Token` | 대시보드의 앱 토큰. **Adjust에서 Android와 iOS는 서로 다른 앱**이라 토큰도 다르다. 현재 빌드 타깃의 것이 쓰인다 |
 | `Environment` | `Sandbox`는 테스트 콘솔로만 흘러가고 어트리뷰션에 집계되지 않는다. 출시 빌드는 `Production` |
 | `Force Sandbox In Development Build` | 켜면 Development Build에서 위 설정과 무관하게 `Sandbox`로 강제한다. `Production`인 채로 테스트해 실데이터를 오염시키는 사고를 막는다 |
-| `Delay First Session` | 첫 세션(=인스톨) 전송을 버퍼 flush가 끝날 때까지 보류한다. **A/B 그룹·설치 버전·유저 ID를 인스톨 레코드에 실으려면 켠다**(8.4절) |
+| `Delay First Session` | **0.12부터 무시된다 — 항상 켜진다.** 첫 세션(=인스톨) 전송을 버퍼 flush(동의 게이트가 있으면 처음 허용된 직후)까지 보류한다(8.4절) |
 | `Log Level` / `Send In Background` | SDK 로그 레벨, 백그라운드 전송 여부 |
 | `Event Tokens` | **이름 → 토큰** 매핑표. 게임 코드는 Firebase에 보내던 이름 그대로 `LogEvent`를 부른다 |
 | `Purchase Event Token` | `LogPurchase`가 쓸 토큰. 비우면 구매를 Adjust로 보내지 않는다 |
@@ -437,7 +437,7 @@ SDK에게 맡기고 개발자에게만 알립니다. Firebase가 규칙 위반 �
 | `LogAdImpression` | `Adjust.TrackAdRevenue`. 토큰이 필요 없는 전용 API다 |
 | `SetUserId` / `SetUserProperty` | `Adjust.AddGlobalCallbackParameter` (빈 값이면 `Remove~`) |
 | `SetCollectionEnabled` | `Adjust.Enable()` / `Adjust.Disable()` |
-| (버퍼 flush 완료) | `Delay First Session`이 켜져 있으면 `Adjust.EndFirstSessionDelay()`. `IAnalyticsFlushHook`으로 통보받는다(8.4절) |
+| (버퍼 flush 완료) | `Adjust.EndFirstSessionDelay()`. `IAnalyticsFlushHook`으로 통보받는다(8.4절) |
 
 **이름이 아니라 토큰인 것이 이 어댑터의 전부입니다.** `Adjust.TrackEvent`는 대시보드가 발급한
 토큰만 받으므로 "이름을 그냥 보낸다"는 선택지가 없습니다. 표에 없는 이름은 **전송하지 않고
@@ -472,13 +472,14 @@ SDK에게 맡기고 개발자에게만 알립니다. Firebase가 규칙 위반 �
 "유입 코호트"를 나누는 값이 정작 **인스톨 레코드에만 빠집니다.** 두 번째 세션부터는 정상이라
 대시보드를 보다가 늦게 발견하기 쉽습니다.
 
-`Delay First Session`을 켜면:
+0.12부터 첫 세션 지연은 항상 켜집니다(동의 전에 인스톨 세션이 나가지 않게 하려는 이유도 있습니다 — ConsentService README 6.2):
 
 1. `InitializeAsync`가 `AdjustConfig.IsFirstSessionDelayEnabled = true`로 `InitSdk`를 부릅니다.
    SDK는 첫 세션을 보내지 않고 들고 있습니다.
 2. 코어가 버퍼된 유저 상태 → 이벤트를 flush합니다. 전역 콜백 파라미터가 이 사이에 다 붙습니다.
 3. flush가 끝나면 `OnBufferedStateFlushed()`에서 `Adjust.EndFirstSessionDelay()`를 부릅니다.
-   첫 세션이 파라미터를 달고 나갑니다.
+   첫 세션이 파라미터를 달고 나갑니다. 동의 게이트가 켜져 있으면 이 단계는 **처음 허용된 직후**이고,
+   그 전에 DMA 동의 번역(`ApplyConsent`)이 먼저 갑니다. 거부·판정 전이면 첫 세션은 계속 보류됩니다.
 
 ```csharp
 // 순서가 전부다. Initialize 앞에 넣은 값만 인스톨에 실린다.

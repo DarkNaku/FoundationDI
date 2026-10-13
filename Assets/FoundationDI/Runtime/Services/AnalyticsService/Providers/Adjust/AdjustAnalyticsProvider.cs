@@ -70,13 +70,14 @@ namespace DarkNaku.FoundationDI
                 IsSendingInBackgroundEnabled = _settings.SendInBackground,
             };
 
-            if (_settings.DelayFirstSession)
-            {
-                // 이 플래그를 켜면 누군가 EndFirstSessionDelay를 부를 때까지 SDK가 첫 세션을
-                // 보내지 않는다. 우리 쪽 해제 지점은 OnBufferedStateFlushed 하나뿐이다.
-                config.IsFirstSessionDelayEnabled = true;
-                _firstSessionDelayed = true;
-            }
+            // 첫 세션 지연을 항상 켠다(0.12). 켜 두면 누군가 EndFirstSessionDelay를 부를 때까지 SDK가 첫
+            // 세션(인스톨)을 보내지 않는다. 해제 지점은 코어의 flush 훅(OnBufferedStateFlushed) 하나다 —
+            // 동의 게이트가 없으면 초기화 직후, 있으면 처음 허용된 직후라 어느 쪽이든 안전하다.
+            // 끄면 동의 게이트가 켜져 있어도 약관 창이 떠 있는 동안 인스톨 세션이 나가고, EEA에서 거부할
+            // 사용자도 집계된다(Disable은 동의 판정 뒤에야 불린다). 그래서 설정의 Delay First Session은
+            // 더 이상 끄는 스위치가 아니다.
+            config.IsFirstSessionDelayEnabled = true;
+            _firstSessionDelayed = true;
 
             Adjust.InitSdk(config);
 

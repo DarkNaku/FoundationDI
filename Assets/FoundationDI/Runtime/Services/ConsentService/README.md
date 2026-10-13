@@ -180,8 +180,9 @@ builder.RegisterConsentService(_consentServiceSettings, prompt: new MyPolicyProm
 - 빌드 후처리가 Firebase 자동 수집을 기본으로 꺼 둡니다(`firebase_analytics_collection_enabled=false`).
   동의 후 AnalyticsService가 켭니다. 이게 없으면 약관 수락 전에도 `first_open` 등이 나갑니다.
 - **Adjust는 TCF를 읽지 않습니다.** 어댑터가 동의를 Google DMA 신호(`google_dma` eea / ad_user_data /
-  ad_personalization)로 번역해 보냅니다. 인스톨 레코드에 실리려면 Adjust 설정의 **Delay First Session**을 켜
-  두세요 — 코어가 번역을 첫 세션 지연 해제보다 먼저 부릅니다. 매핑(P1·P7 → ad_user_data, P3·P4 →
+  ad_personalization)로 번역해 보냅니다. 어댑터는 첫 세션 지연을 **항상** 켜므로(0.12) 약관 창이 떠 있거나
+  판정 전인 동안 인스톨 세션이 나가지 않고, 코어가 번역을 첫 세션 지연 해제보다 먼저 부르므로 DMA 값이
+  인스톨 레코드에 실립니다. 매핑(P1·P7 → ad_user_data, P3·P4 →
   ad_personalization)은 Google의 TCF 매핑을 따른 이 패키지의 해석입니다.
 
 ## 7. iOS 추적 권한(ATT)
