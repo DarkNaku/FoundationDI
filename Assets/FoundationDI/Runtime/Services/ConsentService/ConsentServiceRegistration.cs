@@ -34,7 +34,7 @@ namespace DarkNaku.FoundationDI
                 // 선행 작업(분석 SDK 초기화 등)은 해석 시점에 모은다. 등록 순서와 무관하게 잡힌다.
                 var prerequisites = new List<IConsentPrerequisite>(container.All<IConsentPrerequisite>());
 
-                var ump = settings.UseUmp ? (IUmpConsent)new UnsupportedUmpConsent() : new UnsupportedUmpConsent();
+                var ump = settings.UseUmp ? UmpConsentFactory.Create(dispatcher) : new UnsupportedUmpConsent();
                 var tracking = TrackingAuthorizationRegistry.Create(dispatcher);
                 var resolvedPrompt = prompt ?? new DefaultPolicyAgreementPrompt(settings.PromptPrefab, new UnityUrlOpener());
 
