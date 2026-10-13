@@ -146,3 +146,20 @@ public class FakeAnalyticsProviderSettings : AnalyticsProviderSettings
 public class OtherAnalyticsProviderSettings : AnalyticsProviderSettings
 {
 }
+
+// 동의를 SDK 신호로 번역하는 provider(Adjust 같은). 번역이 flush 훅보다 먼저 와야 한다 —
+// Adjust는 DMA 값을 첫 세션 지연을 풀기 전에 받아야 인스톨 레코드에 실린다.
+public class FakeConsentAwareAnalyticsProvider : FakeFlushHookAnalyticsProvider, IAnalyticsConsentAware
+{
+    public FakeConsentAwareAnalyticsProvider(string name = "ConsentAware") : base(name)
+    {
+    }
+
+    public readonly List<ConsentResult> AppliedConsents = new();
+
+    public void ApplyConsent(ConsentResult result)
+    {
+        AppliedConsents.Add(result);
+        Calls.Add($"ApplyConsent:{result.AnalyticsConsent}");
+    }
+}

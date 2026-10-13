@@ -35,20 +35,37 @@ namespace DarkNaku.FoundationDI
         private bool _collectionEnabled;
         private bool _disposed;
 
-        public AnalyticsService(IReadOnlyList<IAnalyticsProvider> providers, AnalyticsServiceOptions options)
+        // null이면 0.11과 같다(동의를 기다리지 않는다).
+        private readonly IConsentService _consent;
+
+        // 동의 게이트. 동의 서비스가 없으면 처음부터 Granted다.
+        private AnalyticsConsent _gate;
+
+        // IAnalyticsFlushHook은 처음 허용될 때 한 번만 부른다(Adjust 첫 세션 지연 해제).
+        private bool _flushHookFired;
+
+        public AnalyticsService(IReadOnlyList<IAnalyticsProvider> providers, AnalyticsServiceOptions options,
+                                IConsentService consent = null)
         {
             _providers = providers == null
                 ? new List<IAnalyticsProvider>()
                 : new List<IAnalyticsProvider>(providers);
 
             _collectionEnabled = options.CollectionEnabledByDefault;
+            _consent = consent;
+            _gate = consent == null ? AnalyticsConsent.Granted : AnalyticsConsent.Unknown;
         }
 
         public bool IsInitialized { get; private set; }
 
-        // 수집이 꺼져 있으면 버퍼에도 넣지 않는다. 동의 전에 쌓아 뒀다가 동의 시점에
+        // 게임이 끈 수집과 동의 거부는 버퍼에도 넣지 않는다. 동의 전에 쌓아 뒀다가 거부 시점에
         // 소급 전송하는 것은 게이트를 두는 의미 자체를 없앤다.
-        private bool CanCollect => !_disposed && _collectionEnabled;
+        private bool CanCollect => !_disposed && _collectionEnabled && _gate != AnalyticsConsent.Denied;
+
+        // 버퍼에 쌓아야 하는가: 초기화 전이거나 동의가 아직 판정되지 않았다.
+        private bool ShouldBuffer => !IsInitialized || _gate == AnalyticsConsent.Unknown;
+
+        private bool EffectiveCollection => _collectionEnabled && _gate == AnalyticsConsent.Granted;
 
         // false면 모든 로깅이 호출 즉시 드롭되고, provider에도 SDK 레벨로 끄라고 알린다.
         // 후자가 없으면 게이트가 사실상 무력하다 — Firebase 같은 SDK는 우리가 LogEvent를
@@ -62,7 +79,7 @@ namespace DarkNaku.FoundationDI
                 if (_collectionEnabled == value) return;
 
                 _collectionEnabled = value;
-                Fanout(p => p.SetCollectionEnabled(value));
+                Fanout(p => p.SetCollectionEnabled(EffectiveCollection));
             }
         }
 
@@ -103,7 +120,7 @@ namespace DarkNaku.FoundationDI
         {
             if (!CanCollect) return;
 
-            if (!IsInitialized)
+            if (ShouldBuffer)
             {
                 _pendingUserId = userId;
                 _hasPendingUserId = true;
@@ -123,7 +140,7 @@ namespace DarkNaku.FoundationDI
                 return;
             }
 
-            if (!IsInitialized)
+            if (ShouldBuffer)
             {
                 _pendingProperties[name] = value;
                 return;
@@ -137,6 +154,8 @@ namespace DarkNaku.FoundationDI
             if (_disposed) return;
 
             _disposed = true;
+
+            if (_consent != null) _consent.ConsentChanged -= OnConsentChanged;
 
             foreach (var provider in _providers)
             {
@@ -189,8 +208,22 @@ namespace DarkNaku.FoundationDI
 
             if (succeeded)
             {
-                IsInitialized = true;
-                Flush();
+                if (_consent == null)
+                {
+                    IsInitialized = true;
+                    Flush();
+                }
+                else
+                {
+                    var result = await _consent.RequestAsync();
+
+                    if (!_disposed)
+                    {
+                        IsInitialized = true;
+                        _consent.ConsentChanged += OnConsentChanged;
+                        ApplyConsent(result);
+                    }
+                }
             }
 
             _initializing = false;
@@ -220,7 +253,7 @@ namespace DarkNaku.FoundationDI
         {
             if (!CanCollect) return;
 
-            if (!IsInitialized)
+            if (ShouldBuffer)
             {
                 _pendingEvents.Enqueue(action);
                 return;
@@ -233,7 +266,7 @@ namespace DarkNaku.FoundationDI
         // 이벤트가 나가야 하기 때문이다 — 순서가 뒤집히면 첫 이벤트들이 익명으로 집계된다.
         private void Flush()
         {
-            var enabled = _collectionEnabled;
+            var enabled = EffectiveCollection;
             Fanout(p => p.SetCollectionEnabled(enabled));
 
             if (_hasPendingUserId)
@@ -258,9 +291,46 @@ namespace DarkNaku.FoundationDI
                 Fanout(_pendingEvents.Dequeue());
             }
 
+            if (_flushHookFired) return;
+
+            _flushHookFired = true;
+
             // 반드시 마지막이다. Adjust 어댑터가 여기서 첫 세션 지연을 푸는데(IAnalyticsFlushHook),
             // 이 줄이 위로 올라가면 아직 전달되지 않은 파라미터가 첫 세션에서 빠진다.
             Fanout(p => (p as IAnalyticsFlushHook)?.OnBufferedStateFlushed());
+        }
+
+        private void OnConsentChanged()
+        {
+            if (_disposed || !IsInitialized) return;
+
+            ApplyConsent(_consent.Current);
+        }
+
+        // 번역(IAnalyticsConsentAware)을 먼저 하고 게이트를 적용한다. Adjust는 DMA 값을 첫 세션
+        // 지연을 풀기 전(flush 훅 전)에 받아야 한다.
+        private void ApplyConsent(ConsentResult result)
+        {
+            Fanout(p => (p as IAnalyticsConsentAware)?.ApplyConsent(result));
+
+            _gate = result.AnalyticsConsent;
+
+            switch (_gate)
+            {
+                case AnalyticsConsent.Granted:
+                    Flush();
+                    break;
+
+                case AnalyticsConsent.Denied:
+                    Fanout(p => p.SetCollectionEnabled(false));
+                    ClearPending();
+                    break;
+
+                default:
+                    // 판정 전: SDK 자동 수집은 막아 두고 버퍼는 쥐고 있는다.
+                    Fanout(p => p.SetCollectionEnabled(false));
+                    break;
+            }
         }
 
         private void ClearPending()
