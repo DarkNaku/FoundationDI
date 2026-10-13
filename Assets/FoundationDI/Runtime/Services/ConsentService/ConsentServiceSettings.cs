@@ -19,6 +19,9 @@ namespace DarkNaku.FoundationDI
         [SerializeField] private string _privacyLabel = "개인정보처리방침";
         [SerializeField] private string _privacyUrl = "";
 
+        [Tooltip("약관 수락 창 프리팹. 루트에 PolicyAgreementView가 있어야 한다. 비우면 기본 프리팹을 쓴다.")]
+        [SerializeField] private PolicyAgreementView _promptPrefab;
+
         [Header("Google UMP")]
         [Tooltip("켜면 에디터가 UMP 네이티브 의존성 XML을 생성하고 런타임이 UMP 동의를 받는다. " +
                  "AdMob 콘솔의 '개인 정보 보호 및 메시지'에서 GDPR 메시지를 만들어 둬야 한다.")]
@@ -44,6 +47,7 @@ namespace DarkNaku.FoundationDI
         public bool UseUmp => _useUmp;
         public string AdMobAppIdAndroid => _adMobAppIdAndroid;
         public string AdMobAppIdIos => _adMobAppIdIos;
+        public PolicyAgreementView PromptPrefab => _promptPrefab;
 
         public ConsentServiceOptions ToOptions(bool isDebugBuild)
         {
@@ -58,5 +62,19 @@ namespace DarkNaku.FoundationDI
                                              _requestTrackingAuthorization,
                                              Mathf.Max(1f, _umpUpdateTimeoutSeconds));
         }
+
+#if UNITY_EDITOR
+        // 새 설정 에셋을 만들면 패키지 기본 프리팹으로 채운다. 런타임에서 Resources로 찾지 않기 위해서다.
+        private void Reset()
+        {
+            const string defaultPrefabPath =
+                "Packages/com.darknaku.foundationdi/Runtime/Services/ConsentService/Policy/PolicyAgreementView.prefab";
+            const string hostPrefabPath =
+                "Assets/FoundationDI/Runtime/Services/ConsentService/Policy/PolicyAgreementView.prefab";
+
+            _promptPrefab = UnityEditor.AssetDatabase.LoadAssetAtPath<PolicyAgreementView>(defaultPrefabPath)
+                            ?? UnityEditor.AssetDatabase.LoadAssetAtPath<PolicyAgreementView>(hostPrefabPath);
+        }
+#endif
     }
 }

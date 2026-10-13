@@ -3,7 +3,8 @@
     "rootNamespace": "",
     "references": [
         "FoundationDI",
-        "UnityEditor.UI"
+        "UnityEditor.UI",
+        "Unity.TextMeshPro"
     ],
     "includePlatforms": [
         "Editor"

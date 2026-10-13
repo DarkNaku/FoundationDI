@@ -36,8 +36,9 @@ namespace DarkNaku.FoundationDI
 
                 var ump = settings.UseUmp ? (IUmpConsent)new UnsupportedUmpConsent() : new UnsupportedUmpConsent();
                 var tracking = TrackingAuthorizationRegistry.Create(dispatcher);
+                var resolvedPrompt = prompt ?? new DefaultPolicyAgreementPrompt(settings.PromptPrefab, new UnityUrlOpener());
 
-                return new ConsentService(settings.ToOptions(Debug.isDebugBuild), prompt, storage, ump,
+                return new ConsentService(settings.ToOptions(Debug.isDebugBuild), resolvedPrompt, storage, ump,
                                           tracking, dispatcher, prerequisites);
             }, Lifetime.Singleton, Resolution.Lazy);
         }
