@@ -23,7 +23,7 @@ namespace DarkNaku.FoundationDI
     // 스레드: Adjust의 정적 API는 내부에서 네이티브 브리지로 넘기고 콜백만 비동기로 돌려준다.
     // 우리는 콜백을 구독하지 않으므로 추가 마샬링이 필요 없다 — IAnalyticsProvider의 모든
     // 메서드는 AnalyticsService가 메인 스레드에서만 부른다.
-    public sealed class AdjustAnalyticsProvider : IAnalyticsProvider, IAnalyticsFlushHook
+    public sealed class AdjustAnalyticsProvider : IAnalyticsProvider, IAnalyticsFlushHook, IAnalyticsConsentAware
     {
         private readonly AdjustAnalyticsSettings _settings;
         private readonly AdjustEventTokenMap _tokens;
@@ -191,6 +191,21 @@ namespace DarkNaku.FoundationDI
 
         // 코어가 버퍼된 유저 상태와 이벤트를 모두 내보낸 직후. 여기서 첫 세션을 풀어 주면
         // AddGlobalCallbackParameter로 붙인 파라미터가 전부 인스톨 레코드에 실린다.
+        // Adjust는 TCF를 읽지 않는다. EEA 유저에게 Google Ads를 쓰면 DMA 신호가 필수다.
+        // 코어가 이 메서드를 flush 훅(EndFirstSessionDelay)보다 먼저 부르므로 첫 세션(인스톨)에 실린다.
+        public void ApplyConsent(ConsentResult result)
+        {
+            if (!DmaConsentMapper.TryMap(result.Tcf, out var dma)) return;
+
+            var sharing = new AdjustThirdPartySharing(null);
+
+            sharing.AddGranularOption("google_dma", "eea", dma.Eea == true ? "1" : "0");
+            sharing.AddGranularOption("google_dma", "ad_personalization", dma.AdPersonalization ? "1" : "0");
+            sharing.AddGranularOption("google_dma", "ad_user_data", dma.AdUserData ? "1" : "0");
+
+            Adjust.TrackThirdPartySharing(sharing);
+        }
+
         public void OnBufferedStateFlushed()
         {
             EndFirstSessionDelayIfDelayed();
