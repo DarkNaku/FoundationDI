@@ -49,6 +49,15 @@ namespace DarkNaku.FoundationDI
             _content = options.PolicyContent;
         }
 
+        // ConsentService를 등록하지 않은 프로젝트의 AdService 기본값. 0.11까지의 동작(광고 초기화 앞에서
+        // ATT만 묻는다)을 그대로 유지한다 — 약관 단계(버전 0)와 UMP를 쓰지 않는다.
+        public static ConsentService CreateTrackingOnly(IMainThreadDispatcher dispatcher, ITrackingAuthorization tracking)
+        {
+            var options = new ConsentServiceOptions(0, default, false, default, true);
+
+            return new ConsentService(options, null, null, new UnsupportedUmpConsent(), tracking, dispatcher);
+        }
+
         public ITrackingAuthorization TrackingAuthorization => _tracking;
 
         public bool IsPolicyAccepted =>
