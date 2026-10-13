@@ -66,4 +66,25 @@ public class AnalyticsProviderInitializerTest
         Assert.IsTrue(await sut.InitializeAsync());
         Assert.AreEqual(2, provider.InitializeCount);
     });
+
+    [Test]
+    public void 분석_등록이_provider_초기화를_동의_선행_작업으로_노출한다()
+    {
+        var settings = ScriptableObject.CreateInstance<AnalyticsServiceSettings>();
+
+        try
+        {
+            var builder = new Reflex.Core.ContainerBuilder();
+
+            builder.RegisterAnalyticsService(settings);
+
+            // 광고가 먼저 동의를 요청해도 ConsentService가 이 바인딩으로 분석 SDK 초기화를 먼저 기다린다.
+            Assert.IsTrue(builder.HasBinding(typeof(IConsentPrerequisite)));
+            Assert.IsTrue(builder.HasBinding(typeof(AnalyticsProviderInitializer)));
+        }
+        finally
+        {
+            Object.DestroyImmediate(settings);
+        }
+    }
 }
