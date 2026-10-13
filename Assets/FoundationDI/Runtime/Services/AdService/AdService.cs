@@ -18,16 +18,10 @@ namespace DarkNaku.FoundationDI
         public float InterstitialCooldownSeconds { get; }
         public bool AutoLoadOnInitialize { get; }
 
-        // 초기화 앞에서 iOS ATT 다이얼로그를 띄울지. 끄면 게임이 원하는 시점에
-        // IAdService.TrackingAuthorization.RequestAsync()로 직접 묻는다(사전 안내 화면을
-        // 먼저 보여주고 싶은 경우). iOS 실기가 아니면 켜 두어도 아무 일도 하지 않는다.
-        public bool RequestTrackingAuthorization { get; }
-
         public AdServiceOptions(AdUnitId banner, AdUnitId interstitial, AdUnitId rewarded,
                                 BannerOptions bannerOptions, AdProviderContext providerContext,
                                 AdRetryPolicy retryPolicy, int rewardGraceFrames,
-                                float interstitialCooldownSeconds, bool autoLoadOnInitialize,
-                                bool requestTrackingAuthorization = true)
+                                float interstitialCooldownSeconds, bool autoLoadOnInitialize)
         {
             Banner = banner;
             Interstitial = interstitial;
@@ -38,7 +32,6 @@ namespace DarkNaku.FoundationDI
             RewardGraceFrames = rewardGraceFrames;
             InterstitialCooldownSeconds = interstitialCooldownSeconds;
             AutoLoadOnInitialize = autoLoadOnInitialize;
-            RequestTrackingAuthorization = requestTrackingAuthorization;
         }
     }
 
@@ -48,7 +41,7 @@ namespace DarkNaku.FoundationDI
         private readonly IAdDispatcher _dispatcher;
         private readonly AdServiceOptions _options;
         private readonly IAdRemovalStorage _removalStorage;
-        private readonly ITrackingAuthorization _tracking;
+        private readonly IConsentService _consent;
 
         private FullScreenAdUnit _interstitial;
         private FullScreenAdUnit _rewarded;
@@ -71,25 +64,21 @@ namespace DarkNaku.FoundationDI
         public event Action<AdImpression> Paid;
         public event Action<bool> AdsRemovedChanged;
 
-        // tracking은 선택 인자다. 넘기지 않으면 "물어볼 수 없는 플랫폼"으로 취급해
-        // 초기화 경로가 그대로 동작한다 — 기존 호출부와 테스트를 깨지 않기 위해서다.
+        // consent는 선택 인자다. 넘기지 않으면 약관·UMP 없이 ATT만 묻는(실기 iOS가 아니면 아무것도
+        // 하지 않는) 기본 동의로 동작한다 — 0.11까지의 호출부와 테스트를 깨지 않기 위해서다.
         public AdService(IAdProvider provider, IAdDispatcher dispatcher,
                          AdServiceOptions options, IAdRemovalStorage removalStorage,
-                         ITrackingAuthorization tracking = null)
+                         IConsentService consent = null)
         {
             _provider = provider;
             _dispatcher = dispatcher;
             _options = options;
             _removalStorage = removalStorage;
-            _tracking = tracking ?? new UnsupportedTrackingAuthorization();
+            _consent = consent ?? ConsentService.CreateTrackingOnly(dispatcher, new UnsupportedTrackingAuthorization());
             _adsRemoved = removalStorage?.Load() ?? false;
         }
 
         public bool IsInitialized { get; private set; }
-
-        public IAdConsent Consent => _provider.Consent;
-
-        public ITrackingAuthorization TrackingAuthorization => _tracking;
 
         // InitializeAsync가 성공하기 전에는 null이다. provider가 초기화되기 전에는
         // 어댑터를 만들 수 없기 때문이다. 게임 코드는 초기화를 먼저 await 해야 한다.
@@ -117,19 +106,24 @@ namespace DarkNaku.FoundationDI
 
             try
             {
-                // provider보다 먼저 묻는다. 광고 SDK는 초기화 시점의 ATT 상태를 보고
-                // IDFA 사용 여부와 타게팅 가능 여부를 결정하므로, 뒤에 물으면 그 세션의
-                // 첫 요청들이 동의를 받고도 비타게팅으로 나간다.
-                await RequestTrackingAuthorizationAsync();
+                // provider보다 먼저 동의를 받는다. 광고 SDK는 초기화 시점의 TCF·ATT 상태로
+                // 개인화 여부를 정하므로, 뒤에 받으면 그 세션의 첫 요청들이 잘못된 상태로 나간다.
+                var consent = await _consent.RequestAsync();
 
                 // 다이얼로그가 떠 있는 동안 씬이 언로드돼 서비스가 정리됐을 수 있다.
                 if (_isDisposed) return false;
 
-                // RequestAsync의 반환값이 아니라 Status를 다시 읽는다. 요청을 건너뛴 경로
-                // (RequestTrackingAuthorization = false, 이미 답한 상태, 물을 수 없는 플랫폼)
-                // 에서도 현재 상태를 provider에 실어야 하기 때문이다 — 반환값을 쓰면 그 세
-                // 경로가 전부 NotDetermined로 뭉개진다.
-                var context = _options.ProviderContext.WithTrackingStatus(_tracking.Status);
+                if (!consent.PolicyAccepted || !consent.CanRequestAds)
+                {
+                    // Google 지침: canRequestAds가 false면 광고를 요청하지 않는다. 게임이 다시
+                    // InitializeAsync를 부르면 동의 재판정부터 다시 시도한다.
+                    Debug.LogWarning($"[AdService] 광고를 요청할 수 없다({consent}). provider를 초기화하지 않는다.");
+                    return false;
+                }
+
+                // 결과의 추적 상태는 "요청을 건너뛴 경로"(게임이 직접 묻는 모드, 이미 답한 상태,
+                // 물을 수 없는 플랫폼)에서도 현재 상태를 담는다 — ConsentService가 매번 다시 읽는다.
+                var context = _options.ProviderContext.WithTrackingStatus(consent.TrackingStatus);
 
                 ok = await _provider.InitializeAsync(context);
 
@@ -155,29 +149,6 @@ namespace DarkNaku.FoundationDI
                 // 실패 경로에서도 진행 플래그를 반드시 내려야 다음 재시도가 다시 시도될 수 있다.
                 _initializing = false;
                 CompleteWaiters(ok);
-            }
-        }
-
-        private async Awaitable RequestTrackingAuthorizationAsync()
-        {
-            if (!_options.RequestTrackingAuthorization) return;
-            if (!_tracking.IsSupported) return;
-
-            // 이미 답을 받았으면 다시 묻지 않는다. iOS는 두 번째 요청에 다이얼로그를
-            // 띄우지 않고 기존 상태를 그대로 돌려주므로 왕복만 낭비된다.
-            if (_tracking.Status != TrackingAuthorizationStatus.NotDetermined) return;
-
-            try
-            {
-                var status = await _tracking.RequestAsync();
-
-                Debug.Log($"[AdService] ATT 추적 권한: {status}");
-            }
-            catch (Exception e)
-            {
-                // 권한 요청이 깨져도 광고는 초기화되어야 한다. 비타게팅 광고는 여전히
-                // 나가고, 여기서 던지면 그마저 잃는다.
-                Debug.LogWarning($"[AdService] ATT 권한 요청 중 예외가 났다. 초기화를 계속한다: {e}");
             }
         }
 

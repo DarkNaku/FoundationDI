@@ -46,7 +46,7 @@ namespace DarkNaku.FoundationDI
         // 안드로이드 광고가 통째로 비개인화로 떨어져 수익이 이유 없이 죽는다.
         //
         // iOS에서 "아직 안 물었다"가 provider까지 도달하는 경로는
-        // AdServiceOptions.RequestTrackingAuthorization = false뿐이고, 그건 게임이 직접 묻겠다고
+        // ConsentServiceSettings의 Request Tracking Authorization을 끈 경우뿐이고, 그건 게임이 직접 묻겠다고
         // 선언한 경우라 판단 주체가 게임이다.
         public bool IsTrackingRestricted =>
             TrackingStatus == TrackingAuthorizationStatus.Denied ||
@@ -74,7 +74,6 @@ namespace DarkNaku.FoundationDI
     {
         string Name { get; }
         Awaitable<bool> InitializeAsync(AdProviderContext context);
-        IAdConsent Consent { get; }
 
         IFullScreenAdapter CreateInterstitial(string adUnitId);
         IFullScreenAdapter CreateRewarded(string adUnitId);

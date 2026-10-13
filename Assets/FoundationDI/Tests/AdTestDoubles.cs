@@ -144,8 +144,6 @@ public class FakeAdProvider : IAdProvider
     public readonly FakeFullScreenAdapter RewardedAdapter = new();
     public readonly FakeBannerAdapter BannerAdapter = new();
 
-    public IAdConsent Consent { get; } = new NoopAdConsent();
-
     // 재진입(동시 InitializeAsync) 테스트용. true면 InitializeAsync가 즉시 완료되지 않고
     // CompleteInitialize 호출을 기다린다. Awaitable은 단일 사용이므로 대기 중인 호출자마다
     // completion source를 만들어 리스트에 쌓고, CompleteInitialize가 한 번에 전부 깨운다.

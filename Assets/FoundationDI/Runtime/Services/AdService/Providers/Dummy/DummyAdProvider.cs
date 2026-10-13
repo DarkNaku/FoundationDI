@@ -16,7 +16,6 @@ namespace DarkNaku.FoundationDI
         private bool _isDisposed;
 
         public string Name => "Dummy";
-        public IAdConsent Consent { get; } = new NoopAdConsent();
 
         // 이 provider에는 provider-전역 임프레션 경로가 없다 — 더미 임프레션은 전부
         // 어댑터별 Paid로 온다. 여기서 진짜로 전달하면 AdService.BuildAdUnits가 어댑터 Paid와

@@ -52,17 +52,14 @@ namespace DarkNaku.FoundationDI
         // 이 문자열이 AdImpression.AdPlatform으로 나가 Firebase의 ad_platform이 된다.
         public string Name => "LevelPlay";
 
-        // IAdConsent는 여전히 no-op이다. 이 인터페이스가 요구하는 것은 "동의 폼을 띄우고
-        // CanRequestAds를 갱신하는" CMP 수준의 계약인데, LevelPlay가 제공하는 것은 이미 받은
-        // 동의 값을 SDK에 통보하는 세터뿐이라 폼을 띄우는 주체(UMP/CMP)가 따로 필요하다.
-        // 억지로 매핑하면 "RequestAsync를 불렀는데 아무 폼도 안 뜨고 true가 온다"가 된다.
+        // GDPR 동의 폼은 이 provider가 띄우지 않는다. ConsentService(UMP)가 LevelPlay.Init 전에
+        // 받고, LevelPlay와 미디에이션 네트워크가 UMP가 쓴 TCF·AC 문자열을 직접 읽는다.
         //
-        // **ATT는 이 축이 아니다.** 폼을 OS가 대신 띄워 주므로 세터만 있으면 충분하고,
-        // 실제로 ApplyPrivacy가 LevelPlayPrivacySettings로 통보한다. 예전에는 이 주석이
+        // **ATT는 다른 축이다.** 폼을 OS가 대신 띄워 주므로 세터만 있으면 충분하고,
+        // 실제로 ApplyPrivacy가 LevelPlayPrivacySettings로 통보한다. 예전에는 동의 축 주석이
         // "LevelPlay의 동의 플로우는 범위 밖"이라며 두 축을 함께 버렸고, 그 결과 ATT를
         // 거부해도 미디에이션 네트워크들이 동의받은 상태로 돌아 App Store 5.1.1(iv)로
         // 리젝됐다(2026-09-18, InfiniteSteps 1.1.7).
-        public IAdConsent Consent { get; } = new NoopAdConsent();
 
         // provider 전역 임프레션 경로. IAdProvider의 주석은 이 이벤트의 존재 이유로 LevelPlay를
         // 지목하지만("임프레션 데이터가 광고 객체가 아니라 SDK 전역 이벤트 하나로 온다"),
@@ -214,7 +211,7 @@ namespace DarkNaku.FoundationDI
             // 제한 방향으로만 통보한다. 허용일 때 SetGDPRConsent(true)를 부르지 않는 이유는,
             // ATT 허용이 "Apple의 크로스-앱 추적 동의"이지 "GDPR 개인정보 처리 동의"가
             // 아니기 때문이다. 둘은 법적으로 다른 동의이고, 받지 않은 동의를 SDK에 긍정하면
-            // 그쪽이 더 큰 문제가 된다. GDPR 동의는 UMP/CMP가 받아 IAdConsent 축으로 흘린다.
+            // 그쪽이 더 큰 문제가 된다. GDPR 동의는 ConsentService(UMP)가 받고, LevelPlay가 TCF·AC 문자열을 직접 읽는다.
             if (!context.IsTrackingRestricted) return;
 
             // GDPR 동의 거부. 유럽 밖에서도 대부분의 어댑터가 이 플래그를 개인화 스위치로 읽는다.

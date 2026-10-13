@@ -1,6 +1,7 @@
 using DarkNaku.FoundationDI;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.TestTools;
 using Reflex.Core;
 using Reflex.Enums;
 using Resolution = Reflex.Enums.Resolution;
@@ -29,6 +30,8 @@ public class AdServiceRegistrationTest
                                  Lifetime.Singleton, Resolution.Lazy);
 
             var container = builder.Build();
+
+            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("IConsentService가 등록되지 않았다"));
 
             var service = container.Resolve<IAdService>();
 
