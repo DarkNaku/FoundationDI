@@ -255,7 +255,32 @@ namespace DarkNaku.FoundationDI
             return await source.Awaitable;
         }
 
-        private Awaitable RunTrackingAsync() => Completed();
+        private async Awaitable RunTrackingAsync()
+        {
+            // 재판정(RequestAsync 재호출)은 UMP만 다시 한다. ATT는 iOS가 한 번만 띄우므로
+            // 다시 물어도 왕복만 낭비되고, 무시된 경우의 재요청은 AttTrackingAuthorization이 이미 한다.
+            if (_trackingAsked) return;
+
+            _trackingAsked = true;
+
+            if (!_options.RequestTrackingAuthorization) return;
+            if (!_tracking.IsSupported) return;
+
+            // UMP의 IDFA 설명 메시지가 ATT를 이미 띄웠다면 여기서 걸러진다.
+            if (_tracking.Status != TrackingAuthorizationStatus.NotDetermined) return;
+
+            try
+            {
+                var status = await _tracking.RequestAsync();
+
+                Debug.Log($"[ConsentService] ATT 추적 권한: {status}");
+            }
+            catch (Exception e)
+            {
+                // 권한 요청이 깨져도 흐름은 끝나야 한다. 비타게팅 광고는 여전히 나간다.
+                Debug.LogWarning($"[ConsentService] ATT 권한 요청 중 예외가 났다. 계속 진행한다: {e}");
+            }
+        }
 
         private void Finish()
         {
