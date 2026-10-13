@@ -8,12 +8,8 @@ namespace DarkNaku.FoundationDI
     // 무엇을 무시할지는 각 어댑터(또는 MMP 대시보드)가 결정한다.
     public sealed class AnalyticsService : IAnalyticsService
     {
-        // 생성 시점에 받은 전부. 초기화에 실패한 provider도 여기 남는다 — 재시도의 대상이고,
-        // Dispose 대상이기도 하기 때문이다.
-        private readonly List<IAnalyticsProvider> _providers;
-
-        // 초기화에 성공해 실제로 팬아웃을 받는 provider들.
-        private readonly List<IAnalyticsProvider> _active = new();
+        // provider SDK 초기화와 활성 목록을 쥔다. ConsentService가 UMP 전에 같은 인스턴스를 기다린다.
+        private readonly AnalyticsProviderInitializer _initializer;
 
         // 초기화 전 이벤트. 순서가 의미를 가지므로 큐다. 상한을 두지 않는 이유:
         // 초기화는 보통 수 초 안에 끝나고 그 사이 이벤트는 기껏해야 수십 개다. 상한을 두면
@@ -46,11 +42,14 @@ namespace DarkNaku.FoundationDI
 
         public AnalyticsService(IReadOnlyList<IAnalyticsProvider> providers, AnalyticsServiceOptions options,
                                 IConsentService consent = null)
+            : this(new AnalyticsProviderInitializer(providers), options, consent)
         {
-            _providers = providers == null
-                ? new List<IAnalyticsProvider>()
-                : new List<IAnalyticsProvider>(providers);
+        }
 
+        public AnalyticsService(AnalyticsProviderInitializer initializer, AnalyticsServiceOptions options,
+                                IConsentService consent)
+        {
+            _initializer = initializer;
             _collectionEnabled = options.CollectionEnabledByDefault;
             _consent = consent;
             _gate = consent == null ? AnalyticsConsent.Granted : AnalyticsConsent.Unknown;
@@ -157,7 +156,7 @@ namespace DarkNaku.FoundationDI
 
             if (_consent != null) _consent.ConsentChanged -= OnConsentChanged;
 
-            foreach (var provider in _providers)
+            foreach (var provider in _initializer.Providers)
             {
                 try
                 {
@@ -169,8 +168,6 @@ namespace DarkNaku.FoundationDI
                 }
             }
 
-            _providers.Clear();
-            _active.Clear();
             ClearPending();
         }
 
@@ -179,32 +176,7 @@ namespace DarkNaku.FoundationDI
         // 다시 호출하면 그대로 재시도된다 — 네트워크 없이 앱을 켠 경우가 실제로 이 경로다.
         private async Awaitable<bool> RunInitializeAsync()
         {
-            _active.Clear();
-
-            foreach (var provider in _providers)
-            {
-                var ok = false;
-
-                try
-                {
-                    ok = await provider.InitializeAsync();
-                }
-                catch (Exception e)
-                {
-                    Debug.LogError($"[AnalyticsService] {provider.Name} 초기화 중 예외: {e}");
-                }
-
-                if (ok)
-                {
-                    _active.Add(provider);
-                }
-                else
-                {
-                    Debug.LogError($"[AnalyticsService] {provider.Name} 초기화에 실패했다. 팬아웃에서 제외한다.");
-                }
-            }
-
-            var succeeded = _active.Count > 0;
+            var succeeded = await _initializer.InitializeAsync();
 
             if (succeeded)
             {
@@ -345,9 +317,9 @@ namespace DarkNaku.FoundationDI
         // 분석은 게임 로직이 아니라 곁다리이므로, SDK 하나가 죽었다고 나머지까지 멎으면 안 된다.
         private void Fanout(Action<IAnalyticsProvider> action)
         {
-            for (var i = 0; i < _active.Count; i++)
+            for (var i = 0; i < _initializer.Active.Count; i++)
             {
-                var provider = _active[i];
+                var provider = _initializer.Active[i];
 
                 try
                 {
