@@ -76,9 +76,12 @@ namespace DarkNaku.FoundationDI
                 gdprApplies = prefs.Call<int>("getInt", "IABTCF_gdprApplies", 0) == 1;
             }
 
-            var purposes = prefs.Call<string>("getString", "IABTCF_PurposeConsents", null);
+            // 기본값으로 null을 넘기지 않는다. AndroidJNIHelper가 null 인자의 시그니처를 Object로 추론해
+            // getString(String, String) 조회가 실패할 수 있고, 그 예외는 SafeRead가 삼켜 TCF가 통째로
+            // 비게 된다 — 그러면 목적 1을 거부한 EEA 사용자가 Granted로 판정된다.
+            var purposes = prefs.Call<string>("getString", "IABTCF_PurposeConsents", string.Empty);
 
-            return new TcfSignals(gdprApplies, purposes);
+            return new TcfSignals(gdprApplies, string.IsNullOrEmpty(purposes) ? null : purposes);
         }
 
         public Awaitable<bool> UpdateAsync(UmpRequestOptions options)
