@@ -10,18 +10,18 @@ namespace DarkNaku.FoundationDI
     // 광고 네트워크를 쓰든 같은 것을 묻기 때문이다.
     public static class TrackingAuthorizationRegistry
     {
-        private static Func<IAdDispatcher, ITrackingAuthorization> _creator;
+        private static Func<IMainThreadDispatcher, ITrackingAuthorization> _creator;
 
         // 두 번 등록하면 조용히 교체한다. 도메인 리로드와 에디터의 반복적인
         // [RuntimeInitializeOnLoadMethod] 실행이 이 경로를 실제로 여러 번 태운다.
-        public static void Register(Func<IAdDispatcher, ITrackingAuthorization> creator)
+        public static void Register(Func<IMainThreadDispatcher, ITrackingAuthorization> creator)
         {
             _creator = creator;
         }
 
         // 등록된 것이 없으면 UnsupportedTrackingAuthorization으로 떨어진다. 호출자가
         // null을 신경 쓸 일이 없도록 절대 null을 돌려주지 않는다.
-        public static ITrackingAuthorization Create(IAdDispatcher dispatcher)
+        public static ITrackingAuthorization Create(IMainThreadDispatcher dispatcher)
         {
             var created = _creator?.Invoke(dispatcher);
 

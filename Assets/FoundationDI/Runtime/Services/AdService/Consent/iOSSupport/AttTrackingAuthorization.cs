@@ -56,7 +56,7 @@ namespace DarkNaku.FoundationDI
 
         internal static readonly float[] RetryDelaySeconds = { 1f, 2f, 4f };
 
-        private readonly IAdDispatcher _dispatcher;
+        private readonly IMainThreadDispatcher _dispatcher;
         private readonly IAttBinding _binding;
         private readonly IAppActivity _activity;
 
@@ -68,12 +68,12 @@ namespace DarkNaku.FoundationDI
         private int _requestCount;
         private int _resignCountAtRequest;
 
-        public AttTrackingAuthorization(IAdDispatcher dispatcher)
+        public AttTrackingAuthorization(IMainThreadDispatcher dispatcher)
             : this(dispatcher, new IosSupportAttBinding(), new NativeAppActivity())
         {
         }
 
-        internal AttTrackingAuthorization(IAdDispatcher dispatcher, IAttBinding binding, IAppActivity activity)
+        internal AttTrackingAuthorization(IMainThreadDispatcher dispatcher, IAttBinding binding, IAppActivity activity)
         {
             _dispatcher = dispatcher;
             _binding = binding;

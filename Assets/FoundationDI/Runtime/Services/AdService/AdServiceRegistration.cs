@@ -21,8 +21,7 @@ namespace DarkNaku.FoundationDI
             builder.RegisterValue(settings);
             builder.RegisterType(typeof(PlayerPrefsAdRemovalStorage), new[] { typeof(IAdRemovalStorage) },
                                  Lifetime.Singleton, Resolution.Lazy);
-            builder.RegisterType(typeof(UnityAdDispatcher), new[] { typeof(IAdDispatcher) },
-                                 Lifetime.Singleton, Resolution.Lazy);
+            builder.RegisterMainThreadDispatcher();
             builder.RegisterType(typeof(AdProviderFactory), new[] { typeof(IAdProviderFactory) },
                                  Lifetime.Singleton, Resolution.Lazy);
 
