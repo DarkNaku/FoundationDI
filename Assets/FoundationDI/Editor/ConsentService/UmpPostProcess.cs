@@ -22,7 +22,9 @@ namespace DarkNaku.FoundationDI.Editor
         {
             var settings = ConsentServiceSettingsLocator.FindAll().FirstOrDefault();
             var projectRoot = Directory.GetParent(unityLibraryPath).FullName;
-            var manifests = Directory.GetFiles(projectRoot, "AndroidManifest.xml", SearchOption.AllDirectories);
+            var manifests = Directory.GetFiles(projectRoot, "AndroidManifest.xml", SearchOption.AllDirectories)
+                                     .Where(UmpBuildRules.IsSourceManifest)
+                                     .ToArray();
             var target = Path.Combine(unityLibraryPath, "src", "main", "AndroidManifest.xml");
 
             if (!File.Exists(target)) return;

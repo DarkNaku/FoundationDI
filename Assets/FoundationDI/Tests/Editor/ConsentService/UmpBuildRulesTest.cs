@@ -37,4 +37,16 @@ public class UmpBuildRulesTest
         Assert.IsFalse(UmpBuildRules.ShouldDisableFirebaseCollection(true, false, false));
         Assert.IsFalse(UmpBuildRules.ShouldDisableFirebaseCollection(true, true, true));
     }
+
+    [TestCase("/proj/unityLibrary/src/main/AndroidManifest.xml", true)]
+    [TestCase("/proj/launcher/src/main/AndroidManifest.xml", true)]
+    [TestCase("/proj/unityLibrary/IronSourceAdapter.androidlib/AndroidManifest.xml", true)]
+    [TestCase("/proj/unityLibrary/build/intermediates/merged_manifest/release/AndroidManifest.xml", false)]
+    [TestCase("/proj/launcher/build/intermediates/packaged_manifests/AndroidManifest.xml", false)]
+    public void 앱_ID_검사는_소스_매니페스트만_본다(string path, bool expected)
+    {
+        // 이전 Gradle 내보내기의 build/ 산출물에 남은 앱 ID를 근거로 주입을 건너뛰면,
+        // 소스에서 ID가 빠졌을 때 빌드는 통과하고 앱이 실행 시점에 크래시한다.
+        Assert.AreEqual(expected, UmpBuildRules.IsSourceManifest(path));
+    }
 }
