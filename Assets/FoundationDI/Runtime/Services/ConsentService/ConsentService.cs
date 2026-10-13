@@ -168,9 +168,92 @@ namespace DarkNaku.FoundationDI
             }
         }
 
-        private Awaitable RunPrerequisitesAsync() => Completed();
+        private async Awaitable RunPrerequisitesAsync()
+        {
+            if (_prerequisitesDone) return;
 
-        private Awaitable RunUmpAsync() => Completed();
+            foreach (var prerequisite in _prerequisites)
+            {
+                try
+                {
+                    await prerequisite.PrepareAsync();
+                }
+                catch (Exception e)
+                {
+                    // Firebase 초기화가 실패했다고 동의 흐름을 멈추면 광고까지 죽는다.
+                    Debug.LogWarning($"[ConsentService] 선행 작업이 실패했다. UMP를 계속 진행한다: {e}");
+                }
+
+                if (_disposed) return;
+            }
+
+            _prerequisitesDone = true;
+        }
+
+        private async Awaitable RunUmpAsync()
+        {
+            if (!UsesUmp) return;
+
+            var updated = await UpdateWithTimeoutAsync();
+
+            if (_disposed || !updated) return;
+
+            try
+            {
+                await _ump.LoadAndShowIfRequiredAsync();
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[ConsentService] UMP 동의 폼 표시 중 예외가 났다. 계속 진행한다: {e}");
+            }
+        }
+
+        // 네트워크 단계에만 타임아웃을 건다. 늦게 도착한 결과는 버린다 — 캐시된 값으로 이미 진행했다.
+        private async Awaitable<bool> UpdateWithTimeoutAsync()
+        {
+            var source = new AwaitableCompletionSource<bool>();
+            var settled = false;
+            IDisposable timer = null;
+
+            void Settle(bool ok)
+            {
+                if (settled) return;
+
+                settled = true;
+                timer?.Dispose();
+                source.SetResult(ok);
+            }
+
+            async void Forward()
+            {
+                var ok = false;
+
+                try
+                {
+                    ok = await _ump.UpdateAsync(_options.UmpRequest);
+
+                    if (!ok) Debug.LogWarning("[ConsentService] UMP 동의 정보 갱신이 실패했다. 이전 값으로 진행한다.");
+                }
+                catch (Exception e)
+                {
+                    Debug.LogWarning($"[ConsentService] UMP 동의 정보 갱신 중 예외가 났다. 이전 값으로 진행한다: {e}");
+                }
+
+                Settle(ok);
+            }
+
+            timer = _dispatcher?.Delay(_options.UmpUpdateTimeoutSeconds, () =>
+            {
+                if (settled) return;
+
+                Debug.LogWarning($"[ConsentService] UMP 동의 정보 갱신이 {_options.UmpUpdateTimeoutSeconds}초 안에 끝나지 않았다. 이전 값으로 진행한다.");
+                Settle(false);
+            });
+
+            Forward();
+
+            return await source.Awaitable;
+        }
 
         private Awaitable RunTrackingAsync() => Completed();
 
