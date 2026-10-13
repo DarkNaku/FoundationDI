@@ -240,4 +240,61 @@ public class ConsentServiceRobustnessTest
 
         f.Ump.CompleteForm();   // 늦은 콜백이 예외를 내지 않는다
     });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator UMP_갱신이_실패하면_물러나며_다시_판정한다() => AwaitableTest.Run(async () =>
+    {
+        // 첫 실행 오프라인. 게임이 RequestAsync를 다시 부르지 않아도 판정이 나야 분석 버퍼가 풀리고
+        // 비 EEA 사용자의 광고가 세션 내내 죽지 않는다.
+        var f = Accepted();
+        f.Ump.UpdateResult = false;
+        f.Ump.Status = UmpConsentStatus.Unknown;
+        var sut = f.Build();
+        var changed = 0;
+        sut.ConsentChanged += () => changed++;
+
+        await sut.RequestAsync();
+        Assert.AreEqual(1, f.Ump.UpdateCount);
+
+        f.Dispatcher.Advance(ConsentService.RetryDelaySeconds[0]);
+        Assert.AreEqual(2, f.Ump.UpdateCount, "실패 뒤 다시 판정하지 않았다");
+
+        f.Ump.UpdateResult = true;
+        f.Ump.Status = UmpConsentStatus.NotRequired;
+        f.Dispatcher.Advance(ConsentService.RetryDelaySeconds[1]);
+
+        Assert.AreEqual(3, f.Ump.UpdateCount, "간격이 늘어난 두 번째 재시도가 없었다");
+        Assert.AreEqual(1, changed);
+        Assert.AreEqual(AnalyticsConsent.Granted, sut.Current.AnalyticsConsent);
+    });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 확정되면_더_이상_재판정하지_않는다() => AwaitableTest.Run(async () =>
+    {
+        var f = Accepted();
+        var sut = f.Build();
+
+        await sut.RequestAsync();
+        f.Dispatcher.Advance(3600f);
+
+        Assert.AreEqual(1, f.Ump.UpdateCount);
+    });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator Dispose하면_재판정을_멈춘다() => AwaitableTest.Run(async () =>
+    {
+        var f = Accepted();
+        f.Ump.UpdateResult = false;
+        f.Ump.Status = UmpConsentStatus.Unknown;
+        var sut = f.Build();
+
+        await sut.RequestAsync();
+        sut.Dispose();
+        f.Dispatcher.Advance(3600f);
+
+        Assert.AreEqual(1, f.Ump.UpdateCount);
+    });
 }

@@ -11,6 +11,11 @@ namespace DarkNaku.FoundationDI
     // 끝나고 광고·분석이 시작되지 않는다.
     public sealed class ConsentService : IConsentService
     {
+        // UMP 정보 갱신(네트워크)이 실패했을 때 스스로 다시 판정하는 간격. 마지막 값이 상한으로 반복된다.
+        // 첫 실행 오프라인이면 게임이 다시 부르지 않는 한 판정이 영원히 나지 않아, 분석 버퍼가 쌓이기만
+        // 하고 비 EEA 사용자의 광고도 세션 내내 죽는다.
+        internal static readonly float[] RetryDelaySeconds = { 30f, 60f, 120f, 300f };
+
         private readonly ConsentServiceOptions _options;
         private readonly IPolicyAgreementPrompt _prompt;
         private readonly IPolicyAgreementStorage _storage;
@@ -29,6 +34,12 @@ namespace DarkNaku.FoundationDI
         private bool _prerequisitesDone;
         private bool _trackingAsked;
         private bool _disposed;
+
+        // 마지막 UMP 정보 갱신이 실패했는가(네트워크). 이때만 스스로 재판정한다 — 폼에서 거부한 경우까지
+        // 재시도하면 게임 도중 폼이 반복해서 뜬다.
+        private bool _lastUpdateFailed;
+        private int _retryIndex;
+        private IDisposable _retry;
 
         public event Action ConsentChanged;
 
@@ -123,6 +134,9 @@ namespace DarkNaku.FoundationDI
 
             _disposed = true;
 
+            _retry?.Dispose();
+            _retry = null;
+
             try
             {
                 _prompt?.Close();
@@ -204,6 +218,8 @@ namespace DarkNaku.FoundationDI
             if (!UsesUmp) return;
 
             var updated = await UpdateWithTimeoutAsync();
+
+            _lastUpdateFailed = !updated;
 
             if (_disposed || !updated) return;
 
@@ -307,6 +323,33 @@ namespace DarkNaku.FoundationDI
             CompleteWaiters(_last);
 
             if (hadCompleted && !previous.Equals(_last)) ConsentChanged?.Invoke();
+
+            ScheduleRetryIfNeeded();
+        }
+
+        private void ScheduleRetryIfNeeded()
+        {
+            _retry?.Dispose();
+            _retry = null;
+
+            if (_disposed) return;
+
+            if (!_lastUpdateFailed || IsSettled(_last))
+            {
+                _retryIndex = 0;
+                return;
+            }
+
+            var delay = RetryDelaySeconds[Math.Min(_retryIndex, RetryDelaySeconds.Length - 1)];
+            _retryIndex++;
+
+            _retry = _dispatcher?.Delay(delay, () =>
+            {
+                _retry = null;
+
+                // 결과는 ConsentChanged로 전달된다(값이 바뀌었을 때).
+                if (!_disposed) RequestAsync();
+            });
         }
 
         private ConsentResult Snapshot()

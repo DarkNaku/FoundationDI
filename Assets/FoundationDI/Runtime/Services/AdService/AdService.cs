@@ -50,6 +50,9 @@ namespace DarkNaku.FoundationDI
         private bool _adsRemoved;
         private bool _isDisposed;
 
+        // 동의가 아직 광고를 허용하지 않아 초기화를 미뤘다. ConsentChanged로 허용되면 스스로 다시 초기화한다.
+        private bool _waitingForConsent;
+
         // 재진입 가드: InitializeAsync는 완료 전(IsInitialized가 아직 참이 되기 전)에
         // 두 번째로 불릴 수 있다(부트스트랩 시퀀스 + UI 화면이 같은 프레임에 각각 기다리는 등).
         // 진행 중 호출은 새 초기화를 시작하지 않고 이 리스트에 편승해 같은 결과를 받는다.
@@ -118,6 +121,7 @@ namespace DarkNaku.FoundationDI
                     // Google 지침: canRequestAds가 false면 광고를 요청하지 않는다. 게임이 다시
                     // InitializeAsync를 부르면 동의 재판정부터 다시 시도한다.
                     Debug.LogWarning($"[AdService] 광고를 요청할 수 없다({consent}). provider를 초기화하지 않는다.");
+                    WaitForConsent();
                     return false;
                 }
 
@@ -150,6 +154,28 @@ namespace DarkNaku.FoundationDI
                 _initializing = false;
                 CompleteWaiters(ok);
             }
+        }
+
+        // 오프라인 첫 실행 뒤 ConsentService가 재판정해 광고가 허용되면, 게임이 다시 부르지 않아도 초기화한다.
+        private void WaitForConsent()
+        {
+            if (_waitingForConsent) return;
+
+            _waitingForConsent = true;
+            _consent.ConsentChanged += OnConsentChanged;
+        }
+
+        private void OnConsentChanged()
+        {
+            if (_isDisposed || IsInitialized) return;
+
+            var consent = _consent.Current;
+
+            if (!consent.PolicyAccepted || !consent.CanRequestAds) return;
+
+            _waitingForConsent = false;
+            _consent.ConsentChanged -= OnConsentChanged;
+            InitializeAsync();
         }
 
         private void CompleteWaiters(bool result)
@@ -243,6 +269,7 @@ namespace DarkNaku.FoundationDI
             _isDisposed = true;
 
             if (_provider != null) _provider.ImpressionPaid -= OnPaid;
+            if (_waitingForConsent) _consent.ConsentChanged -= OnConsentChanged;
 
             _interstitial?.Dispose();
             _rewarded?.Dispose();

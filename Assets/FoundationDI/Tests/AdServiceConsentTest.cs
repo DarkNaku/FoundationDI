@@ -160,4 +160,38 @@ public class AdServiceConsentTest
         Assert.IsTrue(context.TestMode);
         Assert.AreSame(ids, context.TestDeviceIds);
     }
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 동의가_나중에_확정되면_스스로_다시_초기화한다() => AwaitableTest.Run(async () =>
+    {
+        var provider = new FakeAdProvider();
+        var consent = new FakeConsentService { Result = ConsentResults.Unknown() };
+        var sut = Create(provider, consent);
+
+        LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("광고를 요청할 수 없다"));
+        Assert.IsFalse(await sut.InitializeAsync());
+
+        consent.RaiseChanged(ConsentResults.Granted());
+
+        Assert.AreEqual(1, provider.InitializeCallCount, "오프라인 첫 실행 뒤 네트워크가 돌아와도 광고가 세션 내내 죽어 있다");
+        Assert.IsTrue(sut.IsInitialized);
+    });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator Dispose_뒤의_동의_변경은_무시한다() => AwaitableTest.Run(async () =>
+    {
+        var provider = new FakeAdProvider();
+        var consent = new FakeConsentService { Result = ConsentResults.Unknown() };
+        var sut = Create(provider, consent);
+
+        LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("광고를 요청할 수 없다"));
+        await sut.InitializeAsync();
+        sut.Dispose();
+
+        consent.RaiseChanged(ConsentResults.Granted());
+
+        Assert.AreEqual(0, provider.InitializeCallCount);
+    });
 }
