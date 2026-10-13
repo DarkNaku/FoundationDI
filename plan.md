@@ -1,29 +1,29 @@
 # plan.md
 
-## 진행 중: ConsentService (약관 + UMP + ATT) — 0.12.0
+## 완료: ConsentService (약관 + UMP + ATT) — 0.12.0
 
 상세 계획: `docs/superpowers/plans/2026-10-14-consent-service.md` (Task 0~19).
 각 Task의 테스트를 이 목록에 옮겨 적고 `/go` → `/green` → `/refactor` → `/commit`으로 진행한다.
 
-- [ ] Task 1 [STRUCTURAL] IMainThreadDispatcher 추출
-- [ ] Task 2 [STRUCTURAL] ATT를 ConsentService로 이동
-- [ ] Task 3 타입·저장소
-- [ ] Task 4 분석 동의 판정
-- [ ] Task 5 약관 단계
-- [ ] Task 6 UMP 단계·선행 작업
-- [ ] Task 7 ATT 단계
-- [ ] Task 8 견고성
-- [ ] Task 9 설정·등록
-- [ ] Task 10 AdService 연동
-- [ ] Task 11 AnalyticsService 동의 게이트
-- [ ] Task 12 분석 SDK 선행 초기화
-- [ ] Task 13 Adjust DMA 번역
-- [ ] Task 14 기본 약관 창 UI
-- [ ] Task 15 UMP Android 브리지
-- [ ] Task 16 UMP iOS 브리지·팩토리
-- [ ] Task 17 UMP 의존성 XML
-- [ ] Task 18 빌드 후처리
-- [ ] Task 19 문서·버전
+- [x] Task 1 [STRUCTURAL] IMainThreadDispatcher 추출
+- [x] Task 2 [STRUCTURAL] ATT를 ConsentService로 이동
+- [x] Task 3 타입·저장소
+- [x] Task 4 분석 동의 판정
+- [x] Task 5 약관 단계
+- [x] Task 6 UMP 단계·선행 작업
+- [x] Task 7 ATT 단계
+- [x] Task 8 견고성
+- [x] Task 9 설정·등록
+- [x] Task 10 AdService 연동
+- [x] Task 11 AnalyticsService 동의 게이트
+- [x] Task 12 분석 SDK 선행 초기화
+- [x] Task 13 Adjust DMA 번역
+- [x] Task 14 기본 약관 창 UI
+- [x] Task 15 UMP Android 브리지
+- [x] Task 16 UMP iOS 브리지·팩토리
+- [x] Task 17 UMP 의존성 XML
+- [x] Task 18 빌드 후처리
+- [x] Task 19 문서·버전
 
 ## 완료: iOS ATT 요청이 Inactive 구간에서 무시되는 문제를 고친다
 
