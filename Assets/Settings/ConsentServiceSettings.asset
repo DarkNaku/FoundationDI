@@ -1,0 +1,31 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4e8fd0f8ae1f64a1295e67255cb60c26, type: 3}
+  m_Name: ConsentServiceSettings
+  m_EditorClassIdentifier: FoundationDI::DarkNaku.FoundationDI.ConsentServiceSettings
+  _policyVersion: 1
+  _title: Terms of Service & Privacy Policy
+  _message: To start the game, please agree to our Terms of Service and Privacy Policy.
+  _acceptLabel: Agree and Start
+  _termsLabel: Terms of Service
+  _termsUrl: 
+  _privacyLabel: Privacy Policy
+  _privacyUrl: 
+  _promptPrefab: {fileID: 5360296936658932122, guid: 765cb45aa29c84067b0cd1c62add5d7d, type: 3}
+  _useUmp: 0
+  _adMobAppIdAndroid: 
+  _adMobAppIdIos: 
+  _debugGeography: 0
+  _testDeviceHashedIds: []
+  _tagForUnderAgeOfConsent: 0
+  _umpUpdateTimeoutSeconds: 10
+  _requestTrackingAuthorization: 1

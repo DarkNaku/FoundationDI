@@ -16,6 +16,9 @@ public class RootInstaller : MonoBehaviour, IInstaller
     // 인스펙터에서 Assets/Settings/AnalyticsServiceSettings.asset 을 연결한다.
     [SerializeField] private AnalyticsServiceSettings _analyticsServiceSettings;
 
+    // 인스펙터에서 Assets/Settings/ConsentServiceSettings.asset 을 연결한다.
+    [SerializeField] private ConsentServiceSettings _consentServiceSettings;
+
     public void InstallBindings(ContainerBuilder builder)
     {
         // 프리팹 로드는 Resources 백엔드 ResourceService에 위임한다.
@@ -32,6 +35,8 @@ public class RootInstaller : MonoBehaviour, IInstaller
 
         builder.RegisterHapticService();
         builder.RegisterInitializeService();
+        // 약관 → UMP → ATT. 광고·분석 초기화가 이 동의를 기다린다(등록 순서는 상관없다).
+        builder.RegisterConsentService(_consentServiceSettings);
         builder.RegisterAdService(_adServiceSettings);
         builder.RegisterAnalyticsService(_analyticsServiceSettings);
 #if FOUNDATIONDI_UNITYIAP

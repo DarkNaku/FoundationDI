@@ -7,16 +7,19 @@ namespace DarkNaku.FoundationDI
     public class ConsentServiceSettings : ScriptableObject
     {
         [Header("Policy (약관·개인정보처리방침)")]
+        // 기본 문구가 영어인 이유: 기본 프리팹은 TMP 기본 폰트(LiberationSans)를 쓰는데 한글·일본어 등
+        // CJK 글리프가 없어 네모로 깨진다. 다른 언어는 스킨 프리팹에 해당 폰트를 넣고 문구를 바꾸거나
+        // IConsentService.SetPolicyContent로 넘긴다.
         [Tooltip("약관을 바꾸면 올린다. 저장된 수락 버전보다 크면 다시 묻는다. 0이면 약관 단계를 쓰지 않는다.")]
         [SerializeField, Min(0)] private int _policyVersion = 1;
 
-        [SerializeField] private string _title = "이용약관 및 개인정보처리방침";
+        [SerializeField] private string _title = "Terms of Service & Privacy Policy";
         [SerializeField, TextArea(3, 8)] private string _message =
-            "게임을 시작하려면 이용약관과 개인정보처리방침에 동의해 주세요.";
-        [SerializeField] private string _acceptLabel = "동의하고 시작하기";
-        [SerializeField] private string _termsLabel = "이용약관";
+            "To start the game, please agree to our Terms of Service and Privacy Policy.";
+        [SerializeField] private string _acceptLabel = "Agree and Start";
+        [SerializeField] private string _termsLabel = "Terms of Service";
         [SerializeField] private string _termsUrl = "";
-        [SerializeField] private string _privacyLabel = "개인정보처리방침";
+        [SerializeField] private string _privacyLabel = "Privacy Policy";
         [SerializeField] private string _privacyUrl = "";
 
         [Tooltip("약관 수락 창 프리팹. 루트에 PolicyAgreementView가 있어야 한다. 비우면 기본 프리팹을 쓴다.")]
