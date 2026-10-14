@@ -27,10 +27,6 @@ namespace DarkNaku.FoundationDI
 
         public string Name => "AppLovin";
 
-        // MAX용 CMP/UMP 동의 플로우는 이번 범위 밖이다(작업 지시서의 "만들 파일" 목록에
-        // 없다) — Dummy provider와 동일하게 no-op seam을 그대로 노출한다.
-        public IAdConsent Consent { get; } = new NoopAdConsent();
-
         // provider 전역 임프레션 경로. MAX의 ILRD는 광고 객체(포맷) 단위 정적 이벤트로
         // 오므로(OnAdRevenuePaidEvent) 어댑터별 Paid만으로 전부 커버된다 — LevelPlay와
         // 달리 여기로 흘릴 임프레션이 없다. Dummy와 같은 이유로 no-op.

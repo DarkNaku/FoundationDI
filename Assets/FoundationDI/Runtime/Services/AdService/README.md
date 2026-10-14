@@ -362,8 +362,7 @@ LevelPlay의 전면·보상 임프레션도 `FullScreenAdUnit`이 정상적으�
    리로드·에디터 재실행이 이 경로를 여러 번 태운다). `AdProviderRegistry`는 심볼 유무와
    무관하게 항상 `FoundationDI`에 존재한다 — "심볼이 정의됐는데 아무도 등록하지 않은" 상태는
    `AdProviderFactory.Build`가 에러 로그와 함께 Dummy로 대체해 조용히 새지 않게 한다.
-7. 필요하면 `Consent/`에 provider별 동의 구현(`UmpAdConsent` 등)을 추가해 `IAdProvider.Consent`로 노출한다.
-8. **`IFullScreenAdapter.Load()`는 SDK 호출로 바로 이어져도 된다.** `FullScreenAdUnit`이
+7. **`IFullScreenAdapter.Load()`는 SDK 호출로 바로 이어져도 된다.** `FullScreenAdUnit`이
    이미 로드 진행 중 상태를 추적해 중복 호출을 걸러내므로, 어댑터 스스로 진행 중 로드를
    기억해 뒀다가 걸러내는 자체 로직을 둘 필요가 없다(예: `if (_isLoading) return;` 같은
    가드는 정책 계층의 일이지 어댑터의 일이 아니다).
@@ -380,153 +379,26 @@ LevelPlay의 전면·보상 임프레션도 `FullScreenAdUnit`이 정상적으�
 
 ---
 
-## 6. iOS 추적 권한(ATT)
+## 6. 동의(약관·UMP·ATT)
 
-iOS 14부터 IDFA를 읽으려면 App Tracking Transparency 동의가 필요합니다. 광고 SDK는 **초기화
-시점의 ATT 상태**를 보고 IDFA 사용 여부와 타게팅 가능 여부를 정하므로, 동의는 provider
-초기화보다 **먼저** 끝나 있어야 합니다. 뒤에 물으면 동의를 받고도 그 세션의 첫 요청들이
-비타게팅으로 나갑니다.
-
-그래서 `AdService.InitializeAsync`가 `_provider.InitializeAsync` 직전에 한 번 요청합니다.
-게임 코드가 따로 할 일은 없습니다.
+0.12부터 동의는 **ConsentService**가 맡습니다(`../ConsentService/README.md`). `InitializeAsync`는
+`IConsentService.RequestAsync()`를 먼저 기다리고, **`PolicyAccepted && CanRequestAds`일 때만** provider를
+초기화합니다. 아니면 경고를 남기고 `false`를 돌려주며, 다시 부르면 동의 재판정부터 재시도합니다.
 
 ```csharp
-await _ads.InitializeAsync();   // 이 안에서 ATT 다이얼로그 → provider 초기화 순으로 진행
+builder.RegisterConsentService(_consentServiceSettings);   // 약관 → UMP → ATT
+builder.RegisterAdService(_adServiceSettings);
+
+await _ads.InitializeAsync();   // 이 안에서 동의 → provider 초기화 순으로 진행
 ```
 
-> **다른 권한 팝업(알림·위치 등)은 `await InitializeAsync()` 이후에 요청하세요.** iOS는 시스템
-> 권한 요청을 동시에 받으면 하나만 남기고 버립니다("Concurrent requests aren't preserved by
-> iOS"). 같은 프레임 `Start`에서 알림 권한을 요청하면 ATT가 버려질 수 있습니다 — 아래 6.4의
-> 재요청이 복구를 시도하지만, 처음부터 겹치지 않게 하는 것이 확실합니다.
->
-> ```csharp
-> await _ads.InitializeAsync();
-> await RequestNotificationPermissionAsync();   // ATT가 끝난 뒤
-> ```
-
-### 6.1 설치
-
-바인딩은 유니티 공식 패키지 **iOS 14 Advertising Support**(`com.unity.ads.ios-support`)의
-`ATTrackingStatusBinding`입니다. Package Manager에서 설치하면 그걸로 끝입니다 —
-스크립팅 심볼 `FOUNDATIONDI_IOSSUPPORT`는 `SdkDefineSynchronizer`가 패키지의 존재를 보고
-자동으로 켜고, 패키지를 지우면 다시 끕니다(손으로 정의하지 마세요).
-
-**버전은 아무거나 괜찮습니다.** 이 패키지는 버전 번호가 시간순과 어긋나 있습니다 —
-1.2.0이 2021-11에, 1.0.1이 2025-10에 게시됐고 레지스트리가 `latest`로 가리키는 쪽은
-**1.0.1**입니다(그래서 Package Manager에서 그냥 설치하면 1.0.1이 들어옵니다). 두 버전은
-API도 다릅니다: 완료 콜백을 받는
-`RequestAuthorizationTracking(RequestAuthorizationTrackingCompleteHandler)`는 1.2.0에만
-있습니다. asmdef 이름은 같아서 어느 쪽이든 심볼은 켜지므로, 어댑터가 그 오버로드를 쓰면
-1.0.1 사용자는 컴파일조차 되지 않습니다. 그래서 `AttTrackingAuthorization`은 모든 버전에
-있는 파라미터 없는 요청 + 상태 폴링만 씁니다.
-
-**패키지를 설치하지 않으면 아무 일도 일어나지 않습니다.** 코어는 이 패키지를 참조하지 않고,
-`TrackingAuthorizationRegistry`가 `UnsupportedTrackingAuthorization`으로 떨어져 초기화가
-그대로 진행됩니다. 안드로이드·에디터에서도 같습니다.
-
-### 6.2 동의 문구
-
-`NSUserTrackingUsageDescription`은 `AttIosPostProcess`가 Xcode 빌드 후처리로 Info.plist에
-넣습니다. 유니티 플레이어 설정에는 이 키를 넣을 자리가 없고, **문구가 없으면 iOS는
-다이얼로그를 아예 띄우지 않고** 심사에서도 리젝됩니다.
-
-현재 문구:
-
-> We use your activity data to provide personalized ads and measure ad performance.
-
-바꾸려면 `Editor/AdService/AttIosPostProcess.cs`의 `UsageDescription` 상수를 고칩니다.
-다국어가 필요하면 `InfoPlist.strings`를 쓰거나 별도 후처리로 값을 먼저 채우세요 —
-**이미 값이 있으면 이 후처리는 덮지 않습니다.**
-
-### 6.3 시점을 직접 고르고 싶을 때
-
-사전 안내 화면을 먼저 보여주는 식으로 시점을 조절하려면 `AdServiceSettings`의
-**Request Tracking Authorization**을 끄고 직접 부릅니다.
-
-```csharp
-var status = await _ads.TrackingAuthorization.RequestAsync();
-```
-
-`IAdService.TrackingAuthorization`은 설정을 꺼도, 패키지가 없어도 항상 null이 아닙니다
-(`IsSupported`가 false일 뿐입니다).
-
-### 6.4 요청 시점: Active를 기다렸다가 묻는다
-
-**iOS 15부터 `requestTrackingAuthorization`은 앱이 `UIApplicationStateActive`일 때만 팝업을
-띄웁니다.** 그 외 상태에서 요청하면 팝업도 오류도 없이 `notDetermined`로 끝납니다. 심사에서는
-"ATT 권한 요청을 찾을 수 없다"(Guideline 2.1)로 리젝됩니다.
-
-문제는 **Unity 6.3 iOS 트램펄린이 첫 씬을 Inactive 구간에서 로드한다**는 점입니다. UIScene
-라이프사이클의 시작 순서가 이렇습니다.
-
-```
-sceneWillEnterForeground → initUnityWithScene → startUnity
-  → UnityLoadApplication   ← 첫 씬 로드: Awake/Start가 여기서 돈다 (아직 Inactive)
-  → UnitySetPlayerFocus(1)
-  → ... → sceneDidBecomeActive   ← 여기서야 Active
-```
-
-첫 씬 `Awake`에서 `InitializeAsync()`를 부르면 첫 `await` 전에 동기로 요청이 나가므로, 그대로
-두면 요청이 Inactive에서 버려집니다. 그래서 `AttTrackingAuthorization`은 이렇게 동작합니다.
-
-1. **Active 대기** — 매 프레임 네이티브 헬퍼 `FDI_Att_IsApplicationActive()`로
-   `UIApplication.applicationState`를 확인하고, Active가 되면 **0.5초 안정화** 후 요청합니다.
-   안정화 중 다시 Inactive가 되면 1단계로 돌아갑니다.
-2. **요청 → 폴링** — 상태가 `NotDetermined`를 벗어나면 완료합니다.
-3. **무시 판정과 재요청** — 요청 직전의 `FDI_Att_ResignActiveCount()`(앱이 Inactive로 내려간
-   횟수)를 기억해 두고,
-   - 1.5초 동안 카운트가 그대로(= 팝업이 뜨지 않음)이고 `NotDetermined`면 무시된 것으로 봅니다.
-   - 카운트가 올랐는데(= 다른 팝업 등으로 Inactive를 거침) Active로 돌아온 뒤에도
-     `NotDetermined`면 역시 무시된 것으로 봅니다.
-
-   어느 쪽이든 **1초 → 2초 → 4초** 뒤 1단계부터 다시 묻고, **최대 3회**까지 재요청합니다.
-   iOS는 이미 답한 뒤의 요청에는 팝업을 띄우지 않으므로 재요청은 안전합니다. 상한을 넘기면
-   타임아웃을 기다리지 않고 현재 상태로 끝냅니다.
-4. **전체 60초 타임아웃** — Active 대기와 재요청을 모두 포함합니다. 어떤 경우에도
-   `InitializeAsync`가 영원히 멈추지 않습니다.
-
-시간은 광고 디스패처 펌프(`Time.unscaledDeltaTime`)로 셉니다. 트램펄린은
-`applicationWillResignActive`에서 플레이어 루프를 멈추므로(`UnityPause(1)`), **팝업이 떠 있는
-동안에는 1.5초 판정도 60초 타임아웃도 흐르지 않습니다** — 사용자가 팝업을 읽는 중에 무시로
-오판하거나 타임아웃이 끼어들지 않습니다.
-
-**`Application.isFocused`나 `OnApplicationFocus`를 쓰지 않는 이유:** 위 순서에서 보듯
-`UnitySetPlayerFocus(1)`이 `sceneDidBecomeActive`보다 먼저 불려, 포커스가 true인데 앱은 아직
-Inactive인 구간이 있습니다. 첫 씬이 바로 그 구간입니다. `OnApplicationFocus`는 일부 기기에서
-누락 보고도 있습니다. 그래서 `UIApplication` 상태와 `UIApplicationWillResignActiveNotification`
-을 네이티브에서 직접 읽습니다(`Consent/iOSSupport/Plugins/iOS/FDI_Att.mm`, AppTrackingTransparency
-는 import하지 않음 — 요청과 상태 조회는 계속 ios-support 바인딩이 합니다).
-
-**실기기에서 확인하는 방법:** Xcode 콘솔에서 단계별 로그를 트램펄린 로그와 대조합니다.
-
-```
--> sceneDidBecomeActive()
-[AdService] ATT Active 대기 종료 — 0.5초 안정화 후 요청한다
-[AdService] ATT 1번째 요청
--> sceneWillResignActive()          ← 팝업이 떴다
--> sceneDidBecomeActive()
-[AdService] ATT 최종 상태: Authorized (요청 1회)
-```
-
-`ATT Active 대기 시작`이 `sceneDidBecomeActive`보다 앞서고, `1번째 요청`이 그 뒤에 나오면
-정상입니다. `무시 판정`이 찍히면 다른 권한 팝업과 겹치지 않았는지 먼저 확인하세요.
-
-### 6.5 동작 규칙
-
-- **iOS 실기에서만 묻습니다.** 에디터·안드로이드에서는 `IsSupported`가 false라 건너뜁니다.
-- **이미 답을 받았으면 다시 묻지 않습니다.** iOS는 두 번째 요청에 다이얼로그를 띄우지 않고
-  기존 상태를 그대로 돌려줍니다.
-- **요청이 실패해도 광고 초기화는 계속됩니다.** 비타게팅 광고는 여전히 나가고, 여기서
-  던지면 그마저 잃습니다.
-- **완료 콜백 대신 상태를 폴링합니다.** 콜백 오버로드가 1.2.0에만 있기 때문입니다(위 6.1
-  참고). 폴링은 디스패처 펌프 위에서만 돌아 메인 스레드 마샬링이 필요 없고, 바인딩이
-  진행 중인 요청에 던지는 `InvalidOperationException`도 지나치지 않습니다.
-- **60초 타임아웃이 있습니다.** Active가 끝내 오지 않거나 요청이 계속 버려져도 초기화가
-  영원히 끝나지 않는 일은 없습니다(6.4 참고). 타임아웃이나 재요청 상한으로 끝나면 경고 로그를
-  남기고 현재 상태로 초기화를 계속합니다.
-- **`IAdConsent`와는 다른 축입니다.** `IAdConsent`는 광고 네트워크가 요구하는 개인정보 동의
-  (GDPR/UMP/T&P Flow)로 provider마다 구현이 다르고, ATT는 OS 권한이라 provider와 무관하게
-  하나뿐입니다.
+- ATT 결과는 `AdProviderContext.TrackingStatus`/`IsTrackingRestricted`로 provider까지 갑니다(LevelPlay는
+  `ApplyPrivacy`로 번역). GDPR 동의는 UMP가 쓴 TCF·AC 문자열을 LevelPlay가 직접 읽습니다.
+- `IConsentService`를 등록하지 않으면 경고와 함께 약관·UMP 없이 ATT만 묻습니다(0.11 동작). EEA·영국에서는
+  제한 광고만 나갑니다.
+- 0.11의 `IAdService.TrackingAuthorization`, `IAdService.Consent`, `IAdProvider.Consent`, `IAdConsent`,
+  `AdServiceSettings`의 Request Tracking Authorization은 제거됐습니다. 대체 API는 ConsentService README
+  11장에 있습니다.
 
 ---
 
@@ -551,15 +423,9 @@ AdService/
 │   ├── AdProviderRegistry.cs     3사 어댑터(옵셔널 어셈블리)가 자신을 등록하는 진입점
 │   └── Dummy/                    SDK 없이 흐름을 검증하는 provider 구현
 ├── Dispatch/
-│   ├── IAdDispatcher.cs          메인스레드 마샬링 + 지연 + 프레임 대기 seam
+│   ├── IAdDispatcher.cs          메인스레드 마샬링 + 지연 + 프레임 대기 seam (멤버는 `Runtime/Common/IMainThreadDispatcher`)
 │   ├── UnityAdDispatcher.cs      실제 구현. `HideAndDontSave` GameObject를 코드로 만들어 펌프한다(프리팹 아님)
 │   └── AdServiceRunner.cs        Update에서 큐를 퍼내는 MonoBehaviour(직접 배치하지 않는다)
-├── Consent/
-│   ├── IAdConsent.cs             광고 네트워크 개인정보 동의 seam + NoopAdConsent(Dummy용)
-│   ├── ITrackingAuthorization.cs iOS ATT seam + TrackingAuthorizationStatus
-│   ├── UnsupportedTrackingAuthorization.cs  패키지·플랫폼이 없을 때의 기본 구현
-│   ├── TrackingAuthorizationRegistry.cs     iOSSupport 어셈블리가 자신을 등록하는 진입점
-│   └── iOSSupport/               FOUNDATIONDI_IOSSUPPORT 옵셔널 어셈블리(ATTrackingStatusBinding 래핑)
 ├── Storage/                      IAdRemovalStorage seam + PlayerPrefsAdRemovalStorage
 └── Settings/
     ├── AdServiceSettings.cs      ScriptableObject. 인스펙터에서 편집하고 ToOptions()로 값 타입 변환

@@ -1,0 +1,415 @@
+using System;
+using System.Collections.Generic;
+using UnityEngine;
+
+namespace DarkNaku.FoundationDI
+{
+    // 약관 수락 → 선행 작업 → Google UMP → ATT를 한 흐름으로 묻는다.
+    //
+    // 실패해도 게임을 막지 않는다. UMP 실패·예외는 경고만 남기고 캐시된 이전 세션 값으로 진행한다
+    // (TileExplorer·VitaMahjong과 같은 정책). 약관만은 예외다 — 수락하지 않으면 PolicyAccepted=false로
+    // 끝나고 광고·분석이 시작되지 않는다.
+    public sealed class ConsentService : IConsentService
+    {
+        // UMP 정보 갱신(네트워크)이 실패했을 때 스스로 다시 판정하는 간격. 마지막 값이 상한으로 반복된다.
+        // 첫 실행 오프라인이면 게임이 다시 부르지 않는 한 판정이 영원히 나지 않아, 분석 버퍼가 쌓이기만
+        // 하고 비 EEA 사용자의 광고도 세션 내내 죽는다.
+        internal static readonly float[] RetryDelaySeconds = { 30f, 60f, 120f, 300f };
+
+        private readonly ConsentServiceOptions _options;
+        private readonly IPolicyAgreementPrompt _prompt;
+        private readonly IPolicyAgreementStorage _storage;
+        private readonly IUmpConsent _ump;
+        private readonly ITrackingAuthorization _tracking;
+        private readonly IMainThreadDispatcher _dispatcher;
+        private readonly List<IConsentPrerequisite> _prerequisites;
+
+        // 진행 중인 흐름에 편승한 호출자들. Awaitable은 단일 사용이라 호출자마다 완료 소스를 둔다.
+        private readonly List<AwaitableCompletionSource<ConsentResult>> _waiters = new();
+
+        private PolicyAgreementContent _content;
+        private ConsentResult _last;
+        private bool _hasCompleted;
+        private bool _running;
+        private bool _prerequisitesDone;
+        private bool _trackingAsked;
+        private bool _disposed;
+
+        // 마지막 UMP 정보 갱신이 실패했는가(네트워크). 이때만 스스로 재판정한다 — 폼에서 거부한 경우까지
+        // 재시도하면 게임 도중 폼이 반복해서 뜬다.
+        private bool _lastUpdateFailed;
+        private int _retryIndex;
+        private IDisposable _retry;
+
+        public event Action ConsentChanged;
+
+        public ConsentService(ConsentServiceOptions options, IPolicyAgreementPrompt prompt,
+                              IPolicyAgreementStorage storage, IUmpConsent ump,
+                              ITrackingAuthorization tracking, IMainThreadDispatcher dispatcher,
+                              IReadOnlyList<IConsentPrerequisite> prerequisites = null)
+        {
+            _options = options;
+            _prompt = prompt;
+            _storage = storage;
+            _ump = ump ?? new UnsupportedUmpConsent();
+            _tracking = tracking ?? new UnsupportedTrackingAuthorization();
+            _dispatcher = dispatcher;
+            _prerequisites = prerequisites == null
+                ? new List<IConsentPrerequisite>()
+                : new List<IConsentPrerequisite>(prerequisites);
+            _content = options.PolicyContent;
+        }
+
+        // ConsentService를 등록하지 않은 프로젝트의 AdService 기본값. 0.11까지의 동작(광고 초기화 앞에서
+        // ATT만 묻는다)을 그대로 유지한다 — 약관 단계(버전 0)와 UMP를 쓰지 않는다.
+        public static ConsentService CreateTrackingOnly(IMainThreadDispatcher dispatcher, ITrackingAuthorization tracking)
+        {
+            var options = new ConsentServiceOptions(0, default, false, default, true);
+
+            return new ConsentService(options, null, null, new UnsupportedUmpConsent(), tracking, dispatcher);
+        }
+
+        public ITrackingAuthorization TrackingAuthorization => _tracking;
+
+        public bool IsPolicyAccepted =>
+            _options.PolicyVersion <= 0 ||
+            (_storage != null && _storage.LoadAcceptedVersion() >= _options.PolicyVersion);
+
+        public bool IsPrivacyOptionsRequired => UsesUmp && SafeRead(() => _ump.IsPrivacyOptionsRequired, false);
+
+        public ConsentResult Current => Snapshot();
+
+        // UMP를 켰더라도 네이티브가 없으면(에디터·포드 누락) 쓰지 않는 것으로 본다.
+        private bool UsesUmp => _options.UseUmp && _ump.IsSupported;
+
+        public void AcceptPolicy()
+        {
+            if (_disposed || _options.PolicyVersion <= 0) return;
+
+            _storage?.SaveAcceptedVersion(_options.PolicyVersion);
+        }
+
+        public void SetPolicyContent(PolicyAgreementContent content) => _content = content;
+
+        public Awaitable<ConsentResult> RequestAsync()
+        {
+            if (_disposed) return Completed(Snapshot());
+
+            if (_hasCompleted && !_running && IsSettled(_last)) return Completed(_last);
+
+            var waiter = new AwaitableCompletionSource<ConsentResult>();
+            _waiters.Add(waiter);
+
+            if (!_running)
+            {
+                _running = true;
+                Run();
+            }
+
+            return waiter.Awaitable;
+        }
+
+        public async Awaitable ShowPrivacyOptionsAsync()
+        {
+            if (_disposed || !UsesUmp) return;
+
+            try
+            {
+                await _ump.ShowPrivacyOptionsAsync();
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[ConsentService] 개인정보 옵션 폼 표시 중 예외가 났다: {e}");
+            }
+
+            if (_disposed) return;
+
+            _last = Snapshot();
+            ConsentChanged?.Invoke();
+        }
+
+        public void Dispose()
+        {
+            if (_disposed) return;
+
+            _disposed = true;
+
+            _retry?.Dispose();
+            _retry = null;
+
+            try
+            {
+                _prompt?.Close();
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[ConsentService] 약관 창 정리 중 예외: {e}");
+            }
+
+            CompleteWaiters(Snapshot());
+            ConsentChanged = null;
+        }
+
+        // 직전 결과로 충분한가. 광고를 요청할 수 있고 분석 판정이 났으면 다시 물을 이유가 없다.
+        private static bool IsSettled(ConsentResult result) =>
+            result.PolicyAccepted && result.CanRequestAds && result.AnalyticsConsent != AnalyticsConsent.Unknown;
+
+        // async void인 이유: 결과는 _waiters로 전달하고, 예외는 안에서 전부 잡는다.
+        private async void Run()
+        {
+            try
+            {
+                if (!IsPolicyAccepted)
+                {
+                    if (_prompt == null)
+                    {
+                        throw new InvalidOperationException("약관 수락 창(IPolicyAgreementPrompt)이 등록되지 않았다.");
+                    }
+
+                    await _prompt.ShowAsync(_content);
+
+                    if (_disposed) return;
+
+                    _storage?.SaveAcceptedVersion(_options.PolicyVersion);
+                }
+
+                await RunPrerequisitesAsync();
+                if (_disposed) return;
+
+                await RunUmpAsync();
+                if (_disposed) return;
+
+                await RunTrackingAsync();
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[ConsentService] 동의 흐름이 중단됐다. 현재 상태로 완료한다: {e}");
+            }
+            finally
+            {
+                Finish();
+            }
+        }
+
+        private async Awaitable RunPrerequisitesAsync()
+        {
+            if (_prerequisitesDone) return;
+
+            foreach (var prerequisite in _prerequisites)
+            {
+                try
+                {
+                    await prerequisite.PrepareAsync();
+                }
+                catch (Exception e)
+                {
+                    // Firebase 초기화가 실패했다고 동의 흐름을 멈추면 광고까지 죽는다.
+                    Debug.LogWarning($"[ConsentService] 선행 작업이 실패했다. UMP를 계속 진행한다: {e}");
+                }
+
+                if (_disposed) return;
+            }
+
+            _prerequisitesDone = true;
+        }
+
+        private async Awaitable RunUmpAsync()
+        {
+            if (!UsesUmp) return;
+
+            var updated = await UpdateWithTimeoutAsync();
+
+            _lastUpdateFailed = !updated;
+
+            if (_disposed || !updated) return;
+
+            try
+            {
+                await _ump.LoadAndShowIfRequiredAsync();
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[ConsentService] UMP 동의 폼 표시 중 예외가 났다. 계속 진행한다: {e}");
+            }
+        }
+
+        // 네트워크 단계에만 타임아웃을 건다. 늦게 도착한 결과는 버린다 — 캐시된 값으로 이미 진행했다.
+        private async Awaitable<bool> UpdateWithTimeoutAsync()
+        {
+            var source = new AwaitableCompletionSource<bool>();
+            var settled = false;
+            IDisposable timer = null;
+
+            void Settle(bool ok)
+            {
+                if (settled) return;
+
+                settled = true;
+                timer?.Dispose();
+                source.SetResult(ok);
+            }
+
+            async void Forward()
+            {
+                var ok = false;
+
+                try
+                {
+                    ok = await _ump.UpdateAsync(_options.UmpRequest);
+
+                    if (!ok) Debug.LogWarning("[ConsentService] UMP 동의 정보 갱신이 실패했다. 이전 값으로 진행한다.");
+                }
+                catch (Exception e)
+                {
+                    Debug.LogWarning($"[ConsentService] UMP 동의 정보 갱신 중 예외가 났다. 이전 값으로 진행한다: {e}");
+                }
+
+                Settle(ok);
+            }
+
+            timer = _dispatcher?.Delay(_options.UmpUpdateTimeoutSeconds, () =>
+            {
+                if (settled) return;
+
+                Debug.LogWarning($"[ConsentService] UMP 동의 정보 갱신이 {_options.UmpUpdateTimeoutSeconds}초 안에 끝나지 않았다. 이전 값으로 진행한다.");
+                Settle(false);
+            });
+
+            Forward();
+
+            return await source.Awaitable;
+        }
+
+        private async Awaitable RunTrackingAsync()
+        {
+            // 재판정(RequestAsync 재호출)은 UMP만 다시 한다. ATT는 iOS가 한 번만 띄우므로
+            // 다시 물어도 왕복만 낭비되고, 무시된 경우의 재요청은 AttTrackingAuthorization이 이미 한다.
+            if (_trackingAsked) return;
+
+            _trackingAsked = true;
+
+            if (!_options.RequestTrackingAuthorization) return;
+            if (!_tracking.IsSupported) return;
+
+            // UMP의 IDFA 설명 메시지가 ATT를 이미 띄웠다면 여기서 걸러진다.
+            if (_tracking.Status != TrackingAuthorizationStatus.NotDetermined) return;
+
+            try
+            {
+                var status = await _tracking.RequestAsync();
+
+                Debug.Log($"[ConsentService] ATT 추적 권한: {status}");
+            }
+            catch (Exception e)
+            {
+                // 권한 요청이 깨져도 흐름은 끝나야 한다. 비타게팅 광고는 여전히 나간다.
+                Debug.LogWarning($"[ConsentService] ATT 권한 요청 중 예외가 났다. 계속 진행한다: {e}");
+            }
+        }
+
+        private void Finish()
+        {
+            _running = false;
+
+            // Dispose가 대기자를 이미 완료했다.
+            if (_disposed) return;
+
+            var hadCompleted = _hasCompleted;
+            var previous = _last;
+
+            _last = Snapshot();
+            _hasCompleted = true;
+
+            CompleteWaiters(_last);
+
+            if (hadCompleted && !previous.Equals(_last)) ConsentChanged?.Invoke();
+
+            ScheduleRetryIfNeeded();
+        }
+
+        private void ScheduleRetryIfNeeded()
+        {
+            _retry?.Dispose();
+            _retry = null;
+
+            if (_disposed) return;
+
+            if (!_lastUpdateFailed || IsSettled(_last))
+            {
+                _retryIndex = 0;
+                return;
+            }
+
+            var delay = RetryDelaySeconds[Math.Min(_retryIndex, RetryDelaySeconds.Length - 1)];
+            _retryIndex++;
+
+            _retry = _dispatcher?.Delay(delay, () =>
+            {
+                _retry = null;
+
+                // 결과는 ConsentChanged로 전달된다(값이 바뀌었을 때).
+                if (!_disposed) RequestAsync();
+            });
+        }
+
+        private ConsentResult Snapshot()
+        {
+            var trackingStatus = SafeRead(() => _tracking.Status, TrackingAuthorizationStatus.NotDetermined);
+
+            if (!IsPolicyAccepted)
+            {
+                return new ConsentResult(false, false, AnalyticsConsent.Unknown, trackingStatus, TcfSignals.None);
+            }
+
+            if (!UsesUmp)
+            {
+                return new ConsentResult(true, true, AnalyticsConsent.Granted, trackingStatus, TcfSignals.None);
+            }
+
+            var tcf = SafeRead(() => _ump.ReadTcf(), TcfSignals.None);
+            var status = SafeRead(() => _ump.Status, UmpConsentStatus.Unknown);
+            var canRequestAds = SafeRead(() => _ump.CanRequestAds, false);
+
+            return new ConsentResult(true, canRequestAds, AnalyticsConsentJudge.Judge(status, tcf),
+                                     trackingStatus, tcf);
+        }
+
+        // 네이티브 읽기는 JNI·P/Invoke라 던질 수 있다. 상태 조회가 흐름을 깨지 않게 한다.
+        private static T SafeRead<T>(Func<T> read, T fallback)
+        {
+            try
+            {
+                return read();
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[ConsentService] 동의 상태를 읽지 못했다: {e.Message}");
+                return fallback;
+            }
+        }
+
+        private void CompleteWaiters(ConsentResult result)
+        {
+            if (_waiters.Count == 0) return;
+
+            var waiters = new List<AwaitableCompletionSource<ConsentResult>>(_waiters);
+            _waiters.Clear();
+
+            foreach (var waiter in waiters) waiter.TrySetResult(result);
+        }
+
+        private static Awaitable<ConsentResult> Completed(ConsentResult value)
+        {
+            var source = new AwaitableCompletionSource<ConsentResult>();
+            source.SetResult(value);
+            return source.Awaitable;
+        }
+
+        private static Awaitable Completed()
+        {
+            var source = new AwaitableCompletionSource();
+            source.SetResult();
+            return source.Awaitable;
+        }
+    }
+}

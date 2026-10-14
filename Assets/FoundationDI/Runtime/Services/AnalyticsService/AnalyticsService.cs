@@ -8,12 +8,8 @@ namespace DarkNaku.FoundationDI
     // 무엇을 무시할지는 각 어댑터(또는 MMP 대시보드)가 결정한다.
     public sealed class AnalyticsService : IAnalyticsService
     {
-        // 생성 시점에 받은 전부. 초기화에 실패한 provider도 여기 남는다 — 재시도의 대상이고,
-        // Dispose 대상이기도 하기 때문이다.
-        private readonly List<IAnalyticsProvider> _providers;
-
-        // 초기화에 성공해 실제로 팬아웃을 받는 provider들.
-        private readonly List<IAnalyticsProvider> _active = new();
+        // provider SDK 초기화와 활성 목록을 쥔다. ConsentService가 UMP 전에 같은 인스턴스를 기다린다.
+        private readonly AnalyticsProviderInitializer _initializer;
 
         // 초기화 전 이벤트. 순서가 의미를 가지므로 큐다. 상한을 두지 않는 이유:
         // 초기화는 보통 수 초 안에 끝나고 그 사이 이벤트는 기껏해야 수십 개다. 상한을 두면
@@ -35,20 +31,40 @@ namespace DarkNaku.FoundationDI
         private bool _collectionEnabled;
         private bool _disposed;
 
-        public AnalyticsService(IReadOnlyList<IAnalyticsProvider> providers, AnalyticsServiceOptions options)
-        {
-            _providers = providers == null
-                ? new List<IAnalyticsProvider>()
-                : new List<IAnalyticsProvider>(providers);
+        // null이면 0.11과 같다(동의를 기다리지 않는다).
+        private readonly IConsentService _consent;
 
+        // 동의 게이트. 동의 서비스가 없으면 처음부터 Granted다.
+        private AnalyticsConsent _gate;
+
+        // IAnalyticsFlushHook은 처음 허용될 때 한 번만 부른다(Adjust 첫 세션 지연 해제).
+        private bool _flushHookFired;
+
+        public AnalyticsService(IReadOnlyList<IAnalyticsProvider> providers, AnalyticsServiceOptions options,
+                                IConsentService consent = null)
+            : this(new AnalyticsProviderInitializer(providers), options, consent)
+        {
+        }
+
+        public AnalyticsService(AnalyticsProviderInitializer initializer, AnalyticsServiceOptions options,
+                                IConsentService consent)
+        {
+            _initializer = initializer;
             _collectionEnabled = options.CollectionEnabledByDefault;
+            _consent = consent;
+            _gate = consent == null ? AnalyticsConsent.Granted : AnalyticsConsent.Unknown;
         }
 
         public bool IsInitialized { get; private set; }
 
-        // 수집이 꺼져 있으면 버퍼에도 넣지 않는다. 동의 전에 쌓아 뒀다가 동의 시점에
+        // 게임이 끈 수집과 동의 거부는 버퍼에도 넣지 않는다. 동의 전에 쌓아 뒀다가 거부 시점에
         // 소급 전송하는 것은 게이트를 두는 의미 자체를 없앤다.
-        private bool CanCollect => !_disposed && _collectionEnabled;
+        private bool CanCollect => !_disposed && _collectionEnabled && _gate != AnalyticsConsent.Denied;
+
+        // 버퍼에 쌓아야 하는가: 초기화 전이거나 동의가 아직 판정되지 않았다.
+        private bool ShouldBuffer => !IsInitialized || _gate == AnalyticsConsent.Unknown;
+
+        private bool EffectiveCollection => _collectionEnabled && _gate == AnalyticsConsent.Granted;
 
         // false면 모든 로깅이 호출 즉시 드롭되고, provider에도 SDK 레벨로 끄라고 알린다.
         // 후자가 없으면 게이트가 사실상 무력하다 — Firebase 같은 SDK는 우리가 LogEvent를
@@ -62,7 +78,7 @@ namespace DarkNaku.FoundationDI
                 if (_collectionEnabled == value) return;
 
                 _collectionEnabled = value;
-                Fanout(p => p.SetCollectionEnabled(value));
+                Fanout(p => p.SetCollectionEnabled(EffectiveCollection));
             }
         }
 
@@ -103,7 +119,7 @@ namespace DarkNaku.FoundationDI
         {
             if (!CanCollect) return;
 
-            if (!IsInitialized)
+            if (ShouldBuffer)
             {
                 _pendingUserId = userId;
                 _hasPendingUserId = true;
@@ -123,7 +139,7 @@ namespace DarkNaku.FoundationDI
                 return;
             }
 
-            if (!IsInitialized)
+            if (ShouldBuffer)
             {
                 _pendingProperties[name] = value;
                 return;
@@ -138,7 +154,9 @@ namespace DarkNaku.FoundationDI
 
             _disposed = true;
 
-            foreach (var provider in _providers)
+            if (_consent != null) _consent.ConsentChanged -= OnConsentChanged;
+
+            foreach (var provider in _initializer.Providers)
             {
                 try
                 {
@@ -150,8 +168,6 @@ namespace DarkNaku.FoundationDI
                 }
             }
 
-            _providers.Clear();
-            _active.Clear();
             ClearPending();
         }
 
@@ -160,37 +176,26 @@ namespace DarkNaku.FoundationDI
         // 다시 호출하면 그대로 재시도된다 — 네트워크 없이 앱을 켠 경우가 실제로 이 경로다.
         private async Awaitable<bool> RunInitializeAsync()
         {
-            _active.Clear();
-
-            foreach (var provider in _providers)
-            {
-                var ok = false;
-
-                try
-                {
-                    ok = await provider.InitializeAsync();
-                }
-                catch (Exception e)
-                {
-                    Debug.LogError($"[AnalyticsService] {provider.Name} 초기화 중 예외: {e}");
-                }
-
-                if (ok)
-                {
-                    _active.Add(provider);
-                }
-                else
-                {
-                    Debug.LogError($"[AnalyticsService] {provider.Name} 초기화에 실패했다. 팬아웃에서 제외한다.");
-                }
-            }
-
-            var succeeded = _active.Count > 0;
+            var succeeded = await _initializer.InitializeAsync();
 
             if (succeeded)
             {
-                IsInitialized = true;
-                Flush();
+                if (_consent == null)
+                {
+                    IsInitialized = true;
+                    Flush();
+                }
+                else
+                {
+                    var result = await _consent.RequestAsync();
+
+                    if (!_disposed)
+                    {
+                        IsInitialized = true;
+                        _consent.ConsentChanged += OnConsentChanged;
+                        ApplyConsent(result);
+                    }
+                }
             }
 
             _initializing = false;
@@ -220,7 +225,7 @@ namespace DarkNaku.FoundationDI
         {
             if (!CanCollect) return;
 
-            if (!IsInitialized)
+            if (ShouldBuffer)
             {
                 _pendingEvents.Enqueue(action);
                 return;
@@ -233,7 +238,7 @@ namespace DarkNaku.FoundationDI
         // 이벤트가 나가야 하기 때문이다 — 순서가 뒤집히면 첫 이벤트들이 익명으로 집계된다.
         private void Flush()
         {
-            var enabled = _collectionEnabled;
+            var enabled = EffectiveCollection;
             Fanout(p => p.SetCollectionEnabled(enabled));
 
             if (_hasPendingUserId)
@@ -258,9 +263,46 @@ namespace DarkNaku.FoundationDI
                 Fanout(_pendingEvents.Dequeue());
             }
 
+            if (_flushHookFired) return;
+
+            _flushHookFired = true;
+
             // 반드시 마지막이다. Adjust 어댑터가 여기서 첫 세션 지연을 푸는데(IAnalyticsFlushHook),
             // 이 줄이 위로 올라가면 아직 전달되지 않은 파라미터가 첫 세션에서 빠진다.
             Fanout(p => (p as IAnalyticsFlushHook)?.OnBufferedStateFlushed());
+        }
+
+        private void OnConsentChanged()
+        {
+            if (_disposed || !IsInitialized) return;
+
+            ApplyConsent(_consent.Current);
+        }
+
+        // 번역(IAnalyticsConsentAware)을 먼저 하고 게이트를 적용한다. Adjust는 DMA 값을 첫 세션
+        // 지연을 풀기 전(flush 훅 전)에 받아야 한다.
+        private void ApplyConsent(ConsentResult result)
+        {
+            Fanout(p => (p as IAnalyticsConsentAware)?.ApplyConsent(result));
+
+            _gate = result.AnalyticsConsent;
+
+            switch (_gate)
+            {
+                case AnalyticsConsent.Granted:
+                    Flush();
+                    break;
+
+                case AnalyticsConsent.Denied:
+                    Fanout(p => p.SetCollectionEnabled(false));
+                    ClearPending();
+                    break;
+
+                default:
+                    // 판정 전: SDK 자동 수집은 막아 두고 버퍼는 쥐고 있는다.
+                    Fanout(p => p.SetCollectionEnabled(false));
+                    break;
+            }
         }
 
         private void ClearPending()
@@ -275,9 +317,9 @@ namespace DarkNaku.FoundationDI
         // 분석은 게임 로직이 아니라 곁다리이므로, SDK 하나가 죽었다고 나머지까지 멎으면 안 된다.
         private void Fanout(Action<IAnalyticsProvider> action)
         {
-            for (var i = 0; i < _active.Count; i++)
+            for (var i = 0; i < _initializer.Active.Count; i++)
             {
-                var provider = _active[i];
+                var provider = _initializer.Active[i];
 
                 try
                 {

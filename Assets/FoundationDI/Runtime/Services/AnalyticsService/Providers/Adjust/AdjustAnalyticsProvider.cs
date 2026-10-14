@@ -23,7 +23,7 @@ namespace DarkNaku.FoundationDI
     // 스레드: Adjust의 정적 API는 내부에서 네이티브 브리지로 넘기고 콜백만 비동기로 돌려준다.
     // 우리는 콜백을 구독하지 않으므로 추가 마샬링이 필요 없다 — IAnalyticsProvider의 모든
     // 메서드는 AnalyticsService가 메인 스레드에서만 부른다.
-    public sealed class AdjustAnalyticsProvider : IAnalyticsProvider, IAnalyticsFlushHook
+    public sealed class AdjustAnalyticsProvider : IAnalyticsProvider, IAnalyticsFlushHook, IAnalyticsConsentAware
     {
         private readonly AdjustAnalyticsSettings _settings;
         private readonly AdjustEventTokenMap _tokens;
@@ -70,13 +70,14 @@ namespace DarkNaku.FoundationDI
                 IsSendingInBackgroundEnabled = _settings.SendInBackground,
             };
 
-            if (_settings.DelayFirstSession)
-            {
-                // 이 플래그를 켜면 누군가 EndFirstSessionDelay를 부를 때까지 SDK가 첫 세션을
-                // 보내지 않는다. 우리 쪽 해제 지점은 OnBufferedStateFlushed 하나뿐이다.
-                config.IsFirstSessionDelayEnabled = true;
-                _firstSessionDelayed = true;
-            }
+            // 첫 세션 지연을 항상 켠다(0.12). 켜 두면 누군가 EndFirstSessionDelay를 부를 때까지 SDK가 첫
+            // 세션(인스톨)을 보내지 않는다. 해제 지점은 코어의 flush 훅(OnBufferedStateFlushed) 하나다 —
+            // 동의 게이트가 없으면 초기화 직후, 있으면 처음 허용된 직후라 어느 쪽이든 안전하다.
+            // 끄면 동의 게이트가 켜져 있어도 약관 창이 떠 있는 동안 인스톨 세션이 나가고, EEA에서 거부할
+            // 사용자도 집계된다(Disable은 동의 판정 뒤에야 불린다). 그래서 설정의 Delay First Session은
+            // 더 이상 끄는 스위치가 아니다.
+            config.IsFirstSessionDelayEnabled = true;
+            _firstSessionDelayed = true;
 
             Adjust.InitSdk(config);
 
@@ -191,6 +192,21 @@ namespace DarkNaku.FoundationDI
 
         // 코어가 버퍼된 유저 상태와 이벤트를 모두 내보낸 직후. 여기서 첫 세션을 풀어 주면
         // AddGlobalCallbackParameter로 붙인 파라미터가 전부 인스톨 레코드에 실린다.
+        // Adjust는 TCF를 읽지 않는다. EEA 유저에게 Google Ads를 쓰면 DMA 신호가 필수다.
+        // 코어가 이 메서드를 flush 훅(EndFirstSessionDelay)보다 먼저 부르므로 첫 세션(인스톨)에 실린다.
+        public void ApplyConsent(ConsentResult result)
+        {
+            if (!DmaConsentMapper.TryMap(result.Tcf, out var dma)) return;
+
+            var sharing = new AdjustThirdPartySharing(null);
+
+            sharing.AddGranularOption("google_dma", "eea", dma.Eea == true ? "1" : "0");
+            sharing.AddGranularOption("google_dma", "ad_personalization", dma.AdPersonalization ? "1" : "0");
+            sharing.AddGranularOption("google_dma", "ad_user_data", dma.AdUserData ? "1" : "0");
+
+            Adjust.TrackThirdPartySharing(sharing);
+        }
+
         public void OnBufferedStateFlushed()
         {
             EndFirstSessionDelayIfDelayed();

@@ -22,9 +22,15 @@ namespace DarkNaku.FoundationDI
         [Tooltip("CollectionEnabled의 초기값. 동의를 먼저 받아야 하는 앱은 꺼진 채로 출시하고 동의 후 켠다.")]
         [SerializeField] private bool _collectionEnabledByDefault = true;
 
+        [Header("Consent")]
+        [Tooltip("ConsentService의 동의를 기다린 뒤 수집을 시작한다. GDPR 지역에서 분석을 거부하면 수집하지 " +
+                 "않는다. 켜 두면 빌드 후처리가 Firebase 자동 수집을 기본으로 꺼 둔다(동의 후 켠다).")]
+        [SerializeField] private bool _waitForConsent = true;
+
         public AnalyticsProviderType Providers => _providers;
         public bool ForceDebugOnlyInEditor => _forceDebugOnlyInEditor;
         public bool CollectionEnabledByDefault => _collectionEnabledByDefault;
+        public bool WaitForConsent => _waitForConsent;
 
         // SDK가 프로젝트에서 빠지면 그 어댑터의 설정 타입도 사라져 항목이 null이 된다.
         // 그대로 넘긴다 — 소비 지점(GetSettings<T>)이 타입 패턴 매칭이라 null은 그냥 안 걸린다.

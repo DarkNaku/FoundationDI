@@ -21,8 +21,7 @@ namespace DarkNaku.FoundationDI
             builder.RegisterValue(settings);
             builder.RegisterType(typeof(PlayerPrefsAdRemovalStorage), new[] { typeof(IAdRemovalStorage) },
                                  Lifetime.Singleton, Resolution.Lazy);
-            builder.RegisterType(typeof(UnityAdDispatcher), new[] { typeof(IAdDispatcher) },
-                                 Lifetime.Singleton, Resolution.Lazy);
+            builder.RegisterMainThreadDispatcher();
             builder.RegisterType(typeof(AdProviderFactory), new[] { typeof(IAdProviderFactory) },
                                  Lifetime.Singleton, Resolution.Lazy);
 
@@ -35,12 +34,21 @@ namespace DarkNaku.FoundationDI
                 var forceDummy = settings.ForceDummyInEditor && Application.isEditor;
                 var provider = factory.Create(settings.Provider, settings.DummyOptions, forceDummy);
 
-                // 등록된 구현이 없으면(= iOS 14 Advertising Support 패키지가 없거나
-                // 다른 플랫폼이면) UnsupportedTrackingAuthorization으로 떨어진다.
-                var tracking = TrackingAuthorizationRegistry.Create(dispatcher);
-
-                return new AdService(provider, dispatcher, settings.ToOptions(), storage, tracking);
+                return new AdService(provider, dispatcher, settings.ToOptions(), storage,
+                                     ResolveConsent(container, dispatcher));
             }, Lifetime.Singleton, Resolution.Lazy);
+        }
+
+        // ConsentService를 등록하지 않은 프로젝트도 0.11처럼 ATT는 묻게 한다. 다만 약관·UMP 없이
+        // EEA에 Google 수요를 내보내면 제한 광고만 나가므로 경고를 남긴다.
+        private static IConsentService ResolveConsent(Container container, IAdDispatcher dispatcher)
+        {
+            if (container.HasBinding<IConsentService>()) return container.Resolve<IConsentService>();
+
+            Debug.LogWarning("[AdService] IConsentService가 등록되지 않았다. 약관·UMP 없이 ATT만 묻는다. " +
+                             "EEA·영국에서 광고를 내보내려면 RegisterConsentService로 UMP를 켠다.");
+
+            return ConsentService.CreateTrackingOnly(dispatcher, TrackingAuthorizationRegistry.Create(dispatcher));
         }
     }
 }

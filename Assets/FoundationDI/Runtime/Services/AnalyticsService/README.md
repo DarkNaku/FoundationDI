@@ -23,7 +23,8 @@ Singular / Airbridge 어댑터는 각각 별도 계획으로 붙습니다.
 | `Providers` | 동시에 사용할 provider(다중 선택). 켜진 것 전부로 브로드캐스트된다 |
 | `Force Debug Only In Editor` | 켜면 에디터에서는 `Debug` provider만 생성한다. 개발 중 이벤트가 실제 대시보드를 오염시키는 것을 막는다 |
 | `Provider Settings` | 어댑터 고유 설정 에셋 목록(6.1절). 설정이 필요 없는 어댑터는 비워 둔다 |
-| `Collection Enabled By Default` | `CollectionEnabled`의 초기값. 동의를 먼저 받아야 하는 앱은 꺼진 채로 출시한다 |
+| `Collection Enabled By Default` | `CollectionEnabled`의 초기값(게임이 끄는 스위치). 동의 게이트는 아래 `Wait For Consent`가 맡는다 |
+| `Wait For Consent` | 켜면(기본) ConsentService 판정으로 수집을 게이트한다(5절). 빌드 후처리가 Firebase 자동 수집을 기본으로 꺼 둔다 |
 
 ### 1.2 DI 등록
 
@@ -220,7 +221,7 @@ _ads.Paid += _analytics.LogAdImpression;
 
 ---
 
-## 5. `CollectionEnabled`와 동의의 경계
+## 5. `CollectionEnabled`와 동의 게이트
 
 ```csharp
 _analytics.CollectionEnabled = false;   // 게임이 판단해서 밀어 넣는다
@@ -236,6 +237,25 @@ _analytics.CollectionEnabled = false;   // 게임이 판단해서 밀어 넣는�
 
 초기값은 `AnalyticsServiceSettings.CollectionEnabledByDefault`에서 오고, **영속화하지 않습니다.**
 
+### 동의 게이트 (Wait For Consent)
+
+0.12부터 `Wait For Consent`(기본 켜짐)가 켜져 있고 `IConsentService`가 등록돼 있으면
+(`../ConsentService/README.md`), `InitializeAsync`가 provider SDK를 초기화한 뒤 동의 판정을 기다리고
+그 결과로 수집을 게이트합니다. 실제 수집은 `CollectionEnabled && 판정 == Granted`일 때만 켜집니다.
+
+| 판정 | 언제 | 수집 | 초기화 전·판정 전 이벤트 |
+|---|---|---|---|
+| `Granted` | GDPR 지역에서 TCF Purpose 1 동의, GDPR 지역 아님(UMP `NotRequired`), UMP 미사용 | 켬 | 전송 |
+| `Denied` | GDPR 지역에서 분석 거부 | 끔 (게임은 진행) | 폐기 |
+| `Unknown` | 판정 불가(첫 실행 오프라인 등) | 끔 | 메모리에 유지, 재판정(`ConsentChanged`)에서 전송/폐기 |
+
+- 설정 화면에서 동의를 바꾸면(`ConsentChanged`) 같은 규칙으로 다시 적용합니다.
+- 동의 번역이 필요한 provider(Adjust)는 `IAnalyticsConsentAware.ApplyConsent`를 받습니다. 항상 flush 훅
+  (`IAnalyticsFlushHook`, Adjust 첫 세션 지연 해제)보다 먼저이고, flush 훅은 처음 허용될 때 한 번만 불립니다.
+- provider SDK 초기화는 `AnalyticsProviderInitializer`가 맡고 `IConsentPrerequisite`로도 등록됩니다.
+  Google이 "UMP 전에 Firebase를 초기화하라"고 요구하므로 ConsentService가 UMP 전에 이것을 기다립니다.
+- `IConsentService`가 등록되지 않았으면 경고를 남기고 동의를 기다리지 않습니다(0.11 동작).
+
 ### ATT와 GDPR형 동의는 다르다
 
 혼동이 잦은 지점이라 명시해 둡니다.
@@ -247,23 +267,18 @@ _analytics.CollectionEnabled = false;   // 게임이 판단해서 밀어 넣는�
   (2026-09-18, InfiniteSteps 1.1.7). 광고 쪽은 `AdService`가 `AdProviderContext.TrackingStatus`로
   provider까지 전달해 SDK에 비개인화를 통보합니다.
 
-  **분석 쪽은 게임이 판단합니다.** `IAnalyticsService`는 ATT를 보지 않습니다 — 수집을 ATT에
-  묶을지는 사용하는 SDK와 수집 항목에 달린 법적 판단이고, 이 서비스가 대신 내릴 수 없습니다.
-  묶기로 했다면 게임이 ATT 응답을 받은 뒤 `CollectionEnabled`를 세팅하면 됩니다.
+  **분석 수집은 ATT로 게이트하지 않습니다.** ATT가 막는 것은 IDFA 연결(추적)이고 자체 분석 전송이
+  아닙니다. 수집 게이트는 GDPR 판정(위 표)만 봅니다.
 
-  > **iOS에서 하나 더**: Firebase Analytics는 `AnalyticsService.InitializeAsync`가 돌기 전,
-  > 앱 런치 시점에 이미 수집을 시작합니다. `CollectionEnabledByDefault = false`로 출시한다면
-  > Info.plist에 `FIREBASE_ANALYTICS_COLLECTION_ENABLED = NO`도 함께 넣어야 그 구간이 막힙니다.
-  > 이 키는 패키지가 넣지 않습니다 — `AnalyticsServiceSettings`가 DI로 주입되는 에셋이라
-  > 에디터 후처리가 "이 프로젝트의 설정"을 특정할 수 없기 때문입니다. 게임의 빌드 후처리에서
-  > 넣으세요.
+  > **앱 런치 구간**: Firebase Analytics는 `InitializeAsync`가 돌기 전, 앱 런치 시점에 이미 수집을
+  > 시작합니다. `Wait For Consent`가 켜진 설정이 있고 Firebase 어댑터가 활성이면 ConsentService의
+  > `UmpPostProcess`가 `firebase_analytics_collection_enabled=false` /
+  > `FIREBASE_ANALYTICS_COLLECTION_ENABLED = NO`를 **키가 없을 때만** 넣습니다.
 - **GDPR형 수집 동의** — **OS가 강제하지 않습니다.** `FirebaseAnalytics.LogEvent()`를 부르면 그냥
   나갑니다. 앱이 안 부르거나 SDK에 명시적으로 꺼달라고 해야만 안 나갑니다. 그래서 게이트가
   필요합니다.
 
-**동의 UI·법적 판단·ATT 팝업·동의 기록 보관은 전부 이 서비스의 범위 밖입니다.** 게임(또는 별도
-동의 서비스)이 판단하고 결과 `bool`만 밀어 넣습니다 — `AdService`가 `AdsRemoved` 세터만 두고 IAP를
-범위 밖으로 뺀 것과 같은 경계입니다.
+**동의 UI와 판정은 ConsentService가 맡습니다.** 이 서비스는 그 결과로 수집을 켜고 끄기만 합니다.
 
 ---
 
@@ -405,7 +420,7 @@ SDK에게 맡기고 개발자에게만 알립니다. Firebase가 규칙 위반 �
 | `Android App Token` / `iOS App Token` | 대시보드의 앱 토큰. **Adjust에서 Android와 iOS는 서로 다른 앱**이라 토큰도 다르다. 현재 빌드 타깃의 것이 쓰인다 |
 | `Environment` | `Sandbox`는 테스트 콘솔로만 흘러가고 어트리뷰션에 집계되지 않는다. 출시 빌드는 `Production` |
 | `Force Sandbox In Development Build` | 켜면 Development Build에서 위 설정과 무관하게 `Sandbox`로 강제한다. `Production`인 채로 테스트해 실데이터를 오염시키는 사고를 막는다 |
-| `Delay First Session` | 첫 세션(=인스톨) 전송을 버퍼 flush가 끝날 때까지 보류한다. **A/B 그룹·설치 버전·유저 ID를 인스톨 레코드에 실으려면 켠다**(8.4절) |
+| `Delay First Session` | **0.12부터 무시된다 — 항상 켜진다.** 첫 세션(=인스톨) 전송을 버퍼 flush(동의 게이트가 있으면 처음 허용된 직후)까지 보류한다(8.4절) |
 | `Log Level` / `Send In Background` | SDK 로그 레벨, 백그라운드 전송 여부 |
 | `Event Tokens` | **이름 → 토큰** 매핑표. 게임 코드는 Firebase에 보내던 이름 그대로 `LogEvent`를 부른다 |
 | `Purchase Event Token` | `LogPurchase`가 쓸 토큰. 비우면 구매를 Adjust로 보내지 않는다 |
@@ -422,7 +437,7 @@ SDK에게 맡기고 개발자에게만 알립니다. Firebase가 규칙 위반 �
 | `LogAdImpression` | `Adjust.TrackAdRevenue`. 토큰이 필요 없는 전용 API다 |
 | `SetUserId` / `SetUserProperty` | `Adjust.AddGlobalCallbackParameter` (빈 값이면 `Remove~`) |
 | `SetCollectionEnabled` | `Adjust.Enable()` / `Adjust.Disable()` |
-| (버퍼 flush 완료) | `Delay First Session`이 켜져 있으면 `Adjust.EndFirstSessionDelay()`. `IAnalyticsFlushHook`으로 통보받는다(8.4절) |
+| (버퍼 flush 완료) | `Adjust.EndFirstSessionDelay()`. `IAnalyticsFlushHook`으로 통보받는다(8.4절) |
 
 **이름이 아니라 토큰인 것이 이 어댑터의 전부입니다.** `Adjust.TrackEvent`는 대시보드가 발급한
 토큰만 받으므로 "이름을 그냥 보낸다"는 선택지가 없습니다. 표에 없는 이름은 **전송하지 않고
@@ -457,13 +472,14 @@ SDK에게 맡기고 개발자에게만 알립니다. Firebase가 규칙 위반 �
 "유입 코호트"를 나누는 값이 정작 **인스톨 레코드에만 빠집니다.** 두 번째 세션부터는 정상이라
 대시보드를 보다가 늦게 발견하기 쉽습니다.
 
-`Delay First Session`을 켜면:
+0.12부터 첫 세션 지연은 항상 켜집니다(동의 전에 인스톨 세션이 나가지 않게 하려는 이유도 있습니다 — ConsentService README 6.2):
 
 1. `InitializeAsync`가 `AdjustConfig.IsFirstSessionDelayEnabled = true`로 `InitSdk`를 부릅니다.
    SDK는 첫 세션을 보내지 않고 들고 있습니다.
 2. 코어가 버퍼된 유저 상태 → 이벤트를 flush합니다. 전역 콜백 파라미터가 이 사이에 다 붙습니다.
 3. flush가 끝나면 `OnBufferedStateFlushed()`에서 `Adjust.EndFirstSessionDelay()`를 부릅니다.
-   첫 세션이 파라미터를 달고 나갑니다.
+   첫 세션이 파라미터를 달고 나갑니다. 동의 게이트가 켜져 있으면 이 단계는 **처음 허용된 직후**이고,
+   그 전에 DMA 동의 번역(`ApplyConsent`)이 먼저 갑니다. 거부·판정 전이면 첫 세션은 계속 보류됩니다.
 
 ```csharp
 // 순서가 전부다. Initialize 앞에 넣은 값만 인스톨에 실린다.
@@ -576,7 +592,6 @@ unzip -p app.apk assets/bin/Data/Managed/Metadata/global-metadata.dat \
 ## 11. 알려진 범위 밖
 
 - **AppsFlyer / Singular / Airbridge 어댑터** — seam과 매핑표만 준비돼 있습니다.
-- **동의(GDPR/ATT) UI·판단·영속화** — `CollectionEnabled` 세터만 제공합니다(5절).
 - **`google-services.json` 없이의 Firebase 실전송 검증** — 설정 파일이 있어야 합니다(7절).
 - **라우팅 규칙** — 이벤트별로 provider를 골라 보내는 기능은 없습니다. 전체 브로드캐스트만 합니다.
 - **이벤트 이름 상수 생성** — `SoundService`의 `SFX`/`Track` 같은 에디터 생성 상수는 두지 않습니다.

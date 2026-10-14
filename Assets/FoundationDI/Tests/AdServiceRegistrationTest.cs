@@ -1,6 +1,7 @@
 using DarkNaku.FoundationDI;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.TestTools;
 using Reflex.Core;
 using Reflex.Enums;
 using Resolution = Reflex.Enums.Resolution;
@@ -24,10 +25,13 @@ public class AdServiceRegistrationTest
             // 것은 그 MonoBehaviour 생명주기가 아니라 RegisterAdService의 등록 그래프 자체이므로,
             // 뒤에 다시 등록해서 덮어쓴다 — Reflex는 같은 계약이 여러 번 등록되면
             // Resolve<T>()는 마지막에 등록된 바인딩을 돌려준다.
-            builder.RegisterType(typeof(FakeAdDispatcher), new[] { typeof(IAdDispatcher) },
+            builder.RegisterType(typeof(FakeAdDispatcher),
+                                 new[] { typeof(IAdDispatcher), typeof(IMainThreadDispatcher) },
                                  Lifetime.Singleton, Resolution.Lazy);
 
             var container = builder.Build();
+
+            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("IConsentService가 등록되지 않았다"));
 
             var service = container.Resolve<IAdService>();
 
