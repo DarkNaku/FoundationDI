@@ -338,16 +338,25 @@ iOS 후처리 순서는 `FDI_HapticiOSPostProcess`(999) → `AttIosPostProcess`(
 
 ## 10. 실기 확인 체크리스트
 
-EditMode로 검증할 수 없는 항목입니다.
+EditMode로 검증할 수 없는 항목입니다. 체크된 항목은 2026-10-14 Android 실기(Galaxy A13, LevelPlay 9.5.1 +
+AdMob 어댑터 5.31.0.0, UMP 4.0.0, Google 샘플 AdMob 앱 ID)로 확인했습니다.
 
-- [ ] Android·iOS: Debug Geography = EEA → UMP 폼 표시, 동의/거부 결과 반영
-- [ ] 비 EEA → `NotRequired`, 폼 없음, 분석 즉시 켜짐
-- [ ] 설정 화면 → 옵션 폼 다시 열기, 변경 반영
+- [x] Android: Debug Geography = EEA → UMP 폼 표시, 동의/거부 결과 반영 (`PurposeConsents` 읽기 포함)
+- [ ] iOS: Debug Geography = EEA → UMP 폼 표시, 동의/거부 결과 반영
+- [x] 비 EEA → UMP가 `gdprApplies=0` 기록, 폼 없음, 분석 즉시 켜짐
+- [x] 설정 화면 → 옵션 폼 다시 열기, `ConsentChanged`로 변경 반영
+- [x] 오프라인 첫 실행 → `Unknown`·광고 보류 → 네트워크 복귀 후 자동 재판정 → 동의 시 광고 자동 초기화
 - [ ] iOS: 약관 → UMP → ATT 순서, 첫 실행에서 팝업이 버려지지 않음
-- [ ] LevelPlay TCF 로그(7.8.0+)에 동의 전달 확인
+- [ ] LevelPlay TCF 로그(7.8.0+)에 동의 전달 확인 (실제 LevelPlay 앱 키 필요)
 - [ ] Adjust 대시보드에 DMA 값 확인
 - [ ] R8 난독화 빌드에서 UMP JNI 호출 정상 (실패하면 `-keep class com.google.android.ump.** { *; }`)
-- [ ] LevelPlay AdMob 어댑터와 함께 Gradle·CocoaPods 해석 성공
+- [x] Android: LevelPlay AdMob 어댑터(Next-Gen `ads-mobile-sdk:1.5.0`)와 함께 Gradle 해석·빌드 성공 (`play-services-ads` 미포함)
+- [ ] iOS: LevelPlay AdMob 어댑터와 함께 CocoaPods 해석 성공
+
+**테스트 기기 등록**: Debug Geography는 테스트 기기에서만 적용됩니다. 첫 실행 logcat의
+`UserMessagingPlatform: Use new ConsentDebugSettings.Builder().addTestDeviceHashedId("…")` 값을 설정의
+**Test Device Hashed Ids**에 넣으세요. Google 샘플 앱 ID(`ca-app-pub-3940256099942544~3347511713`)로도
+EEA 폼이 뜹니다.
 
 ## 11. 0.11 → 0.12 마이그레이션
 

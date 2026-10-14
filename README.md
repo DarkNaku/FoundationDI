@@ -1,7 +1,7 @@
 # FoundationDI
 
 ![Unity](https://img.shields.io/badge/Unity-6000.3%2B-black?logo=unity)
-![Version](https://img.shields.io/badge/version-0.11.1-blue)
+![Version](https://img.shields.io/badge/version-0.12.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Author](https://img.shields.io/badge/author-DarkNaku-orange)
 
@@ -19,6 +19,7 @@ DI(의존성 주입) 기반 Unity 게임 개발 파운데이션 패키지입니�
 - **햅틱** — iOS/Android 촉각 피드백. 시맨틱 프리셋(`Impact`/`Notification`/`Selection`, 옵트인 쿨다운) + `AnimationCurve` 커브·커스텀 패턴 재생(`Awaitable`, 단일 활성)과 플랫폼 케이퍼빌리티 폴백. 에디터/데스크톱은 Noop
 - **부트스트랩 초기화** — 초기화 단위를 SO(`InitializeItem`)로 정의하고 카탈로그 순서대로 순차 실행. 세션 내 중복 실행 방지, 실패 지점부터 재개
 - **수익화 3종** — 광고(`IAdService`)·분석(`IAnalyticsService`)·인앱결제(`IIAPService`). **코어는 어떤 3사 SDK도 참조하지 않습니다.** 광고·분석은 SDK를 옵셔널 어셈블리로 격리해 SDK가 없으면 Dummy/Debug provider로 에디터에서 전체 플로우가 돌아가고, 인앱결제는 Unity IAP를 직접 쓰는 헬퍼라 Unity IAP를 설치하면(`FOUNDATIONDI_UNITYIAP`) 켜집니다
+- **동의** — 약관·개인정보처리방침 수락 → Google UMP(GDPR/TCF) → iOS ATT를 한 흐름으로 묻고(`IConsentService`), 광고·분석 초기화가 그 결과를 기다린다. UMP는 GMA Unity 플러그인 없이 네이티브 SDK를 직접 불러 LevelPlay AdMob 어댑터와 충돌하지 않는다. 약관 창은 기본 uGUI 프리팹을 제공하고 스킨 교체·완전 교체가 가능하다
 - **튜토리얼** — 게임 조건에 따라 나뉘어 발동하는 튜토리얼 진행 엔진(`ITutorialManager`). 시퀀스는 각자 `StartTrigger`로 발동하는 조건부 집합이고, 진행도는 시퀀스 ID로 영속화. 진행 규칙은 순수 C#이라 EditMode에서 전부 테스트됨
 - **UI 컴포넌트** — uGUI `Button`을 상속한 `UIButton`(클릭 SFX + 햅틱), 상태별 이미지/텍스트 스왑 `UIStateButton`, 호버 확대·누름 축소 `UIScaleButton`(스케일을 자식에만 걸어 히트 영역이 변하지 않는다). 사운드·햅틱 서비스는 선택적이라 등록하지 않으면 그 기능만 조용히 꺼진다
 - **씬 컴포넌트 DI** — 씬에 배치된 MonoBehaviour 주입은 Reflex의 `ContainerScope`가 직접 한다(실행 순서 `-1_000_000_000`, 어떤 `Awake`보다 먼저). `UIButton`/`MusicZone`/`OutputVolumeSlider`/`TutorialTarget` 등 패키지 컴포넌트는 서비스를 `[Inject]` 필드로 직접 받지 않고 `[Inject] Construct(IServiceResolver)` + `TryResolve`로 **선택 주입**한다 — 씬 주입에는 컴포넌트별 격리가 없어, 미등록 서비스를 요구하는 필드 하나가 그 뒤 순번 전체의 주입을 막기 때문이다
@@ -107,6 +108,7 @@ public class RootInstaller : MonoBehaviour, IInstaller
         // builder.RegisterMessageService();
         // builder.RegisterSoundService(_soundSettings);
         // builder.RegisterHapticService();
+        // builder.RegisterConsentService(_consentSettings);   // 약관 → UMP → ATT. 광고·분석보다 앞뒤 무관
         // builder.RegisterAdService(_adSettings);
         // builder.RegisterAnalyticsService(_analyticsSettings);
         // builder.RegisterIAPService();   // Unity IAP 설치 시(FOUNDATIONDI_UNITYIAP). 상품은 IAP Catalog
@@ -137,6 +139,17 @@ public class TitleFlow
     public void Open() => _ui.Page<TitlePresenter>();
 }
 ```
+
+## 마이그레이션 (0.11.x → 0.12.0)
+
+동의(약관·UMP·ATT)가 **ConsentService**로 분리됐습니다. 파괴적 변경입니다.
+
+1. 루트 `IInstaller`에 `builder.RegisterConsentService(_consentServiceSettings);`를 추가합니다. 추가하지 않아도 0.11처럼 ATT는 묻지만 경고가 남고, EEA·영국에서는 제한 광고만 나갑니다.
+2. `IAdService.TrackingAuthorization` → `IConsentService.TrackingAuthorization`, `AdServiceSettings`의 Request Tracking Authorization → `ConsentServiceSettings`로 옮깁니다. `IAdService.Consent`·`IAdProvider.Consent`·`IAdConsent`는 제거됐습니다.
+3. `AnalyticsServiceSettings`의 **Wait For Consent**(기본 켜짐)가 동의 판정으로 수집을 게이트합니다. Adjust 첫 세션 지연은 항상 켜집니다.
+4. **GMA(Google Mobile Ads) Unity 플러그인을 설치하지 마세요.** UMP는 패키지가 직접 부릅니다.
+
+상세 표와 설정은 [ConsentService README](Assets/FoundationDI/Runtime/Services/ConsentService/README.md) 11장에 있습니다.
 
 ## 마이그레이션 (0.9.x → 0.10.x)
 
@@ -190,6 +203,7 @@ DI 컨테이너가 **VContainer에서 Reflex 14.3.1로 바뀌었습니다.** 파
 | **SoundService** | 태그 기반 오디오 시스템. `Sound`/`Music`/`Playlist`/`DynamicMusic` 빌더, AudioSource 풀링, 페이드 인·아웃, 루프/트랙 콜백, id 기반 일괄 제어, AudioMixer Output 볼륨(`PlayerPrefs` 영속, `ISoundVolumeStorage`로 교체 가능), 레이캐스트 3D 오클루전. Audio Creator/Collection/Output Manager/Settings 에디터 창과 `MusicZone`/`OutputVolumeSlider` 컴포넌트 포함(버튼 클릭음은 `SoundService` 소속이 아니라 `Runtime/Components/`의 `UIButton`/`UIStateButton` 참고). | [README](Assets/FoundationDI/Runtime/Services/SoundService/README.md) |
 | **HapticService** | iOS/Android 통합 햅틱. 시맨틱 프리셋(`Impact`/`Notification`/`Selection`, 옵트인 쿨다운) + `AnimationCurve` 커브·커스텀 패턴 재생(`Play`, `Awaitable`, 단일 활성)·케이퍼빌리티 폴백. 에디터/데스크톱은 Noop, `Enabled`는 `PlayerPrefs`에 영속. | [README](Assets/FoundationDI/Runtime/Services/HapticService/README.md) |
 | **InitializeService** | 게임 부트스트랩 순차 초기화. 초기화 단위를 `InitializeItem`(SO)로 정의하고 `InitializeCatalog`에 묶어 리스트 순서대로 직렬 실행. 세션 내 중복 실행 방지, 예외는 즉시 전파하고 실패 지점부터 재개. | [README](Assets/FoundationDI/Runtime/Services/InitializeService/README.md) |
+| **ConsentService** | 약관·개인정보처리방침 수락 → Google UMP(GDPR/TCF) → iOS ATT를 한 흐름으로 묻는 앱 수명 서비스. 약관은 수락해야 진행되고 UMP·ATT는 거부해도 게임이 진행된다. UMP는 네이티브 SDK를 직접 부르는 얇은 브리지(Android JNI·iOS `.mm`)라 LevelPlay AdMob 어댑터(Next-Gen SDK)와 충돌하지 않고, 의존성 XML은 `Use UMP` 설정으로 생성·삭제된다. 실패해도 게임을 막지 않고 오프라인 첫 실행은 백오프로 재판정한다. 광고는 `PolicyAccepted && CanRequestAds`일 때만 초기화되고, 분석은 GDPR 판정으로 수집·버퍼를 게이트한다. | [README](Assets/FoundationDI/Runtime/Services/ConsentService/README.md) |
 | **AdService** | 광고 네트워크 중립 서비스. `IAdService` 하나로 전면·보상·배너를 다루고, 정책 계층(재시도 백오프·보상 래치·자동 재로드·전면 쿨다운·광고제거 게이트)과 SDK 어댑터를 분리. `ShowAsync`는 `Awaitable<AdShowResult>`. 광고제거는 포맷별로 다르게 게이트한다(전면·배너 차단, 보상형은 계속 동작). | [README](Assets/FoundationDI/Runtime/Services/AdService/README.md) |
 | **AnalyticsService** | 다중 분석/MMP 팬아웃. 게임이 `IAnalyticsService` API를 한 번 호출하면 등록된 모든 provider로 브로드캐스트된다. 라우팅 규칙 없음(무엇을 무시할지는 어댑터가 결정), 초기화 전 이벤트는 순서 보존 버퍼링·유저 상태는 latest-wins, provider 예외는 격리. | [README](Assets/FoundationDI/Runtime/Services/AnalyticsService/README.md) |
 | **IAPService** | 모바일 인앱 구매(Google Play/App Store). Unity IAP를 직접 쓰는 헬퍼로, 소모성·비소모성을 `IIAPService` 하나로 구매·복원. **지급을 저장한 뒤에만 확정**하는 규율을 `IIAPFulfillment` seam 하나로 접고, 비소모성 소유를 스토어 확정 목록으로 맞춘다(재설치 복구·환불 회수). 상품은 Unity IAP Catalog, 로컬 영수증 검증(Google Play)·상품 상수 생성기 포함. | [README](Assets/FoundationDI/Runtime/Services/IAPService/README.md) |
