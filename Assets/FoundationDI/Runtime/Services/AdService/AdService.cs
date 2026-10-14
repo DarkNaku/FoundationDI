@@ -175,7 +175,9 @@ namespace DarkNaku.FoundationDI
 
             _waitingForConsent = false;
             _consent.ConsentChanged -= OnConsentChanged;
-            InitializeAsync();
+
+            // 결과는 IsInitialized와 Loaded 이벤트로 드러난다. 여기서 기다릴 호출자가 없다.
+            _ = InitializeAsync();
         }
 
         private void CompleteWaiters(bool result)
