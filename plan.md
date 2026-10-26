@@ -793,7 +793,7 @@ MessagePipe 래퍼를 폐기하고 `Dictionary<Type, Delegate>` 기반 자체 �
 - [x] active 씬이 바뀌면 활성 presenter가 teardown되고 풀 View가 파괴된다
 - [x] 씬 전환 후 Page 재요청 시 새 씬에서 정상적으로 Show까지 도달한다
 
-## 진행 중: docs/TODO.md 기능 추가 요청 (1~5)
+## 완료: docs/TODO.md 기능 추가 요청 (1~5) — 0.13.0
 
 ### 1. `IPoolManager.Prewarm`
 - [x] 처음 보는 키를 Prewarm하면 프리팹을 한 번 로드하고 비활성 인스턴스를 count개 풀 루트 아래에 만든다

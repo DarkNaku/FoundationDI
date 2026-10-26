@@ -1,7 +1,7 @@
 # FoundationDI
 
 ![Unity](https://img.shields.io/badge/Unity-6000.3%2B-black?logo=unity)
-![Version](https://img.shields.io/badge/version-0.12.0-blue)
+![Version](https://img.shields.io/badge/version-0.13.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Author](https://img.shields.io/badge/author-DarkNaku-orange)
 
@@ -139,6 +139,16 @@ public class TitleFlow
     public void Open() => _ui.Page<TitlePresenter>();
 }
 ```
+
+## 변경 (0.12.x → 0.13.0)
+
+다른 프로젝트에서 요청한 기능 추가와 수정입니다(`docs/TODO.md` 1~5). 대부분 하위 호환입니다.
+
+- **`IPoolManager.Prewarm(key, count)`** — 로딩 시점에 풀을 데웁니다. `IPoolManager`를 직접 구현했다면 이 멤버를 추가해야 합니다.
+- **`builder.RegisterResourceService(ResourceBackend)`** — `ResourcesProvider`/`AddressablesProvider` + `ResourceService` 등록 한 줄.
+- **배너 높이** — LevelPlay(Android)는 요청 크기(적응형 컨테이너 높이)가 아니라 실제로 붙은 배너 뷰 높이를 알리고, dp 환산에 `DisplayMetrics.density`를 씁니다. Dummy는 캔버스 스케일이 반영된 실제 화면 높이를 알립니다. `IDummyAdScreen.ShowBanner`가 그린 높이(`float`)를 돌려주도록 바뀌었습니다.
+- **Dummy 광고 캔버스** — 플레이 모드를 끝내면 함께 지워집니다.
+- **IAP 영수증 검증** — Unity IAP 5의 `UnityEngine.Purchasing.Security.GooglePlayTangle`을 찾고, 빌드마다 링커가 보존합니다. 임시로 둔 전역 `GooglePlayTangle` 중계 클래스와 link.xml은 지워도 됩니다.
 
 ## 마이그레이션 (0.11.x → 0.12.0)
 

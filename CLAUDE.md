@@ -81,6 +81,8 @@ DI 코어는 **Reflex 14.3.1**이다. `Assets/Scripts/Installers/RootInstaller.c
   - **구현된 provider는 Dummy / AppLovin MAX / LevelPlay 셋** — AdMob 어댑터만 아직 없다. 3사 어댑터는 각각 `FoundationDI.AppLovin` / `FoundationDI.LevelPlay` 옵셔널 어셈블리이며 `[RuntimeInitializeOnLoadMethod]`에서 `AdProviderRegistry`에 스스로를 등록한다(코어는 역참조 불가).
   - **동의는 ConsentService가 맡는다(0.12).** `InitializeAsync`가 `IConsentService.RequestAsync()`를 먼저 await하고 **`PolicyAccepted && CanRequestAds`일 때만** provider를 초기화한다(아니면 경고 후 `false`, 재호출 시 재판정). `IConsentService`가 등록되지 않았으면 `ConsentService.CreateTrackingOnly`로 ATT만 묻는다(0.11 동작 보존). `IAdConsent`/`IAdProvider.Consent`/`IAdService.TrackingAuthorization`은 제거됐다. ATT 상세는 ConsentService 항목에 있다.
   - **LevelPlay 어댑터의 임프레션은 어댑터별 `Paid`로만 흘린다.** 9.5.1은 각 광고 객체에 `OnAdImpressionDataReady`가 있고 전역 `LevelPlay.OnImpressionDataReady`는 `[Obsolete]`다 — 둘 다 구독하면 수익이 이중 계상된다. 이 콜백은 **메인 스레드 보장이 없어**(Android는 `ThreadUtil`을 거치지 않는다) `IAdDispatcher.Post`로 마샬링한다. 나머지 수명주기 콜백은 SDK가 이미 메인 스레드로 넘겨 준다.
+  - **배너 높이는 요청 크기가 아니라 그려진 뷰에서 읽는다**(0.13). 적응형 배너는 `adSize`로 컨테이너 최대 높이(120dp)를 알려 50dp 소재 위로 UI가 떴다. `BannerHeightTracker`(코어, `IBannerViewMetrics` seam)가 정하며, LevelPlay Android는 `android.R.id.content` 아래 `LevelPlayBannerAdView`를 JNI로 찾아 `getHeight()`를 읽고(레이아웃 전이면 0.1→0.3→1초 재측정, 기다리는 동안 요청 크기를 먼저 알리지 않는다), dp 환산은 `Screen.dpi`(xdpi) 대신 `DisplayMetrics.density`다. iOS·에디터는 기존 근사. Android 구현은 `#if` 없이 `Application.platform`으로 고른다(어느 빌드 타깃에서도 컴파일 확인). **실기 검증은 아직 안 됐다.** Dummy는 캔버스 스케일이 반영된 화면 높이를 보낸다 — 캔버스를 비활성으로 구성한 뒤 켜야 `CanvasScaler`가 생성 직후부터 스케일을 반영한다.
+  - **Dummy 캔버스는 플레이 모드에서 `DontDestroyOnLoad`만, 에디트 모드에서만 `HideAndDontSave`다.** DontSave 계열 플래그가 붙으면 플레이 모드를 끝내도 Unity가 지우지 않아 에디트 모드 Game 뷰에 남았다.
   - 상세: `Assets/FoundationDI/Runtime/Services/AdService/README.md`.
 - **ConsentService** (`Services/ConsentService/`): 약관·개인정보처리방침 수락 → Google UMP(GDPR/TCF) → iOS ATT를 한 흐름으로 묻는 앱 수명 서비스. AdService·AnalyticsService가 초기화 앞에서 이 결과를 기다린다.
   - **약관은 수락해야 진행되고(거절 경로 없음), UMP·ATT는 거부해도 게임이 진행된다** — GDPR은 서비스 이용을 데이터 처리 동의의 조건으로 거는 것을 유효한 동의로 보지 않고, Apple은 추적 허용을 기능의 조건으로 걸거나 보상하는 것을 금지한다. 약관 수락은 버전(int)으로 저장해 `Policy Version`을 올리면 다시 묻는다(0이면 약관 단계 없음). 기존 유저는 게임이 `AcceptPolicy()`로 넘긴다.
@@ -117,12 +119,12 @@ DI 코어는 **Reflex 14.3.1**이다. `Assets/Scripts/Installers/RootInstaller.c
   - **스토어가 `PurchaseProduct` 안에서 동기로 주문을 낼 수 있다**(에디터 FakeStore). 그래서 `PurchaseAsync`는 완료 소스를 지역 변수로 잡고 await한다 — 필드를 다시 읽으면 완료 처리가 먼저 비워 NRE가 난다(플레이 모드에서 실제로 났다).
   - **에디터(FakeStore)**: 구매 확인 창이 Game 뷰에 뜨고, 복원은 지원되지 않으며(`OSXEditor is not a supported platform for the restore button`), **실행 사이에 구매가 남지 않아 다음 Play에서 소유가 회수된다**(동기화가 의도대로 동작하는 것).
   - **`PurchaseAsync`는 `Awaitable<IAPPurchaseResult>`**. 결과는 `Purchased/Restored/AlreadyOwned/UserCancelled/Deferred/NotReady/InvalidReceipt/Failed` 8종이며 `IsSuccess`가 앞 셋을 묶는다. 스토어 UI가 모달이라 동시 구매는 하나만 허용한다(두 번째는 `NotReady`).
-  - **iOS 로컬 검증은 불가능하다** — Unity IAP 5는 StoreKit 2를 쓰고 OS가 이미 검증한다. 로컬 검증은 Google Play 전용(`CrossPlatformValidator` + Tangle)이며 `GooglePlayTangle`은 Assembly-CSharp에 생성되므로 리플렉션으로 찾는다. Tangle이 없으면 경고 후 통과(개발 빌드가 막히지 않게).
+  - **iOS 로컬 검증은 불가능하다** — Unity IAP 5는 StoreKit 2를 쓰고 OS가 이미 검증한다. 로컬 검증은 Google Play 전용(`CrossPlatformValidator` + Tangle)이며 `GooglePlayTangle`은 Assembly-CSharp에 생성되므로 리플렉션으로 찾는다(`GooglePlayTangleLocator`). **Unity IAP 5는 `UnityEngine.Purchasing.Security.GooglePlayTangle`(`Assets/Scripts/UnityPurchasing/generated/`)을 만든다** — 이 이름을 먼저, 없으면 예전 전역 이름을 찾는다(전역만 찾아 검증 없이 통과하던 버그). 리플렉션 전용이라 `GooglePlayTangleLinkXmlGenerator`(`FoundationDI.UnityIAP.Editor`)가 빌드마다 실제로 있는 Tangle 타입만 보존한다. Tangle이 없으면 경고 후 통과(개발 빌드가 막히지 않게).
   - **AdService/AnalyticsService 연동은 수동 배선** — `_ads.AdsRemoved = _iap.IsOwned(...)`(환불 회수도 `OwnedChanged`로 오므로 `true`를 박지 말고 다시 읽는다), `_iap.Purchased += p => _analytics.LogPurchase(...)`.
   - 상품 상수는 `Tools/FoundationDI/IAP/Generate Product Constants`가 IAP Catalog로 `IAPProducts` 클래스를 생성한다. 출력 폴더는 기억한 폴더(EditorPrefs, 프로젝트 GUID 키) → 이 도구가 만든 기존 `IAPProducts.cs` 폴더 → 폴더 선택 창 순서다. `.asmref`로 코어 `FoundationDI`에 합류한다(문자열뿐이라 심볼 없이도 컴파일된다).
   - 상세: `Assets/FoundationDI/Runtime/Services/IAPService/README.md`.
 
-- **PoolManager** (`Managers/PoolManager/`): 키 기반 GameObject 오브젝트 풀. **프리팹 로드는 `IResourceService`에 위임한다.** `ObjectPool<IPoolItem>` 기반이며 `PoolData`가 풀을, `PoolItem`(MonoBehaviour)이 풀 항목 생명주기 콜백(`OnGetItem`/`OnReleaseItem` 등)과 지연 반환(`Release(delay)`)을 담당. 풀 루트는 `DontDestroyOnLoad`가 아니라 씬 스코프에 귀속시켜 씬 언로드 시 함께 정리된다. 생성 시 계층 전체에 DI를 주입하며, **주입 실패는 인스턴스 단위로 격리**된다(격리가 없으면 생성 콜백이 반환하지 못해 인스턴스가 씬에 고아로 남는다).
+- **PoolManager** (`Managers/PoolManager/`): 키 기반 GameObject 오브젝트 풀. **프리팹 로드는 `IResourceService`에 위임한다.** `ObjectPool<IPoolItem>` 기반이며 `PoolData`가 풀을, `PoolItem`(MonoBehaviour)이 풀 항목 생명주기 콜백(`OnGetItem`/`OnReleaseItem` 등)과 지연 반환(`Release(delay)`)을 담당. 풀 루트는 `DontDestroyOnLoad`가 아니라 씬 스코프에 귀속시켜 씬 언로드 시 함께 정리된다. 생성 시 계층 전체에 DI를 주입하며, **주입 실패는 인스턴스 단위로 격리**된다(격리가 없으면 생성 콜백이 반환하지 못해 인스턴스가 씬에 고아로 남는다). **`Prewarm(key, count)`는 `ObjectPool`을 거치지 않고 생성 콜백(`CreateItem`)만 불러 바로 `Release`한다** — `Get`→`Release`로 흉내 내면 `OnGetItem`(활성화)이 불필요하게 돈다. 그래서 Prewarm 인스턴스는 `OnCreateItem` → `OnReleaseItem` 순서로 콜백을 받는다.
 - **TutorialManager** (`Managers/TutorialManager/`): 조건 기반 튜토리얼 진행 엔진. "1레벨 시작 시 조작 안내, 3레벨에서 새 시스템, 5레벨에서 특정 아이템 등장 시" 같이 **게임 조건에 따라 나뉘어 발동**하는 튜토리얼을 다룬다. `Service`가 아니라 `Manager`인 이유는 씬 수명이기 때문이다(PoolManager와 같은 자리).
   - **시퀀스는 순차 리스트가 아니라 조건부 후보 집합**이다. 각 `TutorialSequence`가 자기 `StartTrigger`로 발동하며, 앞의 것이 끝나서 뜨는 게 아니다. 한 번에 하나만 실행되고 겹치면 `Order` 오름차순 대기열로 직렬화한다.
   - **진행도는 인덱스가 아니라 시퀀스 ID로 저장한다** — 시퀀스를 중간에 추가·삭제해도 기존 유저 진행도가 어긋나지 않는다. `ITutorialProgressStorage`(기본 `PlayerPrefsTutorialProgressStorage`) seam.
@@ -241,6 +243,7 @@ Director(DarkNaku의 씬/플로우 라이브러리), Input System, URP 2D가 구
 ## 리소스 로딩은 ResourceService에 위임한다
 
 - **에셋 로딩이 필요한 모든 서비스/시스템은 직접 `Addressables`/`Resources`를 호출하지 말고 `IResourceService`에 위임한다.** (Addressables 호출과 핸들 생명주기가 한 곳에서 참조 카운팅으로 관리되도록.)
+- 등록은 `builder.RegisterResourceService(ResourceBackend.Resources|Addressables)` 한 줄(provider + 서비스, Singleton·Lazy).
 - `IResourceService` API: `Awaitable<T> LoadAsync<T>(string key)`, `T Load<T>(string key)`(동기, `WaitForCompletion`), `void Release(string key)`, `Dispose()`. 모두 `where T : UnityEngine.Object`.
 - 키 단위 캐싱 + 참조 카운팅: 로드 1회 ↔ `Release` 1회 짝을 맞춘다. 참조가 0이 되면 실제 핸들이 해제된다.
 - 같은 키 동시 `LoadAsync`는 내부에서 중복 제거되어 Addressables 로드가 1회만 발생한다.
