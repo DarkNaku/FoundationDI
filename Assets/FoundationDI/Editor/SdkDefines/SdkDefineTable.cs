@@ -103,6 +103,13 @@ namespace DarkNaku.FoundationDI.Editor
                                "FoundationDI.iOSSupport",
                                new[] { "Unity.Advertisement.IosSupport" }),
 
+            // 광고·분석 SDK가 아니라 OS 알림 바인딩이다. iOSSupport와 같은 이유로 표에 있다.
+            new SdkDefineEntry("FOUNDATIONDI_MOBILENOTIFICATIONS",
+                               "Unity.Notifications.Unified",
+                               "Mobile Notifications",
+                               "FoundationDI.MobileNotifications",
+                               new[] { "Unity.Notifications.Unified", "Unity.Notifications.Android", "Unity.Notifications.iOS" }),
+
             new SdkDefineEntry("FOUNDATIONDI_ADJUST",
                                "AdjustSdk.Scripts",
                                "Adjust",
