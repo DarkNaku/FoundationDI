@@ -808,3 +808,12 @@ MessagePipe 래퍼를 폐기하고 `Dictionary<Type, Delegate>` 기반 자체 �
 - [x] Resources 백엔드로 등록하면 IResourceService는 ResourceService, IResourceProvider는 ResourcesProvider로 해석된다
 - [x] Addressables 백엔드로 등록하면 IResourceProvider는 AddressablesProvider로 해석된다
 - [x] 두 번 해석하면 같은 인스턴스를 돌려준다
+
+### 3. 배너 높이를 실제로 그려진 배너 뷰 기준으로
+- [x] 더미 배너는 표시하면 실제로 그려진 높이를 보고한다
+- [x] ShowBanner는 캔버스 스케일이 반영된 실제 화면 높이를 돌려준다
+- [ ] 뷰 높이를 잴 수 있으면 요청 크기 대신 잰 높이를 알린다
+- [ ] 뷰 높이를 잴 수 없는 플랫폼이면 요청 크기를 화면 밀도로 환산해 즉시 알린다
+- [ ] 레이아웃 전이라 아직 잴 수 없으면 다시 재고, 끝내 못 재면 요청 크기로 떨어진다
+- [ ] 다시 표시할 때는 높이가 같아도 알린다
+- [ ] 숨기거나 해제하면 대기 중인 재측정을 취소한다
