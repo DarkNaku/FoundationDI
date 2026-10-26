@@ -792,3 +792,14 @@ MessagePipe 래퍼를 폐기하고 `Dictionary<Type, Delegate>` 기반 자체 �
 - [x] UIRoot의 Canvas GO는 생성 시점 active 씬에 소속된다(DontDestroyOnLoad 아님)
 - [x] active 씬이 바뀌면 활성 presenter가 teardown되고 풀 View가 파괴된다
 - [x] 씬 전환 후 Page 재요청 시 새 씬에서 정상적으로 Show까지 도달한다
+
+## 진행 중: docs/TODO.md 기능 추가 요청 (1~5)
+
+### 1. `IPoolManager.Prewarm`
+- [x] 처음 보는 키를 Prewarm하면 프리팹을 한 번 로드하고 비활성 인스턴스를 count개 풀 루트 아래에 만든다
+- [x] Prewarm한 뒤 Get은 새로 만들지 않고 대기 인스턴스를 꺼낸다
+- [x] 대기 인스턴스가 이미 count 이상이면 Prewarm은 아무것도 만들지 않는다
+- [x] count가 0 이하면 Prewarm은 아무 일도 하지 않는다
+- [x] 빈 키로 Prewarm하면 에러를 남긴다
+- [x] Dispose 뒤 Prewarm은 아무 일도 하지 않는다
+- [x] Prewarm으로 만든 인스턴스도 한 번 주입하고 OnGetItem 없이 OnCreateItem → OnReleaseItem 순서로 콜백을 받는다

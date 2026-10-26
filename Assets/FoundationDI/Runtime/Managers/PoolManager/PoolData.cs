@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine.Pool;
 
@@ -7,10 +8,12 @@ namespace DarkNaku.FoundationDI
     {
         private IObjectPool<IPoolItem> _pool;
         private HashSet<IPoolItem> _items;
+        private readonly Func<IPoolItem> _create;
 
-        public PoolData(IObjectPool<IPoolItem> pool)
+        public PoolData(IObjectPool<IPoolItem> pool, Func<IPoolItem> create = null)
         {
             _pool = pool;
+            _create = create;
             _items = new HashSet<IPoolItem>();
         }
 
@@ -23,6 +26,25 @@ namespace DarkNaku.FoundationDI
             _items.Add(item);
 
             return item;
+        }
+
+        /// <summary>
+        /// 대기 인스턴스가 count개가 되도록 생성 함수만 불러 만든 뒤 바로 풀에 넣는다.
+        /// ObjectPool에는 '만들어서 대기열에 넣는' API가 없고, Get→Release로 흉내 내면
+        /// OnGetItem(활성화)이 불필요하게 돈다. 꺼낸 목록(_items)에는 넣지 않는다.
+        /// </summary>
+        public void Prewarm(int count)
+        {
+            if (_pool == null || _create == null) return;
+
+            for (var i = _pool.CountInactive; i < count; i++)
+            {
+                var item = _create();
+
+                item.PD = this;
+
+                _pool.Release(item);
+            }
         }
 
         public void Release(IPoolItem item)
