@@ -27,9 +27,8 @@ public class RootInstaller : MonoBehaviour, IInstaller
 {
     public void InstallBindings(ContainerBuilder builder)
     {
-        // 프리팹 로드 백엔드는 provider 등록 한 줄로 교체한다(Resources → Addressables 등).
-        builder.RegisterType(typeof(ResourcesProvider), new[] { typeof(IResourceProvider) }, Lifetime.Singleton, Resolution.Lazy);
-        builder.RegisterType(typeof(ResourceService), new[] { typeof(IResourceService) }, Lifetime.Singleton, Resolution.Lazy);
+        // 프리팹 로드 백엔드는 인자로 고른다(기본 Resources, ResourceBackend.Addressables 등).
+        builder.RegisterResourceService();
     }
 }
 
@@ -308,7 +307,7 @@ page.WithOverlay<TouchGuardOverlay>();     // 기본(per-host) 오버레이
 ### DI / 설정
 
 - `void RegisterUINavigator(this ContainerBuilder builder, UINavigatorSettings settings)` — UINavigator 등록 확장(`UINavigatorSettings`/`UIInstanceFactory`/`UINavigator as IUINavigator` 등록).
-  **전제: 호출 전에 `IResourceService`가 등록되어 있어야 합니다.**
+  **전제: 호출 전에 `IResourceService`가 등록되어 있어야 합니다** — 루트 `IInstaller`에서 `builder.RegisterResourceService()`로 등록합니다.
 - **주입 대상**: Presenter는 생성 시(`UIInstanceFactory`), View는 프리팹 인스턴스 생성 시 계층 전체의 MonoBehaviour가 주입됩니다(`InjectGameObject`). 둘 다 `[Inject]` 필드를 쓸 수 있습니다.
   - View 주입은 **풀 인스턴스당 1회**입니다. 풀에서 재사용될 때는 다시 주입되지 않습니다(UINavigator가 dispose되면 풀도 함께 dispose되므로, 다음 씬에서는 새로 생성·주입됩니다).
   - Presenter/View는 UINavigator를 **등록한 스코프**의 리졸버로 주입됩니다. 씬 `IInstaller`에 등록했다면 그 씬 스코프(및 부모인 루트 스코프) 의존까지 해석되고, 형제 씬 스코프나 자식 스코프의 의존은 해석되지 않습니다.

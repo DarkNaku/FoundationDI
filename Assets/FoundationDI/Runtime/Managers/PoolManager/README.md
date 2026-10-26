@@ -24,6 +24,7 @@ public class SceneInstaller : MonoBehaviour, IInstaller   // 씬에 배치
     public void InstallBindings(ContainerBuilder builder)
     {
         // 전제: 부모(루트) 스코프에 IResourceService가 이미 등록되어 있어야 한다.
+        //       (루트 IInstaller에서 builder.RegisterResourceService())
         builder.RegisterPoolManager(transform);
     }
 }
