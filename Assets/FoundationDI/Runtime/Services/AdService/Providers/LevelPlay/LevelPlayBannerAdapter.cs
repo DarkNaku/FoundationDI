@@ -14,21 +14,31 @@ namespace DarkNaku.FoundationDI
     {
         private readonly ILevelPlayBannerAd _bannerAd;
         private readonly IAdDispatcher _dispatcher;
+        private readonly BannerHeightTracker _height;
 
         // OnAdImpressionDataReady는 메인 스레드 보장이 없다(LevelPlayFullScreenAdapter의
         // 같은 핸들러 주석 참고). 그 핸들러가 이 플래그를 읽으므로 volatile이어야 한다.
         private volatile bool _isDisposed;
 
-        private float _height;
-
-        public float Height => _height;
+        public float Height => _height.Height;
 
         public event Action<float> HeightChanged;
         public event Action<AdImpression> Paid;
 
         public LevelPlayBannerAdapter(string adUnitId, BannerOptions options, IAdDispatcher dispatcher)
+            : this(adUnitId, options, dispatcher, LevelPlayBannerViewMetrics.Create())
+        {
+        }
+
+        internal LevelPlayBannerAdapter(string adUnitId, BannerOptions options, IAdDispatcher dispatcher,
+                                        IBannerViewMetrics metrics)
         {
             _dispatcher = dispatcher;
+
+            // 높이는 요청 크기(adSize)가 아니라 실제로 붙은 배너 뷰에서 읽는다. 적응형 배너는
+            // adSize로 컨테이너 최대 높이(예: 120dp)를 알려 주는데 실제 소재는 50dp인 경우가 많다.
+            _height = new BannerHeightTracker(metrics, dispatcher);
+            _height.Changed += h => HeightChanged?.Invoke(h);
 
             // SetDisplayOnLoad(false)가 핵심이다. 기본값(true)이면 로드가 끝나는 즉시 배너가
             // 화면에 뜨는데, 표시 시점을 정하는 것은 BannerAdUnit(정책 계층)이다 —
@@ -60,9 +70,11 @@ namespace DarkNaku.FoundationDI
             // BannerAdUnit.Hide()는 HeightChanged(0)을 쏘고 내려간다(Ads/BannerAdUnit.cs).
             // 그 뒤 다시 Show()해도 SDK가 다음 자동 갱신(OnAdLoaded)을 낼 때까지는 아무
             // 이벤트도 오지 않아, 이벤트로 레이아웃을 잡는 소비자가 배너가 실제로 보이는
-            // 동안에도 높이 0으로 남는다. 표시 시점에 현재 크기를 다시 읽어 즉시 알려준다 —
+            // 동안에도 높이 0으로 남는다. 표시 시점에 높이를 다시 재서 알려준다 —
             // 값이 이전과 같아도 소비자 입장에선 0에서 실제값으로 "변경"된 것이므로 항상 쏜다.
-            UpdateHeight(_bannerAd.GetAdSize(), alwaysNotify: true);
+            // 뷰는 ShowAd가 UI 스레드에서 VISIBLE로 바꾼 뒤 레이아웃돼야 높이가 생기므로
+            // 트래커가 잠시 뒤 다시 잰다.
+            _height.Refresh(_bannerAd.GetAdSize()?.Height, alwaysNotify: true);
         }
 
         public void Hide()
@@ -70,32 +82,20 @@ namespace DarkNaku.FoundationDI
             if (_isDisposed) return;
 
             // HeightChanged(0)은 BannerAdUnit.Hide()가 이미 쏜다. 여기서 또 쏘면 중복이다.
+            // 표시 때 걸어 둔 재측정은 버린다 — 숨긴 뒤에 잰 값이 이벤트로 나가면 안 된다.
             _bannerAd.HideAd();
+            _height.Cancel();
         }
 
-        // 최초 로드와 SDK 자동 갱신 때마다 온다. 어댑티브 배너는 화면 폭/방향에 따라 높이가
-        // 바뀔 수 있으므로 매번 다시 읽는다. AdInfo가 실은 크기를 실어 오지만
+        // 최초 로드와 SDK 자동 갱신 때마다 온다. 갱신마다 붙는 소재가 달라 높이가 바뀔 수 있으므로
+        // 매번 다시 잰다. 요청 크기는 뷰를 잴 수 없을 때의 폴백이다. AdInfo가 실은 크기를 실어 오지만
         // (LevelPlayAdInfo.AdSize) 파싱에 실패하면 null이므로(LevelPlayAdInfo.GetAdSize의
         // catch 분기) 그때는 배너 객체에 직접 묻는다.
         private void OnAdLoaded(LevelPlayAdInfo info)
         {
             if (_isDisposed) return;
 
-            UpdateHeight(info?.AdSize ?? _bannerAd.GetAdSize(), alwaysNotify: false);
-        }
-
-        private void UpdateHeight(LevelPlayAdSize size, bool alwaysNotify)
-        {
-            // 크기를 알 수 없으면 이전 값을 유지한다. 0으로 덮으면 배너가 떠 있는데도
-            // 레이아웃이 배너 없는 상태로 되돌아간다.
-            if (size == null) return;
-
-            var height = LevelPlayAdMapper.DpToPixels(size.Height);
-
-            if (!alwaysNotify && Mathf.Approximately(height, _height)) return;
-
-            _height = height;
-            HeightChanged?.Invoke(_height);
+            _height.Refresh((info?.AdSize ?? _bannerAd.GetAdSize())?.Height, alwaysNotify: false);
         }
 
         // IBannerAdapter에는 로드 실패를 알릴 이벤트가 없다(배너는 재시도 개념이 없다 —
@@ -138,7 +138,7 @@ namespace DarkNaku.FoundationDI
 
             _bannerAd.DestroyAd();
 
-            _height = 0f;
+            _height.Dispose();
             HeightChanged = null;
             Paid = null;
         }

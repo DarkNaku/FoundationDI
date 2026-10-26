@@ -6,3 +6,4 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("FoundationDI.Tests.Runtime")]
 [assembly: InternalsVisibleTo("FoundationDI.UnityIAP.Tests")]
 [assembly: InternalsVisibleTo("DynamicProxyGenAssembly2")]
+[assembly: InternalsVisibleTo("FoundationDI.LevelPlay")]
