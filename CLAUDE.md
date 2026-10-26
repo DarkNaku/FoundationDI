@@ -124,6 +124,19 @@ DI 코어는 **Reflex 14.3.1**이다. `Assets/Scripts/Installers/RootInstaller.c
   - 상품 상수는 `Tools/FoundationDI/IAP/Generate Product Constants`가 IAP Catalog로 `IAPProducts` 클래스를 생성한다. 출력 폴더는 기억한 폴더(EditorPrefs, 프로젝트 GUID 키) → 이 도구가 만든 기존 `IAPProducts.cs` 폴더 → 폴더 선택 창 순서다. `.asmref`로 코어 `FoundationDI`에 합류한다(문자열뿐이라 심볼 없이도 컴파일된다).
   - 상세: `Assets/FoundationDI/Runtime/Services/IAPService/README.md`.
 
+- **LocalNotificationService** (`Services/LocalNotificationService/`): 로컬 알림 **예약 엔진**(BlockAway `LocalNotifications`에서 게임 규칙을 걷어냈다). 0.13.
+  - **일정은 게임이 `ILocalNotificationPlanner`로 공급한다** — 등록된 planner 전부를 `container.All<>()`로 모아 합친다. 서비스는 언제 다시 예약할지(`Start` + 앱이 포커스를 잃을 때), 권한 1회 요청(`TryRequestPermissionOnce`, 창을 띄웠으면 true — 같은 때 리뷰 창을 피하는 데 쓴다), 켜기/끄기 영속화만 맡는다.
+  - 예약은 늘 **전부 지우고 다시 넣는다**. 지난 시각은 서비스가 거르고, planner 예외는 그 planner에 가둔다. 알림 창구는 처음 쓸 때 만든다(모바일 알림 센터 초기화가 저사양에서 0.5~1초).
+  - OS 창구는 `com.unity.mobile.notifications`가 있을 때만 옵셔널 어셈블리 `FoundationDI.MobileNotifications`(`FOUNDATIONDI_MOBILENOTIFICATIONS`, 마커 `Unity.Notifications.Unified`)가 `LocalNotifierRegistry`에 등록한다. 없거나 에디터면 `UnsupportedLocalNotifier`(권한 있음·예약 안 함). 권한 확인만 플랫폼 API — 공통 API `RequestPermission`은 창을 띄워 확인용으로 못 쓴다.
+  - 빌드 직전 `MobileNotificationSettingsApplier`(`FoundationDI.MobileNotifications.Editor`)가 iOS 앱 시작 시 권한 요청을 끄고, Android 재부팅 뒤 재예약을 켜고, 설정의 작은 아이콘을 `fdi_notification_small`로 등록한다. 패키지가 drawable 목록 공개 API를 주지 않아 등록 여부는 `ProjectSettings/NotificationsSettings.asset` 텍스트로 본다(없는 ID를 지우면 경고가 나서).
+  - 호스트에 2.5.0을 설치했다(심볼 동기화가 켬). 이식 후 실기 미검증.
+  - 상세: `Assets/FoundationDI/Runtime/Services/LocalNotificationService/README.md`.
+- **ReviewService** (`Services/ReviewService/`): OS 앱 내 리뷰 창구(BlockAway `IStoreReview` 이식). 0.13.
+  - **언제 부를지는 게임이 정한다** — `Prepare()`(Android는 ReviewInfo를 미리 받음) / `Request()`(요청을 보냈으면 true, 창이 떴다는 뜻은 아님). 우리 팝업으로 먼저 묻지 않는다(Google·Apple 정책).
+  - `StoreReviewFactory`가 `#if` 없이 `Application.platform`으로 고른다: Android JNI(`ReviewManagerFactory`) / iOS `Device.RequestStoreReview` / 에디터 로그만. Android Task 결과는 UI 스레드로 와서 `IMainThreadDispatcher`로 넘기며, **디스패처는 Android 창구를 만들 때만 해석한다**(EditMode에서 해석하면 러너의 `DontDestroyOnLoad`가 던진다).
+  - **Play Review 의존성 XML은 `ReviewServiceSettings.UsePlayInAppReview`로 생성·삭제한다**(`Assets/FoundationDI.Data/Editor/FoundationDIPlayReviewDependencies.xml`, UMP와 같은 이유). 꺼져 있으면 Android에서 창을 띄우지 않는다(ClassNotFound 회피). 창구 생성 실패는 이후 요청을 `false`로 끝낸다.
+  - 상세: `Assets/FoundationDI/Runtime/Services/ReviewService/README.md`.
+
 - **PoolManager** (`Managers/PoolManager/`): 키 기반 GameObject 오브젝트 풀. **프리팹 로드는 `IResourceService`에 위임한다.** `ObjectPool<IPoolItem>` 기반이며 `PoolData`가 풀을, `PoolItem`(MonoBehaviour)이 풀 항목 생명주기 콜백(`OnGetItem`/`OnReleaseItem` 등)과 지연 반환(`Release(delay)`)을 담당. 풀 루트는 `DontDestroyOnLoad`가 아니라 씬 스코프에 귀속시켜 씬 언로드 시 함께 정리된다. 생성 시 계층 전체에 DI를 주입하며, **주입 실패는 인스턴스 단위로 격리**된다(격리가 없으면 생성 콜백이 반환하지 못해 인스턴스가 씬에 고아로 남는다). **`Prewarm(key, count)`는 `ObjectPool`을 거치지 않고 생성 콜백(`CreateItem`)만 불러 바로 `Release`한다** — `Get`→`Release`로 흉내 내면 `OnGetItem`(활성화)이 불필요하게 돈다. 그래서 Prewarm 인스턴스는 `OnCreateItem` → `OnReleaseItem` 순서로 콜백을 받는다.
 - **TutorialManager** (`Managers/TutorialManager/`): 조건 기반 튜토리얼 진행 엔진. "1레벨 시작 시 조작 안내, 3레벨에서 새 시스템, 5레벨에서 특정 아이템 등장 시" 같이 **게임 조건에 따라 나뉘어 발동**하는 튜토리얼을 다룬다. `Service`가 아니라 `Manager`인 이유는 씬 수명이기 때문이다(PoolManager와 같은 자리).
   - **시퀀스는 순차 리스트가 아니라 조건부 후보 집합**이다. 각 `TutorialSequence`가 자기 `StartTrigger`로 발동하며, 앞의 것이 끝나서 뜨는 게 아니다. 한 번에 하나만 실행되고 겹치면 `Order` 오름차순 대기열로 직렬화한다.
