@@ -28,9 +28,9 @@ namespace DarkNaku.FoundationDI
         {
             if (_isDisposed) return;
 
-            _screen.ShowBanner(_bannerOptions.Position, _options.BannerHeight);
-
-            Height = _options.BannerHeight;
+            // 설정값이 아니라 그려진 높이를 알린다. 게임은 이 값으로 배너 바로 위에 UI를 붙이므로
+            // 캔버스 스케일 때문에 둘이 다르면 UI가 배너에 겹치거나 떠 보인다.
+            Height = _screen.ShowBanner(_bannerOptions.Position, _options.BannerHeight);
             HeightChanged?.Invoke(Height);
 
             Paid?.Invoke(new AdImpression(AdFormat.Banner, "Dummy", "DummyNetwork", _adUnitId,

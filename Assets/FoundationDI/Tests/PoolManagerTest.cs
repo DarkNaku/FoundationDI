@@ -223,4 +223,151 @@ public class PoolManagerTest
         Assert.IsTrue(go == null, "풀 루트와 함께 파괴되어야 한다");
         Object.DestroyImmediate(prefab);
     }
+
+    [Test]
+    public void 처음_보는_키를_Prewarm하면_프리팹을_한번_로드하고_비활성_인스턴스를_풀_루트_아래에_만든다()
+    {
+        var prefab = new GameObject("prefab");
+        var resource = Substitute.For<IResourceService>();
+        resource.Load<GameObject>("enemy").Returns(prefab);
+        var scope = new GameObject("scope");
+        var sut = new PoolManager(resource, null, scope.transform);
+        var root = scope.transform.Find("[PoolManager]");
+
+        sut.Prewarm("enemy", 5);
+
+        resource.Received(1).Load<GameObject>("enemy");
+        Assert.AreEqual(5, root.childCount);
+
+        foreach (Transform child in root)
+        {
+            Assert.IsFalse(child.gameObject.activeSelf, "대기 인스턴스는 비활성이어야 한다");
+        }
+
+        sut.Dispose();
+        Object.DestroyImmediate(prefab);
+        Object.DestroyImmediate(scope);
+    }
+
+    [Test]
+    public void Prewarm한_뒤_Get은_새로_만들지_않고_대기_인스턴스를_꺼낸다()
+    {
+        var prefab = new GameObject("prefab");
+        var resource = Substitute.For<IResourceService>();
+        resource.Load<GameObject>("enemy").Returns(prefab);
+        var resolver = Substitute.For<IServiceResolver>();
+        var sut = new PoolManager(resource, resolver);
+        sut.Prewarm("enemy", 5);
+        resolver.ClearReceivedCalls();
+
+        for (var i = 0; i < 5; i++)
+        {
+            Assert.IsTrue(sut.Get("enemy").activeSelf, "꺼낸 인스턴스는 활성이어야 한다");
+        }
+
+        // 새 인스턴스는 생성될 때만 주입된다. 주입이 없으면 Instantiate도 없었다.
+        resolver.DidNotReceive().InjectGameObject(Arg.Any<GameObject>());
+
+        sut.Dispose();
+        Object.DestroyImmediate(prefab);
+    }
+
+    [Test]
+    public void 대기_인스턴스가_이미_count_이상이면_Prewarm은_아무것도_만들지_않는다()
+    {
+        var prefab = new GameObject("prefab");
+        var resource = Substitute.For<IResourceService>();
+        resource.Load<GameObject>("enemy").Returns(prefab);
+        var resolver = Substitute.For<IServiceResolver>();
+        var sut = new PoolManager(resource, resolver);
+        sut.Prewarm("enemy", 5);
+        resolver.ClearReceivedCalls();
+
+        sut.Prewarm("enemy", 3);
+
+        resolver.DidNotReceive().InjectGameObject(Arg.Any<GameObject>());
+
+        sut.Dispose();
+        Object.DestroyImmediate(prefab);
+    }
+
+    [Test]
+    public void count가_0_이하면_Prewarm은_아무_일도_하지_않는다()
+    {
+        var resource = Substitute.For<IResourceService>();
+        var sut = new PoolManager(resource, null);
+
+        sut.Prewarm("enemy", 0);
+        sut.Prewarm("enemy", -1);
+
+        resource.DidNotReceive().Load<GameObject>(Arg.Any<string>());
+
+        sut.Dispose();
+    }
+
+    [Test]
+    public void 빈_키로_Prewarm하면_에러를_남긴다()
+    {
+        var resource = Substitute.For<IResourceService>();
+        var sut = new PoolManager(resource, null);
+
+        LogAssert.Expect(LogType.Error, new Regex("Prewarm : Key is wrong"));
+        sut.Prewarm("", 3);
+
+        sut.Dispose();
+    }
+
+    [Test]
+    public void Dispose_뒤_Prewarm은_아무_일도_하지_않는다()
+    {
+        var resource = Substitute.For<IResourceService>();
+        var sut = new PoolManager(resource, null);
+        sut.Dispose();
+
+        sut.Prewarm("enemy", 3);
+
+        resource.DidNotReceive().Load<GameObject>(Arg.Any<string>());
+    }
+
+    [Test]
+    public void Prewarm으로_만든_인스턴스도_한번_주입하고_OnGetItem_없이_OnCreateItem_다음_OnReleaseItem을_받는다()
+    {
+        var prefab = new GameObject("prefab");
+        prefab.AddComponent<CallbackRecorder>();
+        var resource = Substitute.For<IResourceService>();
+        resource.Load<GameObject>("enemy").Returns(prefab);
+        var resolver = Substitute.For<IServiceResolver>();
+        var scope = new GameObject("scope");
+        var sut = new PoolManager(resource, resolver, scope.transform);
+        var root = scope.transform.Find("[PoolManager]");
+
+        sut.Prewarm("enemy", 1);
+
+        resolver.Received(1).InjectGameObject(Arg.Any<GameObject>());
+        var recorder = root.GetChild(0).GetComponent<CallbackRecorder>();
+        CollectionAssert.AreEqual(new[] { "Create", "Release" }, recorder.Calls);
+
+        sut.Dispose();
+        Object.DestroyImmediate(prefab);
+        Object.DestroyImmediate(scope);
+    }
+
+    private class CallbackRecorder : PoolItem
+    {
+        public readonly System.Collections.Generic.List<string> Calls = new();
+
+        public override void OnCreateItem() => Calls.Add("Create");
+
+        public override void OnGetItem()
+        {
+            Calls.Add("Get");
+            base.OnGetItem();
+        }
+
+        public override void OnReleaseItem()
+        {
+            Calls.Add("Release");
+            base.OnReleaseItem();
+        }
+    }
 }

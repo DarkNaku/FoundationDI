@@ -1,0 +1,25 @@
+{
+    "name": "FoundationDI.MobileNotifications",
+    "rootNamespace": "",
+    "references": [
+        "FoundationDI",
+        "Unity.Notifications.Unified",
+        "Unity.Notifications.Android",
+        "Unity.Notifications.iOS"
+    ],
+    "includePlatforms": [
+        "Editor",
+        "Android",
+        "iOS"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "FOUNDATIONDI_MOBILENOTIFICATIONS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

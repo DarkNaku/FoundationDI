@@ -24,6 +24,7 @@ public class SceneInstaller : MonoBehaviour, IInstaller   // 씬에 배치
     public void InstallBindings(ContainerBuilder builder)
     {
         // 전제: 부모(루트) 스코프에 IResourceService가 이미 등록되어 있어야 한다.
+        //       (루트 IInstaller에서 builder.RegisterResourceService())
         builder.RegisterPoolManager(transform);
     }
 }
@@ -77,6 +78,22 @@ public class Bullet : PoolItem
 
 콜백 순서: `OnCreateItem`(최초 1회) → `OnGetItem`(꺼낼 때마다) → `OnReleaseItem`(반환할 때마다) → `OnDestroyItem`(풀 정리 시).
 
+### 4) 로딩 시점에 풀 데우기 (`Prewarm`)
+
+첫 `Get`마다 `Instantiate`와 DI 주입이 일어나 한꺼번에 많이 꺼내면 첫 프레임이 끊깁니다. 로딩 화면처럼 끊김이 안 보이는 시점에 미리 만들어 둡니다.
+
+```csharp
+public async Awaitable LoadLevelAsync()
+{
+    _pool.Prewarm("Tile", 300);   // 대기 인스턴스가 최소 300개가 되도록 만든다
+    // ...
+}
+```
+
+- 대기 중인 인스턴스가 이미 `count` 이상이면 아무것도 하지 않습니다(부족한 만큼만 만듭니다).
+- Prewarm으로 만든 인스턴스는 `OnGetItem` 없이 **`OnCreateItem` → `OnReleaseItem`** 순서로 콜백을 받고, 비활성 상태로 풀 루트 아래에 대기합니다. `Get`→`Release`로 흉내 낼 때와 달리 활성화·부모 변경이 불필요하게 일어나지 않습니다.
+- 풀 상한(10000)을 넘는 `count`는 상한까지만 만듭니다.
+
 ---
 
 ## API
@@ -88,6 +105,7 @@ public class Bullet : PoolItem
 | `Get` | `GameObject Get(string key, Transform parent = null)` | 키에 해당하는 인스턴스를 풀에서 가져옵니다(없으면 로드·생성). `parent` 생략 시 풀 루트 아래로. |
 | `Get<T>` | `T Get<T>(string key, Transform parent = null) where T : class` | `Get` 후 `GetComponent<T>()` 결과를 반환합니다. |
 | `Release` | `void Release(GameObject item, float delay = 0f)` | 인스턴스를 풀로 되돌립니다. `delay > 0`이면 그 시간 뒤 반환(`Awaitable`). |
+| `Prewarm` | `void Prewarm(string key, int count)` | 키의 풀에 비활성 인스턴스가 최소 `count`개 대기하도록 미리 만듭니다(없으면 로드·생성). `count <= 0`이면 무시, 빈 키는 에러 로그. |
 | `Dispose` | `void Dispose()` | 모든 풀을 정리하고, 로드한 에셋을 키마다 `IResourceService.Release`하며, 풀 루트를 파괴합니다. |
 
 ### 생성자

@@ -792,3 +792,65 @@ MessagePipe 래퍼를 폐기하고 `Dictionary<Type, Delegate>` 기반 자체 �
 - [x] UIRoot의 Canvas GO는 생성 시점 active 씬에 소속된다(DontDestroyOnLoad 아님)
 - [x] active 씬이 바뀌면 활성 presenter가 teardown되고 풀 View가 파괴된다
 - [x] 씬 전환 후 Page 재요청 시 새 씬에서 정상적으로 Show까지 도달한다
+
+## 완료: docs/TODO.md 기능 추가 요청 (1~5) — 0.13.0
+
+### 1. `IPoolManager.Prewarm`
+- [x] 처음 보는 키를 Prewarm하면 프리팹을 한 번 로드하고 비활성 인스턴스를 count개 풀 루트 아래에 만든다
+- [x] Prewarm한 뒤 Get은 새로 만들지 않고 대기 인스턴스를 꺼낸다
+- [x] 대기 인스턴스가 이미 count 이상이면 Prewarm은 아무것도 만들지 않는다
+- [x] count가 0 이하면 Prewarm은 아무 일도 하지 않는다
+- [x] 빈 키로 Prewarm하면 에러를 남긴다
+- [x] Dispose 뒤 Prewarm은 아무 일도 하지 않는다
+- [x] Prewarm으로 만든 인스턴스도 한 번 주입하고 OnGetItem 없이 OnCreateItem → OnReleaseItem 순서로 콜백을 받는다
+
+### 2. `RegisterResourceService`
+- [x] Resources 백엔드로 등록하면 IResourceService는 ResourceService, IResourceProvider는 ResourcesProvider로 해석된다
+- [x] Addressables 백엔드로 등록하면 IResourceProvider는 AddressablesProvider로 해석된다
+- [x] 두 번 해석하면 같은 인스턴스를 돌려준다
+
+### 3. 배너 높이를 실제로 그려진 배너 뷰 기준으로
+- [x] 더미 배너는 표시하면 실제로 그려진 높이를 보고한다
+- [x] ShowBanner는 캔버스 스케일이 반영된 실제 화면 높이를 돌려준다
+- [x] 뷰 높이를 잴 수 있으면 요청 크기 대신 잰 높이를 알린다
+- [x] 뷰 높이를 잴 수 없는 플랫폼이면 요청 크기를 화면 밀도로 환산해 즉시 알린다
+- [x] 레이아웃 전이라 아직 잴 수 없으면 다시 재고, 끝내 못 재면 요청 크기로 떨어진다
+- [x] 다시 표시할 때는 높이가 같아도 알린다
+- [x] 숨기거나 해제하면 대기 중인 재측정을 취소한다
+
+### 4. 플레이 모드를 끝내도 Dummy 광고 캔버스가 남지 않게
+- [x] 플레이 모드에서 만든 루트는 DontSave 없이 DontDestroyOnLoad 씬에 둔다 (PlayMode)
+- [x] 에디트 모드에서 만든 루트는 HideAndDontSave로 둔다
+
+### 5. 영수증 검증기가 Unity IAP 5의 `GooglePlayTangle`을 찾게
+- [x] 네임스페이스 안의 GooglePlayTangle만 있어도 찾는다
+- [x] 전역 GooglePlayTangle만 있어도 찾는다(예전 IAP 호환)
+- [x] 둘 다 있으면 네임스페이스 안의 것을 먼저 쓴다
+- [x] 둘 다 없으면 null
+- [x] 링커 보존 XML은 존재하는 Tangle 타입만 그 어셈블리에 preserve="all"로 넣는다
+- [x] Tangle 타입이 없으면 빈 linker를 만든다
+
+## 완료: LocalNotificationService · ReviewService (BlockAway 참고) — 0.13.0
+
+범위(사용자 결정 2026-10-26): 알림은 **엔진만**(일정은 게임이 `ILocalNotificationPlanner`로 공급),
+리뷰는 **OS 창구만**(언제 부를지는 게임이 정함), Play In-App Review 의존성 XML은 설정 토글로 생성·삭제.
+
+### LocalNotificationService
+- [x] Reschedule는 예약을 지운 뒤 모든 planner의 알림을 예약한다
+- [x] 권한이 없으면 지우기만 한다
+- [x] 꺼져 있으면 지우기만 한다
+- [x] 지난 시각의 알림은 예약하지 않는다
+- [x] planner 하나가 예외를 던져도 나머지는 예약한다
+- [x] 알림 창구는 처음 쓸 때 만든다
+- [x] Start 뒤 앱이 포커스를 잃으면 다시 예약하고, Dispose 뒤에는 하지 않는다
+- [x] 끄면 예약을 지우고 상태를 저장한다, 켜면 다시 예약한다
+- [x] 권한을 처음 물을 때만 창을 띄우고 허용되면 예약한다
+- [x] 이미 권한이 있으면 창 없이 예약만 한다
+- [x] 등록하면 planner들을 모아 서비스를 만든다
+
+### ReviewService
+- [x] Request는 OS 창구에 요청을 넘긴다
+- [x] OS 창구가 예외를 던지면 false를 돌려주고 경고만 남긴다
+- [x] Prepare가 예외를 던져도 삼킨다
+- [x] Play In-App Review 의존성 XML은 설정을 켜면 만들고 끄면 지운다
+- [x] 등록하면 IReviewService가 해석된다

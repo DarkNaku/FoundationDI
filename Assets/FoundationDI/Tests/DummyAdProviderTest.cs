@@ -20,7 +20,14 @@ public class DummyAdProviderTest
             OnComplete = onComplete;
         }
 
-        public void ShowBanner(BannerPosition position, float height) => BannerShowCount++;
+        public float DrawnBannerHeight = 100f;
+
+        public float ShowBanner(BannerPosition position, float height)
+        {
+            BannerShowCount++;
+            return DrawnBannerHeight;
+        }
+
         public void HideBanner() => BannerHideCount++;
         public void Dispose() => IsDisposed = true;
     }
@@ -186,9 +193,10 @@ public class DummyAdProviderTest
     }
 
     [Test]
-    public void 더미_배너는_표시하면_설정된_높이를_보고하고_임프레션을_발행한다()
+    public void 더미_배너는_표시하면_실제로_그려진_높이를_보고하고_임프레션을_발행한다()
     {
-        var screen = new FakeScreen();
+        // 설정값(100)이 아니라 캔버스 스케일이 반영돼 화면에 그려진 높이를 알려야 한다.
+        var screen = new FakeScreen { DrawnBannerHeight = 135f };
         var sut = new DummyBannerAdapter(screen, "unit-1",
             new BannerOptions(BannerPosition.Bottom, BannerSize.Adaptive, true), NeverFails);
 
@@ -200,8 +208,8 @@ public class DummyAdProviderTest
         sut.Show();
 
         Assert.AreEqual(1, screen.BannerShowCount);
-        Assert.AreEqual(100f, sut.Height, 0.001f);
-        Assert.AreEqual(100f, reported, 0.001f);
+        Assert.AreEqual(135f, sut.Height, 0.001f);
+        Assert.AreEqual(135f, reported, 0.001f);
         Assert.IsTrue(impression.HasValue);
         Assert.AreEqual(AdFormat.Banner, impression.Value.Format);
 

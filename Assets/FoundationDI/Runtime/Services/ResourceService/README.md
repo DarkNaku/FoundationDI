@@ -25,12 +25,13 @@ public class RootInstaller : MonoBehaviour, IInstaller
 {
     public void InstallBindings(ContainerBuilder builder)
     {
-        // 백엔드 선택: ResourcesProvider ↔ AddressablesProvider 로만 교체
-        builder.RegisterType(typeof(AddressablesProvider), new[] { typeof(IResourceProvider) }, Lifetime.Singleton, Resolution.Lazy);
-        builder.RegisterType(typeof(ResourceService), new[] { typeof(IResourceService) }, Lifetime.Singleton, Resolution.Lazy);
+        // 백엔드 선택: 기본 Resources, Addressables면 인자로 넘긴다.
+        builder.RegisterResourceService(ResourceBackend.Addressables);
     }
 }
 ```
+
+`RegisterResourceService`는 백엔드에 맞는 provider(`ResourcesProvider`/`AddressablesProvider`)를 `IResourceProvider`로, `ResourceService`를 `IResourceService`로 등록합니다(둘 다 Singleton·Lazy). PoolManager·UINavigator가 `IResourceService`를 전제로 하므로 그 등록보다 먼저, 보통 루트 `IInstaller`에서 호출합니다. 다른 `IResourceProvider` 구현을 쓰려면 이 메서드 대신 두 타입을 직접 `RegisterType`합니다.
 
 ### 2) 비동기 로드 / 해제
 

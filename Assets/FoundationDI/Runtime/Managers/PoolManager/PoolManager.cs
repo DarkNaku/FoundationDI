@@ -13,10 +13,20 @@ namespace DarkNaku.FoundationDI
         GameObject Get(string key, Transform parent = null);
         T Get<T>(string key, Transform parent = null) where T : class;
         void Release(GameObject item, float delay = 0f);
+
+        /// <summary>
+        /// key의 풀에 비활성 인스턴스가 최소 count개 대기하도록 미리 만든다.
+        /// 이미 대기 중인 인스턴스가 count 이상이면 아무것도 하지 않는다.
+        /// 만든 인스턴스는 OnGetItem 없이 OnCreateItem → OnReleaseItem 순서로 콜백을 받는다.
+        /// </summary>
+        void Prewarm(string key, int count);
     }
 
     public class PoolManager : IPoolManager
     {
+        // ObjectPool 기본값과 같다. 넘치는 반환은 풀이 파괴하므로 Prewarm도 여기까지만 만든다.
+        private const int MAX_POOL_SIZE = 10000;
+
         private readonly IResourceService _resourceService;
         private readonly IServiceResolver _resolver;
         private readonly Dictionary<string, PoolData> _table;
@@ -101,6 +111,26 @@ namespace DarkNaku.FoundationDI
             item.GetComponent<IPoolItem>()?.Release(delay);
         }
 
+        public void Prewarm(string key, int count)
+        {
+            if (_disposed) return;
+
+            if (string.IsNullOrEmpty(key))
+            {
+                Debug.LogError($"[PoolManager] Prewarm : Key is wrong.");
+                return;
+            }
+
+            if (count <= 0) return;
+
+            if (!_table.TryGetValue(key, out var data))
+            {
+                data = Load(key);
+            }
+
+            data?.Prewarm(Mathf.Min(count, MAX_POOL_SIZE));
+        }
+
         public void Dispose()
         {
             if (_disposed) return;
@@ -145,40 +175,13 @@ namespace DarkNaku.FoundationDI
             }
 
             var pool = new ObjectPool<IPoolItem>(
-                () =>
-                {
-                    var go = Object.Instantiate(prefab);
-
-                    var item = go.GetComponent<IPoolItem>();
-
-                    if (item == null)
-                    {
-                        item = go.AddComponent<PoolItem>();
-                    }
-
-                    // 생성 시 1회 계층 전체 MonoBehaviour에 DI 주입.
-                    // resolver가 없으면(테스트/컨테이너 미사용) 조용히 건너뛴다.
-                    // 주입 실패는 이 인스턴스에 가둔다 — 여기서 예외가 빠져나가면 create func이
-                    // 반환하지 못해 방금 Instantiate한 GameObject가 풀에 추적되지 않은 채
-                    // 씬에 고아로 남고, Get을 시도할 때마다 하나씩 쌓인다.
-                    try
-                    {
-                        _resolver?.InjectGameObject(go);
-                    }
-                    catch (Exception e)
-                    {
-                        Debug.LogException(e, go);
-                    }
-
-                    item.OnCreateItem();
-
-                    return item;
-                },
+                () => CreateItem(prefab),
                 OnGetItem,
                 OnReleaseItem,
-                OnDestroyItem);
+                OnDestroyItem,
+                maxSize: MAX_POOL_SIZE);
 
-            var data = new PoolData(pool);
+            var data = new PoolData(pool, () => CreateItem(prefab));
 
             if (!_table.TryAdd(key, data))
             {
@@ -209,6 +212,36 @@ namespace DarkNaku.FoundationDI
             }
 
             return Register(key, prefab);
+        }
+
+        private IPoolItem CreateItem(GameObject prefab)
+        {
+            var go = Object.Instantiate(prefab);
+
+            var item = go.GetComponent<IPoolItem>();
+
+            if (item == null)
+            {
+                item = go.AddComponent<PoolItem>();
+            }
+
+            // 생성 시 1회 계층 전체 MonoBehaviour에 DI 주입.
+            // resolver가 없으면(테스트/컨테이너 미사용) 조용히 건너뛴다.
+            // 주입 실패는 이 인스턴스에 가둔다 — 여기서 예외가 빠져나가면 create func이
+            // 반환하지 못해 방금 Instantiate한 GameObject가 풀에 추적되지 않은 채
+            // 씬에 고아로 남고, Get을 시도할 때마다 하나씩 쌓인다.
+            try
+            {
+                _resolver?.InjectGameObject(go);
+            }
+            catch (Exception e)
+            {
+                Debug.LogException(e, go);
+            }
+
+            item.OnCreateItem();
+
+            return item;
         }
 
         private void OnGetItem(IPoolItem item)

@@ -1,8 +1,6 @@
 using DarkNaku.FoundationDI;
 using Reflex.Core;
-using Reflex.Enums;
 using UnityEngine;
-using Resolution = Reflex.Enums.Resolution;
 
 /// <summary>
 /// 앱 수명 서비스를 등록한다. ContainerScope와 함께 루트 스코프 프리팹에 붙이고
@@ -22,11 +20,8 @@ public class RootInstaller : MonoBehaviour, IInstaller
     public void InstallBindings(ContainerBuilder builder)
     {
         // 프리팹 로드는 Resources 백엔드 ResourceService에 위임한다.
-        // 백엔드 교체는 이 provider 등록 한 줄만 바꾼다 (예: AddressablesProvider).
-        builder.RegisterType(typeof(ResourcesProvider), new[] { typeof(IResourceProvider) },
-                             Lifetime.Singleton, Resolution.Lazy);
-        builder.RegisterType(typeof(ResourceService), new[] { typeof(IResourceService) },
-                             Lifetime.Singleton, Resolution.Lazy);
+        // 백엔드 교체는 인자만 바꾼다 (예: ResourceBackend.Addressables).
+        builder.RegisterResourceService();
 
         builder.RegisterMessageService();
 

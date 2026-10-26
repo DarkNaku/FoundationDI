@@ -8,7 +8,9 @@ namespace DarkNaku.FoundationDI
         // onComplete는 카운트다운 완주, onSkip은 중간 닫기. 둘 중 하나만 호출된다.
         void ShowFullScreen(AdFormat format, float duration, Action onSkip, Action onComplete);
 
-        void ShowBanner(BannerPosition position, float height);
+        // 반환값은 실제로 그려진 배너의 화면 픽셀 높이다. height는 캔버스 단위라
+        // 캔버스 스케일에 따라 화면에서는 다른 높이로 그려진다.
+        float ShowBanner(BannerPosition position, float height);
         void HideBanner();
     }
 }

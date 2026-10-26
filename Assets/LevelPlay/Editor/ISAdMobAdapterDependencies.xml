@@ -1,0 +1,21 @@
+<dependencies>
+  <unityversion>5.31.0.0</unityversion>
+  <androidPackages>
+    <androidPackage spec="com.google.android.libraries.ads.mobile.sdk:ads-mobile-sdk:1.5.0">
+      <repositories>
+        <repository>https://maven.google.com/</repository>
+      </repositories>
+    </androidPackage>
+  </androidPackages>
+  <androidPackages>
+    <androidPackage spec="com.unity3d.ads-mediation:admob-adapter:5.16.0">
+    </androidPackage>
+  </androidPackages>
+  <iosPods>
+    <iosPod name="IronSourceAdMobAdapter" version="5.17.0.0">
+      <sources>
+        <source>https://github.com/CocoaPods/Specs</source>
+      </sources>
+    </iosPod>
+  </iosPods>
+</dependencies>

@@ -10,6 +10,7 @@ public class SdkDefineSynchronizerTest
     private const string LevelPlay = "FOUNDATIONDI_LEVELPLAY";
     private const string Adjust = "FOUNDATIONDI_ADJUST";
     private const string IosSupport = "FOUNDATIONDI_IOSSUPPORT";
+    private const string MobileNotifications = "FOUNDATIONDI_MOBILENOTIFICATIONS";
 
     private static Dictionary<string, bool> Present(bool firebase = false, bool unityIAP = false,
                                                     bool appLovin = false) =>
@@ -126,7 +127,8 @@ public class SdkDefineSynchronizerTest
             symbols.Add(entry.Symbol);
         }
 
-        CollectionAssert.AreEquivalent(new[] { Firebase, UnityIAP, AppLovin, LevelPlay, Adjust, IosSupport }, symbols);
+        CollectionAssert.AreEquivalent(new[] { Firebase, UnityIAP, AppLovin, LevelPlay, Adjust, IosSupport, MobileNotifications },
+                                        symbols);
     }
 
     [Test]

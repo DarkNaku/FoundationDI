@@ -27,6 +27,8 @@ namespace DarkNaku.FoundationDI
         // (아무도 렌더링을 기대하지 않는다), 콜백 소유권 북키핑은 검증돼야 한다.
         internal bool IsFullScreenActive => _fullScreenPanel != null && _fullScreenPanel.activeSelf;
         internal bool IsActionButtonVisible => _closeButton != null && _closeButton.gameObject.activeSelf;
+        internal GameObject Root => _root;
+        internal RectTransform BannerRect => _bannerPanel != null ? _bannerPanel.GetComponent<RectTransform>() : null;
 
         public void ShowFullScreen(AdFormat format, float duration, Action onSkip, Action onComplete)
         {
@@ -65,7 +67,7 @@ namespace DarkNaku.FoundationDI
             if (_remaining <= 0f && _format != AdFormat.Interstitial) CompleteFullScreen();
         }
 
-        public void ShowBanner(BannerPosition position, float height)
+        public float ShowBanner(BannerPosition position, float height)
         {
             EnsureRoot();
 
@@ -78,6 +80,11 @@ namespace DarkNaku.FoundationDI
             rect.anchoredPosition = Vector2.zero;
 
             _bannerPanel.SetActive(true);
+
+            // ScreenSpaceOverlay 캔버스의 월드 좌표는 화면 픽셀이다.
+            var corners = new Vector3[4];
+            rect.GetWorldCorners(corners);
+            return corners[1].y - corners[0].y;
         }
 
         public void HideBanner()
@@ -157,14 +164,22 @@ namespace DarkNaku.FoundationDI
         {
             if (_root != null) return;
 
-            _root = new GameObject("[AdService] Dummy Canvas") { hideFlags = HideFlags.HideAndDontSave };
+            _root = new GameObject("[AdService] Dummy Canvas");
 
-            // DontDestroyOnLoad는 플레이 모드 밖에서 부르면 예외를 던진다(에디터 스크립트/
-            // EditMode 테스트에서 이 클래스를 직접 생성할 때가 그렇다). Dispose()가 이미
-            // Application.isPlaying으로 Destroy/DestroyImmediate를 갈라 쓰는 것과 같은 이유로,
-            // 여기서도 플레이 모드에서만 부른다 — HideAndDontSave 자체가 이미 씬 저장에서는
-            // 제외시키므로 에디터에서 건너뛰어도 안전하다.
+            // 플레이 모드에서는 DontDestroyOnLoad로만 둔다. DontSave 계열 플래그가 붙으면 플레이 모드를
+            // 끝내도 Unity가 지우지 않아(DontDestroyOnLoad 씬의 오브젝트만 지운다) 전면광고를 띄운 채
+            // 멈추면 캔버스가 에디트 모드에 남는다 — 계층 창에도 안 보여 지울 길이 없었다.
+            // 에디트 모드(에디터 스크립트·EditMode 테스트)에는 DontDestroyOnLoad가 없고(부르면 예외)
+            // 열린 씬에 저장되지 않게 해야 하므로 HideAndDontSave를 쓴다. Dispose()가
+            // Application.isPlaying으로 Destroy/DestroyImmediate를 갈라 쓰는 것과 같은 분기다.
             if (Application.isPlaying) UnityEngine.Object.DontDestroyOnLoad(_root);
+            else _root.hideFlags = HideFlags.HideAndDontSave;
+
+            // 비활성으로 구성한 뒤 마지막에 켠다. CanvasScaler는 OnEnable에서 스케일을 계산하는데,
+            // 켜진 채로 AddComponent하면 uiScaleMode를 바꾸기 전 기본값(ConstantPixelSize)으로
+            // 계산해 다음 프레임 Update까지 스케일이 1로 남는다 — 그 사이 ShowBanner가 재는
+            // 높이가 실제로 그려지는 높이와 어긋난다.
+            _root.SetActive(false);
 
             var canvas = _root.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
@@ -186,6 +201,8 @@ namespace DarkNaku.FoundationDI
             _bannerPanel = CreatePanel("Banner", new Color(0.1f, 0.4f, 0.8f, 0.9f), stretch: false);
             CreateText(_bannerPanel.transform, "BannerLabel", 24, Vector2.zero).text = "Dummy Banner";
             _bannerPanel.SetActive(false);
+
+            _root.SetActive(true);
         }
 
         private GameObject CreatePanel(string name, Color color, bool stretch)

@@ -1,5 +1,7 @@
 using DarkNaku.FoundationDI;
 using NUnit.Framework;
+using UnityEngine;
+using UnityEngine.UI;
 
 // DummyAdCanvas는 uGUI를 직접 구성하는 클래스라 렌더링 자체는 EditMode에서 검증할 가치가
 // 없다(아무도 화면을 기대하지 않는다). 대신 이 클래스가 실제로 버그를 냈던 지점 —
@@ -204,5 +206,34 @@ public class DummyAdCanvasTest
         Assert.DoesNotThrow(() => _sut.Tick(), "Dispose 후 Tick이 예외를 던졌다");
         Assert.AreEqual(0, skipped);
         Assert.AreEqual(0, completed, "Dispose 후에도 Tick이 콜백을 발화시켰다");
+    }
+
+    [Test]
+    public void ShowBanner는_캔버스_스케일이_반영된_실제_화면_높이를_돌려준다()
+    {
+        _sut = new DummyAdCanvas();
+
+        var drawn = _sut.ShowBanner(BannerPosition.Bottom, 100f);
+
+        // 스케일러를 다시 계산시켜도 값이 같아야 한다 — 생성 직후 스케일이 아직 1로
+        // 남아 있던 상태(다음 프레임 Update에서야 반영)로 재면 그린 높이와 어긋난다.
+        var scaler = _sut.BannerRect.root.GetComponent<CanvasScaler>();
+        scaler.enabled = false;
+        scaler.enabled = true;
+
+        var corners = new Vector3[4];
+        _sut.BannerRect.GetWorldCorners(corners);
+        Assert.AreEqual(corners[1].y - corners[0].y, drawn, 0.01f);
+    }
+
+    [Test]
+    public void 에디트_모드에서_만든_루트는_HideAndDontSave로_둔다()
+    {
+        // 에디트 모드에는 DontDestroyOnLoad가 없다. 숨기지 않으면 열린 씬에 저장된다.
+        _sut = new DummyAdCanvas();
+
+        _sut.ShowBanner(BannerPosition.Bottom, 100f);
+
+        Assert.AreEqual(HideFlags.HideAndDontSave, _sut.Root.hideFlags);
     }
 }

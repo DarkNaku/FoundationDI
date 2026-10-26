@@ -24,7 +24,8 @@ AppLovin(`FoundationDI.AppLovin`)과 LevelPlay(`FoundationDI.LevelPlay`)는 각�
 
 `Dummy Provider` 섹션의 `Load Delay Seconds` / `Failure Rate` / `Ad Duration Seconds` /
 `Banner Height`은 Dummy provider가 로드 지연·실패·보상·배너 표시 시간을 흉내 내는 데 쓰는
-값입니다. 실기에서 재시도·백오프를 눈으로 확인하려면 `Failure Rate`를 0.3~0.5 정도로 올려 둡니다.
+값입니다. `Banner Height`는 캔버스 단위라, `IBannerAdapter.Height`로는 캔버스 스케일이 반영돼 **실제로
+그려진 화면 픽셀 높이**가 나갑니다(예: 설정 100 → 보고 135). 실기에서 재시도·백오프를 눈으로 확인하려면 `Failure Rate`를 0.3~0.5 정도로 올려 둡니다.
 
 ### 1.2 DI 등록
 
@@ -376,6 +377,20 @@ LevelPlay의 전면·보상 임프레션도 `FullScreenAdUnit`이 정상적으�
 값을 보고하지 않습니다.** 실기(스모크 테스트 포함)에서만 실제 높이를 검증할 수 있습니다 —
 에디터에서 배너가 뜨는데 높이가 계속 0이어도 그 자체는 결함이 아닙니다. SDK별 어댑터를
 새로 붙일 때도 "에디터 스텁이 실제 값을 주는가"를 먼저 확인하세요.
+
+**배너 높이는 요청 크기가 아니라 그려진 뷰에서 읽는다(LevelPlay, 0.13).** 적응형 배너는
+`onAdLoaded`의 `adSize`로 컨테이너 최대 높이(예: `CUSTOM 384x120`)를 알려 주지만 실제로 붙는 소재는
+50dp 표준 배너인 경우가 많아, 그 값을 쓰면 게임 UI가 배너 위로 붕 뜬다. 그래서
+`LevelPlayBannerAdapter`는 `BannerHeightTracker`(코어, `IBannerViewMetrics` seam)로 높이를 정한다.
+
+- **Android**: `android.R.id.content` 아래의 `LevelPlayBannerAdView`(LevelPlay 브리지가
+  `addContentView`로 붙인다)를 JNI로 찾아 `getHeight()`를 읽는다. 표시·로드 직후는 레이아웃 전이라
+  0이므로 0.1→0.3→1초 간격으로 다시 재고, 기다리는 동안 요청 크기(컨테이너 높이)를 먼저 알리지 않는다
+  (UI가 튀었다가 내려온다). 끝내 못 재면 요청 크기로 떨어진다.
+- **dp 환산은 `DisplayMetrics.density`**. Android의 `Screen.dpi`는 물리 dpi(xdpi)라 레이아웃 밀도와
+  다르다 — Galaxy A13(density 2.8125, xdpi 403.4)에서 50dp 배너가 141px 대신 126px로 나왔다.
+- **iOS·에디터**: 뷰를 재지 않고 지금처럼 요청 크기 × `Screen.dpi / 160`(근사)이다.
+- 뷰 조회가 한 번 예외를 내면 그 세션은 요청 크기 환산만 쓴다(경고 1회).
 
 ---
 
