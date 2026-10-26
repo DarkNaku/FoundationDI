@@ -817,3 +817,7 @@ MessagePipe 래퍼를 폐기하고 `Dictionary<Type, Delegate>` 기반 자체 �
 - [x] 레이아웃 전이라 아직 잴 수 없으면 다시 재고, 끝내 못 재면 요청 크기로 떨어진다
 - [x] 다시 표시할 때는 높이가 같아도 알린다
 - [x] 숨기거나 해제하면 대기 중인 재측정을 취소한다
+
+### 4. 플레이 모드를 끝내도 Dummy 광고 캔버스가 남지 않게
+- [x] 플레이 모드에서 만든 루트는 DontSave 없이 DontDestroyOnLoad 씬에 둔다 (PlayMode)
+- [x] 에디트 모드에서 만든 루트는 HideAndDontSave로 둔다

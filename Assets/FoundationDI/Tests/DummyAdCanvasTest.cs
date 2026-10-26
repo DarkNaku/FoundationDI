@@ -225,4 +225,15 @@ public class DummyAdCanvasTest
         _sut.BannerRect.GetWorldCorners(corners);
         Assert.AreEqual(corners[1].y - corners[0].y, drawn, 0.01f);
     }
+
+    [Test]
+    public void 에디트_모드에서_만든_루트는_HideAndDontSave로_둔다()
+    {
+        // 에디트 모드에는 DontDestroyOnLoad가 없다. 숨기지 않으면 열린 씬에 저장된다.
+        _sut = new DummyAdCanvas();
+
+        _sut.ShowBanner(BannerPosition.Bottom, 100f);
+
+        Assert.AreEqual(HideFlags.HideAndDontSave, _sut.Root.hideFlags);
+    }
 }
