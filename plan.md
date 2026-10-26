@@ -829,3 +829,28 @@ MessagePipe 래퍼를 폐기하고 `Dictionary<Type, Delegate>` 기반 자체 �
 - [x] 둘 다 없으면 null
 - [x] 링커 보존 XML은 존재하는 Tangle 타입만 그 어셈블리에 preserve="all"로 넣는다
 - [x] Tangle 타입이 없으면 빈 linker를 만든다
+
+## 진행 중: LocalNotificationService · ReviewService (BlockAway 참고)
+
+범위(사용자 결정 2026-10-26): 알림은 **엔진만**(일정은 게임이 `ILocalNotificationPlanner`로 공급),
+리뷰는 **OS 창구만**(언제 부를지는 게임이 정함), Play In-App Review 의존성 XML은 설정 토글로 생성·삭제.
+
+### LocalNotificationService
+- [x] Reschedule는 예약을 지운 뒤 모든 planner의 알림을 예약한다
+- [x] 권한이 없으면 지우기만 한다
+- [x] 꺼져 있으면 지우기만 한다
+- [x] 지난 시각의 알림은 예약하지 않는다
+- [x] planner 하나가 예외를 던져도 나머지는 예약한다
+- [x] 알림 창구는 처음 쓸 때 만든다
+- [x] Start 뒤 앱이 포커스를 잃으면 다시 예약하고, Dispose 뒤에는 하지 않는다
+- [x] 끄면 예약을 지우고 상태를 저장한다, 켜면 다시 예약한다
+- [x] 권한을 처음 물을 때만 창을 띄우고 허용되면 예약한다
+- [x] 이미 권한이 있으면 창 없이 예약만 한다
+- [x] 등록하면 planner들을 모아 서비스를 만든다
+
+### ReviewService
+- [x] Request는 OS 창구에 요청을 넘긴다
+- [x] OS 창구가 예외를 던지면 false를 돌려주고 경고만 남긴다
+- [x] Prepare가 예외를 던져도 삼킨다
+- [x] Play In-App Review 의존성 XML은 설정을 켜면 만들고 끄면 지운다
+- [x] 등록하면 IReviewService가 해석된다
