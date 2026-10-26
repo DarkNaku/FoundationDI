@@ -219,8 +219,12 @@ _iap.Purchased += p => _analytics.LogPurchase(new PurchaseInfo(p.ProductId, p.Pr
 | 에디터 / 그 외 | 통과 |
 
 Google Play 검증을 켜려면 **Services > In-App Purchasing > Receipt Validation Obfuscator**를 한 번 실행해
-`Assets/Plugins/UnityPurchasing/generated/GooglePlayTangle.cs`를 만들어야 한다.
-생성 폴더는 `Assembly-CSharp`에 속해 패키지 어셈블리가 직접 참조할 수 없으므로 리플렉션으로 찾는다.
+`Assets/Scripts/UnityPurchasing/generated/GooglePlayTangle.cs`를 만들어야 한다(Unity IAP 5 기준).
+생성 폴더는 `Assembly-CSharp`에 속해 패키지 어셈블리가 직접 참조할 수 없으므로 리플렉션으로 찾는다
+(`GooglePlayTangleLocator`). **Unity IAP 5는 이 클래스를 `UnityEngine.Purchasing.Security` 네임스페이스
+안에 만든다** — 이름을 먼저 그렇게 찾고, 없으면 예전 버전의 전역 `GooglePlayTangle`을 찾는다.
+리플렉션으로만 닿는 클래스라 IL2CPP 링커가 걷어내므로, `GooglePlayTangleLinkXmlGenerator`가 빌드마다
+실제로 있는 Tangle 타입을 `preserve="all"`로 보존한다(소비 프로젝트가 link.xml을 둘 필요 없음).
 **Tangle이 없으면 경고 한 번만 남기고 통과시킨다** — 개발 빌드가 막히지 않게 하기 위해서다.
 
 더 강한 보증이 필요하면 `IReceiptValidator`를 직접 구현해 서버 검증을 붙인다.

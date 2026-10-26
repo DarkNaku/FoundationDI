@@ -1,5 +1,4 @@
 using System;
-using System.Reflection;
 using UnityEngine;
 
 #if UNITY_ANDROID && !UNITY_EDITOR
@@ -78,20 +77,13 @@ namespace DarkNaku.FoundationDI
         }
 #endif
 
-        // GooglePlayTangle은 IAP 에디터 도구(Receipt Validation Obfuscator)가
-        // Assets/Plugins/UnityPurchasing/generated/에 만들어 주는 클래스다. 그 폴더는 asmdef가
-        // 없어 Assembly-CSharp에 들어가므로 패키지 어셈블리에서 직접 참조할 수 없다 —
-        // 그래서 리플렉션으로 찾는다. 없으면 아직 Obfuscator를 돌리지 않았다는 뜻이다.
+        // 찾는 규칙(이름·순서)은 GooglePlayTangleLocator에 있다. 없으면 아직 Obfuscator를 돌리지 않았다는 뜻이다.
         private byte[] LoadGooglePlayTangle()
         {
-            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+            var method = GooglePlayTangleLocator.GetDataMethod(GooglePlayTangleLocator.Find());
+
+            if (method != null)
             {
-                var type = assembly.GetType("GooglePlayTangle", false);
-                if (type == null) continue;
-
-                var method = type.GetMethod("Data", BindingFlags.Public | BindingFlags.Static);
-                if (method == null) continue;
-
                 try
                 {
                     return method.Invoke(null, null) as byte[];

@@ -821,3 +821,11 @@ MessagePipe 래퍼를 폐기하고 `Dictionary<Type, Delegate>` 기반 자체 �
 ### 4. 플레이 모드를 끝내도 Dummy 광고 캔버스가 남지 않게
 - [x] 플레이 모드에서 만든 루트는 DontSave 없이 DontDestroyOnLoad 씬에 둔다 (PlayMode)
 - [x] 에디트 모드에서 만든 루트는 HideAndDontSave로 둔다
+
+### 5. 영수증 검증기가 Unity IAP 5의 `GooglePlayTangle`을 찾게
+- [x] 네임스페이스 안의 GooglePlayTangle만 있어도 찾는다
+- [x] 전역 GooglePlayTangle만 있어도 찾는다(예전 IAP 호환)
+- [x] 둘 다 있으면 네임스페이스 안의 것을 먼저 쓴다
+- [x] 둘 다 없으면 null
+- [x] 링커 보존 XML은 존재하는 Tangle 타입만 그 어셈블리에 preserve="all"로 넣는다
+- [x] Tangle 타입이 없으면 빈 linker를 만든다
