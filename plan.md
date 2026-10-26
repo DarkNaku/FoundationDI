@@ -830,7 +830,7 @@ MessagePipe 래퍼를 폐기하고 `Dictionary<Type, Delegate>` 기반 자체 �
 - [x] 링커 보존 XML은 존재하는 Tangle 타입만 그 어셈블리에 preserve="all"로 넣는다
 - [x] Tangle 타입이 없으면 빈 linker를 만든다
 
-## 완료: LocalNotificationService · ReviewService (BlockAway 참고) — 0.13.0
+## 완료: LocalNotificationService · ReviewService (BlockAway 참고) — 0.14.0
 
 범위(사용자 결정 2026-10-26): 알림은 **엔진만**(일정은 게임이 `ILocalNotificationPlanner`로 공급),
 리뷰는 **OS 창구만**(언제 부를지는 게임이 정함), Play In-App Review 의존성 XML은 설정 토글로 생성·삭제.

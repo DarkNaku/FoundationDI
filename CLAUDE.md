@@ -124,14 +124,14 @@ DI 코어는 **Reflex 14.3.1**이다. `Assets/Scripts/Installers/RootInstaller.c
   - 상품 상수는 `Tools/FoundationDI/IAP/Generate Product Constants`가 IAP Catalog로 `IAPProducts` 클래스를 생성한다. 출력 폴더는 기억한 폴더(EditorPrefs, 프로젝트 GUID 키) → 이 도구가 만든 기존 `IAPProducts.cs` 폴더 → 폴더 선택 창 순서다. `.asmref`로 코어 `FoundationDI`에 합류한다(문자열뿐이라 심볼 없이도 컴파일된다).
   - 상세: `Assets/FoundationDI/Runtime/Services/IAPService/README.md`.
 
-- **LocalNotificationService** (`Services/LocalNotificationService/`): 로컬 알림 **예약 엔진**(BlockAway `LocalNotifications`에서 게임 규칙을 걷어냈다). 0.13.
+- **LocalNotificationService** (`Services/LocalNotificationService/`): 로컬 알림 **예약 엔진**(BlockAway `LocalNotifications`에서 게임 규칙을 걷어냈다). 0.14.
   - **일정은 게임이 `ILocalNotificationPlanner`로 공급한다** — 등록된 planner 전부를 `container.All<>()`로 모아 합친다. 서비스는 언제 다시 예약할지(`Start` + 앱이 포커스를 잃을 때), 권한 1회 요청(`TryRequestPermissionOnce`, 창을 띄웠으면 true — 같은 때 리뷰 창을 피하는 데 쓴다), 켜기/끄기 영속화만 맡는다.
   - 예약은 늘 **전부 지우고 다시 넣는다**. 지난 시각은 서비스가 거르고, planner 예외는 그 planner에 가둔다. 알림 창구는 처음 쓸 때 만든다(모바일 알림 센터 초기화가 저사양에서 0.5~1초).
   - OS 창구는 `com.unity.mobile.notifications`가 있을 때만 옵셔널 어셈블리 `FoundationDI.MobileNotifications`(`FOUNDATIONDI_MOBILENOTIFICATIONS`, 마커 `Unity.Notifications.Unified`)가 `LocalNotifierRegistry`에 등록한다. 없거나 에디터면 `UnsupportedLocalNotifier`(권한 있음·예약 안 함). 권한 확인만 플랫폼 API — 공통 API `RequestPermission`은 창을 띄워 확인용으로 못 쓴다.
   - 빌드 직전 `MobileNotificationSettingsApplier`(`FoundationDI.MobileNotifications.Editor`)가 iOS 앱 시작 시 권한 요청을 끄고, Android 재부팅 뒤 재예약을 켜고, 설정의 작은 아이콘을 `fdi_notification_small`로 등록한다. 패키지가 drawable 목록 공개 API를 주지 않아 등록 여부는 `ProjectSettings/NotificationsSettings.asset` 텍스트로 본다(없는 ID를 지우면 경고가 나서).
   - 호스트에 2.5.0을 설치했다(심볼 동기화가 켬). 이식 후 실기 미검증.
   - 상세: `Assets/FoundationDI/Runtime/Services/LocalNotificationService/README.md`.
-- **ReviewService** (`Services/ReviewService/`): OS 앱 내 리뷰 창구(BlockAway `IStoreReview` 이식). 0.13.
+- **ReviewService** (`Services/ReviewService/`): OS 앱 내 리뷰 창구(BlockAway `IStoreReview` 이식). 0.14.
   - **언제 부를지는 게임이 정한다** — `Prepare()`(Android는 ReviewInfo를 미리 받음) / `Request()`(요청을 보냈으면 true, 창이 떴다는 뜻은 아님). 우리 팝업으로 먼저 묻지 않는다(Google·Apple 정책).
   - `StoreReviewFactory`가 `#if` 없이 `Application.platform`으로 고른다: Android JNI(`ReviewManagerFactory`) / iOS `Device.RequestStoreReview` / 에디터 로그만. Android Task 결과는 UI 스레드로 와서 `IMainThreadDispatcher`로 넘기며, **디스패처는 Android 창구를 만들 때만 해석한다**(EditMode에서 해석하면 러너의 `DontDestroyOnLoad`가 던진다).
   - **Play Review 의존성 XML은 `ReviewServiceSettings.UsePlayInAppReview`로 생성·삭제한다**(`Assets/FoundationDI.Data/Editor/FoundationDIPlayReviewDependencies.xml`, UMP와 같은 이유). 꺼져 있으면 Android에서 창을 띄우지 않는다(ClassNotFound 회피). 창구 생성 실패는 이후 요청을 `false`로 끝낸다.
