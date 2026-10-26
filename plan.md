@@ -803,3 +803,8 @@ MessagePipe 래퍼를 폐기하고 `Dictionary<Type, Delegate>` 기반 자체 �
 - [x] 빈 키로 Prewarm하면 에러를 남긴다
 - [x] Dispose 뒤 Prewarm은 아무 일도 하지 않는다
 - [x] Prewarm으로 만든 인스턴스도 한 번 주입하고 OnGetItem 없이 OnCreateItem → OnReleaseItem 순서로 콜백을 받는다
+
+### 2. `RegisterResourceService`
+- [x] Resources 백엔드로 등록하면 IResourceService는 ResourceService, IResourceProvider는 ResourcesProvider로 해석된다
+- [x] Addressables 백엔드로 등록하면 IResourceProvider는 AddressablesProvider로 해석된다
+- [x] 두 번 해석하면 같은 인스턴스를 돌려준다
