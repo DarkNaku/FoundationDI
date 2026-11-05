@@ -30,6 +30,19 @@ public class UmpDependenciesFileTest
     }
 
     [Test]
+    public void iOS는_Swift_Package로도_선언해_같은_포드를_대신한다()
+    {
+        // EDM4U가 Swift Package 모드면 LevelPlay AdMob 어댑터가 Google Mobile Ads를 SPM으로 끌고 오고, 그 SPM이
+        // UMP 3.x를 함께 가져온다. 포드로만 선언하면 UMP가 포드와 SPM 두 벌로 들어간다.
+        var xml = UmpDependenciesFile.BuildXml();
+
+        StringAssert.Contains($"<remoteSwiftPackage url=\"{UmpDependenciesFile.IosSwiftPackageUrl}\" " +
+                              $"version=\"{UmpDependenciesFile.IosSwiftPackageVersion}\" upToNextMajor=\"true\">", xml);
+        StringAssert.Contains($"<swiftPackage name=\"{UmpDependenciesFile.IosSwiftPackageProduct}\" " +
+                              $"replacesPod=\"{UmpDependenciesFile.IosPod}\" />", xml);
+    }
+
+    [Test]
     public void 하나라도_UMP를_켜면_파일이_있어야_한다()
     {
         Assert.IsTrue(UmpDependenciesFile.ShouldExist(new[] { false, true }));
