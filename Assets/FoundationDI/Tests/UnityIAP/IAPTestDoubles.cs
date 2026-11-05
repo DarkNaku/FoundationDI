@@ -40,6 +40,33 @@ public class FakeReceiptValidator : IReceiptValidator
     }
 }
 
+public class FakeAsyncReceiptValidator : IAsyncReceiptValidator
+{
+    public readonly List<IAPPurchase> Calls = new();
+    public IAPValidationResult Result = IAPValidationResult.Valid();
+    public bool Throw;
+
+    // true면 테스트가 Release로 결과를 줄 때까지 붙잡아 둔다(서버 응답 대기).
+    public bool Hold;
+    private AwaitableCompletionSource<IAPValidationResult> _held;
+
+    public Awaitable<IAPValidationResult> ValidateAsync(IAPPurchase purchase)
+    {
+        Calls.Add(purchase);
+
+        if (Throw) throw new InvalidOperationException("서버 검증 실패 시뮬레이션");
+
+        var source = new AwaitableCompletionSource<IAPValidationResult>();
+
+        if (Hold) _held = source;
+        else source.SetResult(Result);
+
+        return source.Awaitable;
+    }
+
+    public void Release(IAPValidationResult result) => _held?.SetResult(result);
+}
+
 public class FakeEntitlementStorage : IEntitlementStorage
 {
     public readonly HashSet<string> Owned = new();

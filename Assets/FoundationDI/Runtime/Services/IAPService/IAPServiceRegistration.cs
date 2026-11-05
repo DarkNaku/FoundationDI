@@ -10,6 +10,7 @@ namespace DarkNaku.FoundationDI
     {
         public IIAPFulfillment Fulfillment;
         public IReceiptValidator Validator;
+        public IAsyncReceiptValidator AsyncValidator;
         public IEntitlementStorage Entitlements;
         public IAPServiceOptions Options;
 
@@ -52,6 +53,10 @@ namespace DarkNaku.FoundationDI
                     ? container.Resolve<IReceiptValidator>()
                     : new CrossPlatformReceiptValidator();
 
+                var asyncValidator = container.HasBinding<IAsyncReceiptValidator>()
+                    ? container.Resolve<IAsyncReceiptValidator>()
+                    : null;
+
                 var entitlements = container.HasBinding<IEntitlementStorage>()
                     ? container.Resolve<IEntitlementStorage>()
                     : new PlayerPrefsEntitlementStorage();
@@ -60,6 +65,7 @@ namespace DarkNaku.FoundationDI
                 {
                     Fulfillment = fulfillment,
                     Validator = validator,
+                    AsyncValidator = asyncValidator,
                     Entitlements = entitlements,
                     Options = options,
                     Dispatcher = container.Resolve<IMainThreadDispatcher>,

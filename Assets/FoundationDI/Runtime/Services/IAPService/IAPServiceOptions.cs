@@ -1,5 +1,19 @@
+using System;
+using System.Collections.Generic;
+
 namespace DarkNaku.FoundationDI
 {
+    // 영수증 검증(로컬·서버)에 실패한 구매를 어떻게 할지.
+    public enum InvalidReceiptPolicy
+    {
+        // 확정하지 않는다. 스토어가 매 실행 다시 주고, 검증 규칙을 고친 버전에서 지급될 수 있다.
+        KeepPending,
+
+        // 소모성은 지급 없이 확정해 버린다(위조 영수증이 영원히 재전달되지 않게). 비소모성은 확정하면 스토어의
+        // 확정 목록에 올라 소유로 동기화되므로 이 정책에서도 확정하지 않는다.
+        ConfirmWithoutGrant,
+    }
+
     // RegisterIAPService에 넘기는 설정. 기본값만으로 0.16 이전과 같이 동작한다.
     //   builder.RegisterIAPService(new IAPServiceOptions { VerboseLogging = true });
     public sealed class IAPServiceOptions
@@ -18,5 +32,12 @@ namespace DarkNaku.FoundationDI
         // 결제는 스토어에서 끝났을 수 있어 늦게 온 주문도 지급·확정하고 Purchased를 낸다.
         // 스토어 시트에서 결제 수단을 고르는 시간까지 들어가므로 기본은 끈다(0).
         public float PurchaseTimeoutSeconds { get; set; }
+
+        public InvalidReceiptPolicy InvalidReceiptPolicy { get; set; } = InvalidReceiptPolicy.KeepPending;
+
+        // 지정하면 Unity IAP Catalog 대신 이 상품 목록을 쓴다. 상품을 게임 스펙 표로 관리할 때 표와 Catalog가
+        // 따로 노는 것을 막는다. 서비스를 만들 때 한 번 부른다.
+        //   CatalogSource = () => shopTable.Paid.Select(row => new IAPProductDefinition(row.Pid, IAPProductType.Consumable))
+        public Func<IEnumerable<IAPProductDefinition>> CatalogSource { get; set; }
     }
 }

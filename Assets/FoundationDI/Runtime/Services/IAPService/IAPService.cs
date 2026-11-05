@@ -16,6 +16,7 @@ namespace DarkNaku.FoundationDI
         private readonly List<ProductDefinition> _catalog;
         private readonly IIAPFulfillment _fulfillment;
         private readonly IReceiptValidator _validator;
+        private readonly IAsyncReceiptValidator _asyncValidator;
         private readonly IEntitlementStorage _entitlements;
         private readonly IAPServiceOptions _options;
         private readonly Func<IMainThreadDispatcher> _dispatcherFactory;
@@ -53,6 +54,9 @@ namespace DarkNaku.FoundationDI
         private readonly List<AwaitableCompletionSource> _refetchWaiters = new();
         private bool _refetching;
 
+        // 검증 실패 로그를 남긴 트랜잭션. 위조 영수증은 매 조회 재전달되므로 세션당 한 번만 남긴다.
+        private readonly HashSet<string> _invalidLogged = new();
+
         // 복원. RestoreTransactions의 콜백과 뒤따르는 조회 결과가 둘 다 와야 끝난다 — 순서는 스토어마다
         // 다를 수 있어서, 먼저 온 쪽을 기억해 두었다가 나중에 온 쪽에서 끝낸다.
         private AwaitableCompletionSource<bool> _restoring;
@@ -87,7 +91,8 @@ namespace DarkNaku.FoundationDI
         }
 
         internal IAPService(IAPServiceDependencies dependencies)
-            : this(UnityIAPServices.StoreController(), LoadCatalog(), dependencies)
+            : this(UnityIAPServices.StoreController(), UnityIAPCatalog.Resolve(dependencies?.Options, CurrentStoreName()),
+                   dependencies)
         {
         }
 
@@ -122,6 +127,7 @@ namespace DarkNaku.FoundationDI
             _catalog = catalog != null ? new List<ProductDefinition>(catalog) : new List<ProductDefinition>();
             _fulfillment = dependencies.Fulfillment ?? new AutoConfirmFulfillment();
             _validator = dependencies.Validator ?? new CrossPlatformReceiptValidator();
+            _asyncValidator = dependencies.AsyncValidator;
             _entitlements = dependencies.Entitlements ?? new PlayerPrefsEntitlementStorage();
             _options = dependencies.Options ?? new IAPServiceOptions();
             _dispatcherFactory = dependencies.Dispatcher;
@@ -328,20 +334,6 @@ namespace DarkNaku.FoundationDI
 
             CompleteInitWaiters(success);
             return success;
-        }
-
-        private static List<ProductDefinition> LoadCatalog()
-        {
-            var catalog = ProductCatalog.LoadDefaultCatalog();
-
-            UnityIAPCatalog.WarnIfCodelessAutoInitialization(catalog);
-
-            if (catalog.IsEmpty())
-            {
-                Debug.LogWarning("[IAPService] IAP Catalog가 비어 있다. Services > In-App Purchasing > IAP Catalog에서 상품을 추가할 것.");
-            }
-
-            return UnityIAPCatalog.ToDefinitions(catalog, CurrentStoreName());
         }
 
         // 에디터에서는 빌드 타깃을 따라간다 — 에디터 실행 중에도 현재 타깃의 스토어 ID가 나온다.
@@ -787,9 +779,31 @@ namespace DarkNaku.FoundationDI
 
             if (!_validator.Validate(purchase, out var validationError))
             {
-                Debug.LogError($"[IAPService] 영수증 검증에 실패했다: {purchase.ProductId} {validationError}");
-                CompleteOwnPurchase(productId, isRestored, IAPPurchaseResult.InvalidReceipt(validationError));
+                RejectInvalidReceipt(order, purchase, isRestored, validationError);
                 return;
+            }
+
+            if (_asyncValidator != null)
+            {
+                var validation = await ValidateOnServerAsync(purchase);
+
+                // 검증을 기다리는 사이 해제됐다. 확정하지 않으면 스토어가 다음 실행에 다시 준다.
+                if (_disposed) return;
+
+                if (validation.Status == IAPValidationStatus.Invalid)
+                {
+                    RejectInvalidReceipt(order, purchase, isRestored,
+                                         new IAPError(IAPErrorCodes.ReceiptRejected, validation.Message));
+                    return;
+                }
+
+                if (validation.Status == IAPValidationStatus.RetryLater)
+                {
+                    Debug.LogWarning($"[IAPService] 서버 검증을 나중에 다시 한다. 확정하지 않는다: {productId} {validation.Message}");
+                    CompleteOwnPurchase(productId, isRestored, IAPPurchaseResult.Failed(
+                        new IAPError(IAPErrorCodes.ValidationRetryLater, validation.Message)));
+                    return;
+                }
             }
 
             bool fulfilled;
@@ -829,6 +843,39 @@ namespace DarkNaku.FoundationDI
             Purchased?.Invoke(purchase);
 
             CompleteOwnPurchase(productId, isRestored, IAPPurchaseResult.Purchased(purchase));
+        }
+
+        private async Awaitable<IAPValidationResult> ValidateOnServerAsync(IAPPurchase purchase)
+        {
+            try
+            {
+                return await _asyncValidator.ValidateAsync(purchase);
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[IAPService] 서버 검증기가 예외를 던졌다. 나중에 다시 검증한다: {e}");
+                return IAPValidationResult.RetryLater(e.Message);
+            }
+        }
+
+        private void RejectInvalidReceipt(PendingOrder order, IAPPurchase purchase, bool isRestored, IAPError error)
+        {
+            var transactionId = order.Info.TransactionID;
+
+            if (_invalidLogged.Add(transactionId))
+            {
+                Debug.LogError($"[IAPService] 영수증 검증에 실패했다: {purchase.ProductId} {error}");
+            }
+
+            if (_options.InvalidReceiptPolicy == InvalidReceiptPolicy.ConfirmWithoutGrant &&
+                purchase.Type == IAPProductType.Consumable)
+            {
+                // 지급하지 않았으므로 Purchased도 내지 않는다. 세션 확정 목록에 넣어 재전달돼도 다시 보지 않는다.
+                _confirmedInSession.Add(transactionId);
+                _purchaseService.ConfirmPurchase(order);
+            }
+
+            CompleteOwnPurchase(purchase.ProductId, isRestored, IAPPurchaseResult.InvalidReceipt(error));
         }
 
         private IAPPurchase BuildPurchase(Product product, Order order, bool isRestored)
