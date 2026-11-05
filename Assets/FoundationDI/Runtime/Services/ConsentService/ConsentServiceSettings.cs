@@ -8,8 +8,8 @@ namespace DarkNaku.FoundationDI
     {
         [Header("Policy (약관·개인정보처리방침)")]
         // 기본 문구가 영어인 이유: 기본 프리팹은 TMP 기본 폰트(LiberationSans)를 쓰는데 한글·일본어 등
-        // CJK 글리프가 없어 네모로 깨진다. 다른 언어는 스킨 프리팹에 해당 폰트를 넣고 문구를 바꾸거나
-        // IConsentService.SetPolicyContent로 넘긴다.
+        // CJK 글리프가 없어 네모로 깨진다. 다른 언어는 아래 Localized Texts에 넣고, 프리팹 창이면 스킨 프리팹에
+        // 해당 폰트를 넣는다(네이티브 창은 시스템 폰트라 필요 없다). 맞는 언어가 없으면 이 기본 문구를 쓴다.
         [Tooltip("약관을 바꾸면 올린다. 저장된 수락 버전보다 크면 다시 묻는다. 0이면 약관 단계를 쓰지 않는다.")]
         [SerializeField, Min(0)] private int _policyVersion = 1;
 
@@ -21,6 +21,10 @@ namespace DarkNaku.FoundationDI
         [SerializeField] private string _termsUrl = "";
         [SerializeField] private string _privacyLabel = "Privacy Policy";
         [SerializeField] private string _privacyUrl = "";
+
+        [Tooltip("언어별 문구. 기기 언어(Application.systemLanguage)와 같은 항목을 쓰고, 없으면 위의 기본 문구를 쓴다. " +
+                 "빈 칸은 기본 문구로 채운다(URL이 언어마다 같으면 비워 둔다). 런타임 SetPolicyContent가 이보다 우선한다.")]
+        [SerializeField] private List<LocalizedPolicyText> _localizedTexts = new();
 
         [Tooltip("약관 수락 창 프리팹. 루트에 PolicyAgreementView가 있어야 한다. 비우면 기본 프리팹을 쓴다.")]
         [SerializeField] private PolicyAgreementView _promptPrefab;
@@ -57,10 +61,13 @@ namespace DarkNaku.FoundationDI
         public PolicyAgreementView PromptPrefab => _promptPrefab;
         public bool UseNativePrompt => _useNativePrompt;
 
-        public ConsentServiceOptions ToOptions(bool isDebugBuild)
+        public ConsentServiceOptions ToOptions(bool isDebugBuild) => ToOptions(isDebugBuild, Application.systemLanguage);
+
+        public ConsentServiceOptions ToOptions(bool isDebugBuild, SystemLanguage language)
         {
-            var content = new PolicyAgreementContent(_title, _message, _acceptLabel,
-                                                     _termsLabel, _termsUrl, _privacyLabel, _privacyUrl);
+            var fallback = new PolicyAgreementContent(_title, _message, _acceptLabel,
+                                                      _termsLabel, _termsUrl, _privacyLabel, _privacyUrl);
+            var content = PolicyContentSelector.Select(fallback, _localizedTexts, language);
 
             var geography = isDebugBuild ? _debugGeography : UmpDebugGeography.Disabled;
             var umpRequest = new UmpRequestOptions(geography, new List<string>(_testDeviceHashedIds),

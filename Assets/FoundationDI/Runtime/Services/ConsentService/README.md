@@ -58,6 +58,7 @@ UMP의 공식 Unity 바인딩은 Google Mobile Ads(GMA) Unity 플러그인 안�
 |---|---|---|
 | Policy Version | 1 | 약관을 바꾸면 올립니다. 저장된 수락 버전보다 크면 다시 묻습니다. **0이면 약관 단계를 쓰지 않습니다.** |
 | 문구 (Title 등) | 영어 | 기본 프리팹의 TMP 기본 폰트에 CJK 글리프가 없어 영어가 기본입니다(5장). |
+| Localized Texts | 비어 있음 | 언어별 문구. 기기 언어와 같은 항목을 자동으로 고릅니다(5.2). |
 | Terms/Privacy Url | 비어 있음 | 비면 그 링크 버튼이 숨겨집니다. |
 | Use UMP | 끔 | 켜면 의존성 XML을 만들고 런타임이 UMP 동의를 받습니다. |
 | AdMob App Id | 비어 있음 | `ca-app-pub-XXXX~YYYY`. |
@@ -90,7 +91,7 @@ UMP 폼의 내용은 코드가 아니라 AdMob 콘솔 **개인 정보 보호 및
 // 기존 유저(이전 버전에서 업데이트)는 약관을 다시 묻지 않으려면 판단해서 먼저 수락 처리한다.
 if (_save.HasAnyProgress) _consent.AcceptPolicy();
 
-// 현지화 문구(RequestAsync 전에).
+// 현지화 문구(RequestAsync 전에). 기기 언어로만 고르면 되면 코드 없이 Localized Texts를 쓴다(5.2).
 _consent.SetPolicyContent(new PolicyAgreementContent(
     title: L("policy.title"), message: L("policy.body"), acceptLabel: L("policy.accept"),
     termsLabel: L("policy.terms"), termsUrl: "https://example.com/terms",
@@ -178,6 +179,19 @@ Accept Label `OK`, Terms Label `이용약관`, Privacy Label `개인정보 처�
 - iOS는 앱이 Active가 되고 0.5초 안정된 뒤 띄웁니다(UMP·ATT와 같은 이유 — Inactive에서 띄운 모달은 버려진다).
 - Android Java 클래스는 JNI로만 불리므로 androidlib의 consumer R8 규칙(`proguard-rules.pro`)으로 keep합니다.
 - 네이티브 창은 시스템 폰트를 쓰므로 프리팹 창과 달리 한국어 폰트를 따로 넣을 필요가 없습니다.
+
+### 5.2 언어별 문구 (Localized Texts)
+
+설정의 **Localized Texts**에 언어마다 한 줄씩 넣으면 기기 언어(`Application.systemLanguage`)에 맞는 줄을 골라
+씁니다. 코드는 필요 없습니다.
+
+- 맞는 언어가 없으면 위의 기본 문구(Title, Message …)를 씁니다. 기본 문구를 영어로 두면 나머지 언어의 대체가 됩니다.
+- **빈 칸은 기본 문구로 채웁니다.** 언어마다 URL이 같으면 URL은 비워 두세요.
+- 중국어: 기기는 `ChineseSimplified`/`ChineseTraditional`로 보고합니다. 정확히 맞는 줄이 먼저이고, 없으면 통합
+  `Chinese` 줄을 씁니다(반대로 기기가 `Chinese`면 간체 → 번체 순). 간체와 번체끼리는 서로 대신하지 않습니다.
+- 언어마다 Message에 `{terms}`/`{privacy}`를 넣으면 어순이 달라도 링크가 맞는 자리에 걸립니다(5.1).
+- 언어는 서비스를 만들 때 한 번 고릅니다. 게임 안 언어 설정을 따르려면 `SetPolicyContent`로 넘기세요 — 이쪽이 우선합니다.
+- 프리팹 창은 해당 언어 글리프가 있는 TMP 폰트가 필요합니다. 네이티브 창(5.1)은 필요 없습니다.
 
 ## 6. 광고·분석 연동
 

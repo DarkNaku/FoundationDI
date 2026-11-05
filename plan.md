@@ -16,6 +16,13 @@ NativePolicyAgreementPrompt 테스트
 - [x] 네이티브 창을 못 띄우면 대체 창을 쓴다
 - [x] 닫으면 네이티브 창을 정리하고 늦게 온 동의는 무시한다
 
+PolicyContentSelector 테스트 (Localized Texts)
+- [x] 기기 언어와 같은 항목의 문구를 쓴다
+- [x] 맞는 언어가 없으면 기본 문구를 쓴다
+- [x] 항목의 빈 칸은 기본값으로 채운다
+- [x] 중국어는 간체·번체·통합 항목끼리 서로 대신한다
+- [x] 중국어는 정확히 맞는 항목을 먼저 쓴다
+
 실기 확인
 - [ ] iOS 26+: Liquid Glass 카드, 링크 탭 → Safari, OK → 다음 단계(UMP·ATT)
 - [ ] iOS 25 이하: 블러 카드 폴백
