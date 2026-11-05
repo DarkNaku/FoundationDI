@@ -5,8 +5,8 @@ namespace DarkNaku.FoundationDI
 {
     internal static class StoreReviewFactory
     {
-        // AndroidJavaObject·UnityEngine.iOS.Device는 모든 플랫폼에서 컴파일되므로 #if 대신 실행 플랫폼으로
-        // 고른다 — 에디터가 어느 빌드 타깃에 있든 두 구현의 컴파일 에러가 바로 드러난다.
+        // #if 대신 실행 플랫폼으로 고른다 — 에디터가 어느 빌드 타깃에 있든 두 구현의 컴파일 에러가 바로 드러난다.
+        // 단 UnityEngine.iOS는 Android 플레이어 빌드에 없어 IosStoreReview 안에서만 #if로 가린다.
         //
         // usePlayInAppReview가 꺼져 있으면 Play Review 라이브러리가 빌드에 없다(의존성 XML을 만들지 않았다).
         // 그 상태로 Android 창구를 만들면 ClassNotFound라 미리 피한다.
