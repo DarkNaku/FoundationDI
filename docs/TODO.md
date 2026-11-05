@@ -9,13 +9,13 @@
 | 3 | 배너 높이를 실제로 그려진 배너 뷰 기준으로(적응형 컨테이너 높이·dp 환산) | AdService (LevelPlay·Dummy) | MahjongTile (2026-10-14) | 완료 (0.13.0, Android 실기 미검증) |
 | 4 | 플레이 모드를 끝내도 Dummy 광고 캔버스가 남지 않게 | AdService (Dummy) | CannonPuzzle (2026-10-23) | 완료 (0.13.0) |
 | 5 | 영수증 검증기가 Unity IAP 5 의 `GooglePlayTangle`(네임스페이스 안)을 찾게 | IAPService (UnityIAP) | CannonPuzzle (2026-10-26) | 완료 (0.13.0) |
-| 6 | 지급 처리기가 준비될 때까지 미확정 구매를 보류 | IAPService | PaperHero (2026-11-05) | 요청 |
-| 7 | 실행 중에 미확정 구매를 다시 처리하는 API | IAPService | PaperHero (2026-11-05) | 요청 |
-| 8 | 상품 조회 일부 실패 허용, 연결·조회·구매 시간 제한 | IAPService | PaperHero (2026-11-05) | 요청 |
-| 9 | 재전달된 구매가 진행 중인 같은 상품 구매를 대신 끝내지 않게 | IAPService | PaperHero (2026-11-05) | 요청 |
-| 10 | 비동기 영수증 검증(서버 검증) 훅 | IAPService | PaperHero (2026-11-05) | 요청 (서버를 붙일 때) |
-| 11 | 영수증 검증 실패 구매 처리 방식 선택 | IAPService | PaperHero (2026-11-05) | 요청 |
-| 12 | 상품 목록을 코드(게임 스펙 표)에서 넘기기 | IAPService | PaperHero (2026-11-05) | 요청 (선택) |
+| 6 | 지급 처리기가 준비될 때까지 미확정 구매를 보류 | IAPService | PaperHero (2026-11-05) | 완료 (0.17.0) |
+| 7 | 실행 중에 미확정 구매를 다시 처리하는 API | IAPService | PaperHero (2026-11-05) | 완료 (0.17.0) |
+| 8 | 상품 조회 일부 실패 허용, 연결·조회·구매 시간 제한 | IAPService | PaperHero (2026-11-05) | 완료 (0.17.0) |
+| 9 | 재전달된 구매가 진행 중인 같은 상품 구매를 대신 끝내지 않게 | IAPService | PaperHero (2026-11-05) | 완료 (0.17.0) |
+| 10 | 비동기 영수증 검증(서버 검증) 훅 | IAPService | PaperHero (2026-11-05) | 완료 (0.17.0) |
+| 11 | 영수증 검증 실패 구매 처리 방식 선택 | IAPService | PaperHero (2026-11-05) | 완료 (0.17.0) |
+| 12 | 상품 목록을 코드(게임 스펙 표)에서 넘기기 | IAPService | PaperHero (2026-11-05) | 완료 (0.17.0) |
 
 ---
 
