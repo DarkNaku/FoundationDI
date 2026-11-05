@@ -15,6 +15,12 @@ namespace DarkNaku.FoundationDI.Editor
         internal const string IosPod = "GoogleUserMessagingPlatform";
         internal const string IosPodVersion = "~> 3.1";
 
+        // EDM4U가 Swift Package 모드(1.2.187+)면 포드 대신 이것을 쓴다. LevelPlay AdMob 어댑터가 Google Mobile Ads를
+        // SPM으로 끌고 오고 그 SPM이 UMP 3.x를 가져오므로, 같은 패키지로 선언해야 한 벌로 합쳐진다.
+        internal const string IosSwiftPackageUrl = "https://github.com/googleads/swift-package-manager-google-user-messaging-platform.git";
+        internal const string IosSwiftPackageVersion = "3.1.0";
+        internal const string IosSwiftPackageProduct = "GoogleUserMessagingPlatform";
+
         internal static string BuildXml()
         {
             return "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
@@ -30,6 +36,9 @@ namespace DarkNaku.FoundationDI.Editor
                    "  <iosPods>\n" +
                    $"    <iosPod name=\"{IosPod}\" version=\"{IosPodVersion}\" addToAllTargets=\"false\" />\n" +
                    "  </iosPods>\n" +
+                   $"  <remoteSwiftPackage url=\"{IosSwiftPackageUrl}\" version=\"{IosSwiftPackageVersion}\" upToNextMajor=\"true\">\n" +
+                   $"    <swiftPackage name=\"{IosSwiftPackageProduct}\" replacesPod=\"{IosPod}\" />\n" +
+                   "  </remoteSwiftPackage>\n" +
                    "</dependencies>\n";
         }
 
