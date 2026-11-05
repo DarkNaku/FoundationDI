@@ -19,6 +19,7 @@ namespace DarkNaku.FoundationDI
         private readonly IEntitlementStorage _entitlements;
         private readonly IAPServiceOptions _options;
         private readonly Func<IMainThreadDispatcher> _dispatcherFactory;
+        private IMainThreadDispatcher _dispatcher;
         private readonly bool _verboseLogging;
 
         // 조회된 상품. 게임 코드에 내보낼 값과 구매에 쓸 Unity 객체를 공용 ID로 함께 들고 있는다.
@@ -199,6 +200,17 @@ namespace DarkNaku.FoundationDI
             // 조회한 Product로 산다 — catalogListingId 규칙에 의존하지 않는다.
             _purchaseService.PurchaseProduct(product);
 
+            var seconds = _options.PurchaseTimeoutSeconds;
+
+            using var timeout = StartTimeout(seconds, () =>
+            {
+                if (_pendingSource != source) return;
+
+                Debug.LogWarning($"[IAPService] 구매 결과가 {seconds}초 안에 오지 않았다: {productId}. " +
+                                 "결제가 끝났다면 늦게라도 지급된다.");
+                CompletePending(IAPPurchaseResult.Failed(new IAPError(IAPErrorCodes.Timeout, "구매 결과를 기다리다 시간이 초과됐다")));
+            });
+
             return await source.Awaitable;
         }
 
@@ -356,28 +368,60 @@ namespace DarkNaku.FoundationDI
 
         private Awaitable<bool> ConnectAsync()
         {
-            _connecting = new AwaitableCompletionSource<bool>();
+            var source = new AwaitableCompletionSource<bool>();
+            _connecting = source;
 
             // Connect()가 돌려주는 Task를 직접 await 하지 않는다. 성공/실패가 모두
             // OnStoreConnected/OnStoreDisconnected로 오기 때문에 이벤트 하나로 받는 편이
             // 스레드 문맥에 대한 가정이 없다.
             _ = _store.Connect();
 
-            return _connecting.Awaitable;
+            return WithTimeout(source, _options.ConnectTimeoutSeconds, "스토어 연결");
         }
 
         private Awaitable<bool> FetchProductsAsync()
         {
-            _fetchingProducts = new AwaitableCompletionSource<bool>();
+            var source = new AwaitableCompletionSource<bool>();
+            _fetchingProducts = source;
+            _products.Clear();
+            _unityProducts.Clear();
+
             _productService.FetchProducts(new List<ProductDefinition>(_catalog));
-            return _fetchingProducts.Awaitable;
+
+            return WithTimeout(source, _options.FetchTimeoutSeconds, "상품 조회");
         }
 
         private Awaitable<bool> FetchPurchasesAsync()
         {
-            _fetchingPurchases = new AwaitableCompletionSource<bool>();
+            var source = new AwaitableCompletionSource<bool>();
+            _fetchingPurchases = source;
             _purchaseService.FetchPurchases();
-            return _fetchingPurchases.Awaitable;
+
+            return WithTimeout(source, _options.FetchTimeoutSeconds, "구매 조회");
+        }
+
+        // 늦게 온 이벤트는 그대로 처리된다 — 완료 소스만 먼저 끝낸다. 연결은 다음 초기화가 새 소스로 다시 시도한다.
+        private async Awaitable<bool> WithTimeout(AwaitableCompletionSource<bool> source, float seconds, string what)
+        {
+            // 완료되면 곧바로 이 시간 제한이 해제되므로 콜백이 불렸다면 아직 끝나지 않은 것이다. 로그를 먼저 남긴다 —
+            // 완료가 동기로 이어져 초기화 실패 로그가 먼저 찍히면 원인이 뒤에 보인다.
+            using var timeout = StartTimeout(seconds, () =>
+            {
+                Debug.LogWarning($"[IAPService] {what}이 {seconds}초 안에 끝나지 않았다.");
+                source.TrySetResult(false);
+            });
+
+            return await source.Awaitable;
+        }
+
+        // 디스패처가 없으면(직접 생성) 시간 제한 없이 기다린다.
+        private IDisposable StartTimeout(float seconds, Action onTimeout)
+        {
+            if (seconds <= 0f || _disposed) return null;
+
+            _dispatcher ??= _dispatcherFactory?.Invoke();
+
+            return _dispatcher?.Delay(seconds, onTimeout);
         }
 
         private void Subscribe()
@@ -445,11 +489,31 @@ namespace DarkNaku.FoundationDI
             _fetchingProducts?.TrySetResult(true);
         }
 
+        // Unity IAP 5.4는 일부만 받으면 받은 것으로 OnProductsFetched를 먼저, 빠진 것으로 이 이벤트를 뒤에 쏜다.
+        // 스토어 콘솔에 없는(심사 전·삭제된) 상품 하나 때문에 상점 전체를 닫지 않는다 — 받은 것이 있으면 진행한다.
         private void HandleProductsFetchFailed(ProductFetchFailed failure)
         {
-            Debug.LogError($"[IAPService] 상품 조회에 실패했다: {failure?.FailureReason}");
+            var failed = failure?.FailedFetchProducts;
+            var failedCount = failed?.Count ?? 0;
+            var isPartial = _products.Count > 0 || (failedCount > 0 && failedCount < _catalog.Count);
 
-            _fetchingProducts?.TrySetResult(false);
+            if (!isPartial)
+            {
+                Debug.LogError($"[IAPService] 상품 조회에 실패했다: {failure?.FailureReason}");
+                _fetchingProducts?.TrySetResult(false);
+                return;
+            }
+
+            var ids = new List<string>();
+            if (failed != null)
+            {
+                foreach (var definition in failed) ids.Add(definition?.id);
+            }
+
+            Debug.LogWarning($"[IAPService] 일부 상품을 조회하지 못해 빼고 진행한다(스토어 콘솔에 없거나 비활성): " +
+                             string.Join(", ", ids));
+
+            // 순서가 뒤집혀 받은 상품이 아직 오지 않았으면 그걸 기다린다(오지 않으면 시간 제한이 끝낸다).
         }
 
         private void HandlePurchasesFetched(Orders orders)

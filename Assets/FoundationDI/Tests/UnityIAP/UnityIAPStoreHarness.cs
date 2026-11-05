@@ -19,6 +19,17 @@ public class UnityIAPStoreHarness
     public bool PurchasesFetchSucceeds = true;
     public bool RestoreSucceeds = true;
 
+    // true면 Connect가 아무 이벤트도 쏘지 않는다(스토어 앱 문제·네트워크 끊김).
+    public bool HoldConnect;
+
+    // true면 FetchProducts가 아무 이벤트도 쏘지 않는다.
+    public bool HoldProductsFetch;
+
+    // 스토어 콘솔에 없는 상품. Unity IAP 5.4처럼 받은 것으로 OnProductsFetched를, 빠진 것으로
+    // OnProductsFetchFailed를 쏜다. ReportUnavailableFirst면 순서를 뒤집는다.
+    public readonly HashSet<string> UnavailableProducts = new();
+    public bool ReportUnavailableFirst;
+
     // true면 RestoreTransactions가 뒤따르는 조회를 쏘지 않는다. 테스트가 RaisePurchasesFetched로 쏜다.
     public bool HoldRestoreFetch;
 
@@ -58,6 +69,8 @@ public class UnityIAPStoreHarness
         {
             Calls.Add("Connect");
 
+            if (HoldConnect) return;
+
             if (ConnectSucceeds) Store.OnStoreConnected += Raise.Event<Action>();
             else Store.OnStoreDisconnected += Raise.Event<Action<StoreConnectionFailureDescription>>(
                 new StoreConnectionFailureDescription("연결 실패"));
@@ -68,6 +81,8 @@ public class UnityIAPStoreHarness
             Calls.Add("FetchProducts");
             FetchedDefinitions = call.Arg<List<ProductDefinition>>();
 
+            if (HoldProductsFetch) return;
+
             if (!ProductsFetchSucceeds)
             {
                 Products.OnProductsFetchFailed += Raise.Event<Action<ProductFetchFailed>>(
@@ -76,9 +91,17 @@ public class UnityIAPStoreHarness
             }
 
             var fetched = new List<Product>();
-            foreach (var definition in FetchedDefinitions) fetched.Add(Product(definition));
+            var unavailable = new List<ProductDefinition>();
 
-            Products.OnProductsFetched += Raise.Event<Action<List<Product>>>(fetched);
+            foreach (var definition in FetchedDefinitions)
+            {
+                if (UnavailableProducts.Contains(definition.id)) unavailable.Add(definition);
+                else fetched.Add(Product(definition));
+            }
+
+            if (ReportUnavailableFirst) RaiseUnavailable(unavailable);
+            if (fetched.Count > 0) Products.OnProductsFetched += Raise.Event<Action<List<Product>>>(fetched);
+            if (!ReportUnavailableFirst) RaiseUnavailable(unavailable);
         });
 
         Purchases.When(p => p.FetchPurchases()).Do(_ =>
@@ -121,6 +144,16 @@ public class UnityIAPStoreHarness
             callback?.Invoke(true, null);
         });
     }
+
+    private void RaiseUnavailable(List<ProductDefinition> unavailable)
+    {
+        if (unavailable.Count == 0) return;
+
+        Products.OnProductsFetchFailed += Raise.Event<Action<ProductFetchFailed>>(
+            UnityIAPTestObjects.ProductFetchFailed(unavailable, "Retrieve Products succeeded, but could not retrieve the attached subset."));
+    }
+
+    public void RaiseConnected() => Store.OnStoreConnected += Raise.Event<Action>();
 
     // 같은 ID면 같은 Product 객체를 돌려준다 — SDK도 조회한 객체를 주문에 그대로 싣는다.
     public Product Product(ProductDefinition definition)

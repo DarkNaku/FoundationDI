@@ -52,3 +52,45 @@ public class FakeEntitlementStorage : IEntitlementStorage
         else Owned.Remove(productId);
     }
 }
+
+// 시간 제한 테스트용 시계. Advance로 손으로 돌린다(EditMode에서는 실제 지연이 끝나지 않는다).
+public class ManualIAPDispatcher : IMainThreadDispatcher
+{
+    private class Entry : IDisposable
+    {
+        public float DueAt;
+        public Action Action;
+        public bool Cancelled;
+
+        public void Dispose() => Cancelled = true;
+    }
+
+    private readonly List<Entry> _entries = new();
+    private float _now;
+
+    public int ActiveCount => _entries.FindAll(e => !e.Cancelled).Count;
+
+    public void Post(Action action) => action?.Invoke();
+
+    public IDisposable Delay(float seconds, Action action)
+    {
+        var entry = new Entry { DueAt = _now + seconds, Action = action };
+        _entries.Add(entry);
+        return entry;
+    }
+
+    public IDisposable NextFrames(int count, Action action) => throw new NotSupportedException();
+
+    public void Advance(float seconds)
+    {
+        _now += seconds;
+
+        foreach (var entry in _entries.ToArray())
+        {
+            if (entry.Cancelled || entry.DueAt > _now) continue;
+
+            entry.Cancelled = true;
+            entry.Action?.Invoke();
+        }
+    }
+}
