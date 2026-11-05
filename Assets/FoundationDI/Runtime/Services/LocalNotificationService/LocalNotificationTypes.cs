@@ -96,5 +96,11 @@ namespace DarkNaku.FoundationDI
             AndroidChannelDescription = androidChannelDescription;
             AndroidSmallIcon = androidSmallIcon;
         }
+
+        // 채널 이름·설명만 바꾼 사본. 게임이 현지화한 문구를 넣는다. 채널 ID는 출시 뒤 바꾸면 안 되므로 그대로 둔다.
+        public LocalNotificationOptions WithAndroidChannel(string name, string description)
+        {
+            return new LocalNotificationOptions(AndroidChannelId, name, description, AndroidSmallIcon);
+        }
     }
 }
