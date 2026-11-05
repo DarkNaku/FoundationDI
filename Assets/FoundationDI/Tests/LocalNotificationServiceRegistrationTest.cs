@@ -77,5 +77,12 @@ public class LocalNotificationServiceRegistrationTest
         public void CancelAll() => _scheduled.Clear();
 
         public void Schedule(LocalNotification notification) => _scheduled.Add(notification);
+
+        public Awaitable<string> GetLastOpenedDataAsync()
+        {
+            var source = new AwaitableCompletionSource<string>();
+            source.SetResult(null);
+            return source.Awaitable;
+        }
     }
 }

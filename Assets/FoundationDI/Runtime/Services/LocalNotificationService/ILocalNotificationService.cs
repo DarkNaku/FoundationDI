@@ -10,6 +10,14 @@ namespace DarkNaku.FoundationDI
 
         bool HasPermission { get; }
 
+        // 알림을 눌러 앱을 열었다. 값은 그 알림의 Data다. 같은 알림은 한 번만 알린다(Start와 앱이 포커스를
+        // 되찾을 때 확인한다). Data가 없는 알림은 알리지 않는다.
+        event Action<string> Opened;
+
+        // 처음 권한을 물은 결과(TryRequestPermissionOnce). 설치마다 한 번이다 — 설정 화면에서 다시 묻는
+        // RequestPermissionAsync의 결과는 알리지 않는다.
+        event Action<LocalNotificationPermissionResult> PermissionAnswered;
+
         // 지금 한 번 예약하고, 앞으로 앱이 포커스를 잃을 때마다 다시 예약한다.
         void Start();
 
