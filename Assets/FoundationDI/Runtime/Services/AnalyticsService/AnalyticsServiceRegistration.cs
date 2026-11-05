@@ -37,7 +37,10 @@ namespace DarkNaku.FoundationDI
             {
                 var initializer = container.Resolve<AnalyticsProviderInitializer>();
 
-                return new AnalyticsService(initializer, settings.ToOptions(), ResolveConsent(container, settings));
+                var testLab = settings.ExcludeFirebaseTestLab ? new FirebaseTestLabDetector() : null;
+
+                return new AnalyticsService(initializer, settings.ToOptions(), ResolveConsent(container, settings),
+                                            testLab);
             }, Lifetime.Singleton, Resolution.Lazy);
         }
 

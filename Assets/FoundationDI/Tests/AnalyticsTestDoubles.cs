@@ -163,3 +163,8 @@ public class FakeConsentAwareAnalyticsProvider : FakeFlushHookAnalyticsProvider,
         Calls.Add($"ApplyConsent:{result.AnalyticsConsent}");
     }
 }
+
+public class FakeTestLabDetector : ITestLabDetector
+{
+    public bool IsTestLab { get; set; }
+}

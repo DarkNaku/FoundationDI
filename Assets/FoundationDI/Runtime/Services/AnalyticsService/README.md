@@ -25,6 +25,7 @@ Singular / Airbridge 어댑터는 각각 별도 계획으로 붙습니다.
 | `Provider Settings` | 어댑터 고유 설정 에셋 목록(6.1절). 설정이 필요 없는 어댑터는 비워 둔다 |
 | `Collection Enabled By Default` | `CollectionEnabled`의 초기값(게임이 끄는 스위치). 동의 게이트는 아래 `Wait For Consent`가 맡는다 |
 | `Wait For Consent` | 켜면(기본) ConsentService 판정으로 수집을 게이트한다(5절). 빌드 후처리가 Firebase 자동 수집을 기본으로 꺼 둔다 |
+| `Exclude Firebase Test Lab` | 켜면(기본) Google Play 사전 출시 보고서(Firebase Test Lab) 기기에서 수집하지 않는다(5절, Android 전용) |
 
 ### 1.2 DI 등록
 
@@ -279,6 +280,22 @@ _analytics.CollectionEnabled = false;   // 게임이 판단해서 밀어 넣는�
   필요합니다.
 
 **동의 UI와 판정은 ConsentService가 맡습니다.** 이 서비스는 그 결과로 수집을 켜고 끄기만 합니다.
+
+### Test Lab 기기 제외 (Exclude Firebase Test Lab)
+
+Google Play에 빌드를 올리면 사전 출시 보고서가 Firebase Test Lab 실기기에서 앱을 돌립니다. 이 기기들이
+GA4에는 신규 사용자(`first_open`)로, Adjust에는 인스톨로 잡혀 리텐션과 인스톨 수를 흐립니다.
+
+- `Exclude Firebase Test Lab`(기본 켜짐)이면 `FirebaseTestLabDetector`가 `Settings.System`의
+  `firebase.test.lab == "true"`로 판별합니다. Test Lab이면 **동의 거부와 같게** 다룹니다 — 버퍼에
+  쌓지 않고, 모든 provider에 `SetCollectionEnabled(false)`를 보내고, flush 훅을 부르지 않아 Adjust의
+  첫 세션(인스톨)이 나가지 않습니다.
+- **동의를 묻지도 않습니다.** 로봇이 약관 동의 버튼을 누르면 수집이 켜지기 때문입니다.
+- 판별 코드보다 Firebase의 `first_open`이 먼저 나가므로, 이 옵션이 켜져 있으면 `Wait For Consent`가
+  꺼져 있어도 `UmpPostProcess`가 Android 매니페스트에 `firebase_analytics_collection_enabled=false`를
+  넣습니다. 일반 기기는 초기화 flush에서 다시 켭니다.
+- **Android 전용입니다.** iOS 앱 심사 기기는 판별할 방법이 없습니다. 이미 수집된 Test Lab 데이터는
+  GA4 탐색 항목에서 세그먼트(국가·기기 모델·앱 버전)로 걸러야 합니다.
 
 ---
 

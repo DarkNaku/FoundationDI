@@ -38,9 +38,11 @@ namespace DarkNaku.FoundationDI.Editor
 
         // Basic 모드: 동의 전에는 Firebase 자동 이벤트(first_open 등)도 나가면 안 된다.
         // AnalyticsService가 동의 후 SetCollectionEnabled(true)로 켠다.
-        internal static bool ShouldDisableFirebaseCollection(bool waitForConsent, bool firebaseActive, bool alreadyPresent)
+        // Test Lab 제외도 같은 이유로 기본값을 꺼야 한다 — 판별 코드보다 SDK의 first_open이 먼저 나간다.
+        internal static bool ShouldDisableFirebaseCollection(bool waitForConsent, bool excludeTestLab,
+                                                             bool firebaseActive, bool alreadyPresent)
         {
-            return waitForConsent && firebaseActive && !alreadyPresent;
+            return (waitForConsent || excludeTestLab) && firebaseActive && !alreadyPresent;
         }
     }
 }

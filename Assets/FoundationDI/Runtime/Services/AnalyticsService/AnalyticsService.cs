@@ -40,19 +40,34 @@ namespace DarkNaku.FoundationDI
         // IAnalyticsFlushHook은 처음 허용될 때 한 번만 부른다(Adjust 첫 세션 지연 해제).
         private bool _flushHookFired;
 
+        // Firebase Test Lab(Play 사전 출시 보고서) 기기. 동의 거부와 같게 다루되 동의를 묻지도 않는다 —
+        // 로봇이 약관 동의 버튼을 누르는 순간 수집이 켜지기 때문이다.
+        private readonly bool _isTestLab;
+
         public AnalyticsService(IReadOnlyList<IAnalyticsProvider> providers, AnalyticsServiceOptions options,
-                                IConsentService consent = null)
-            : this(new AnalyticsProviderInitializer(providers), options, consent)
+                                IConsentService consent = null, ITestLabDetector testLab = null)
+            : this(new AnalyticsProviderInitializer(providers), options, consent, testLab)
         {
         }
 
         public AnalyticsService(AnalyticsProviderInitializer initializer, AnalyticsServiceOptions options,
-                                IConsentService consent)
+                                IConsentService consent, ITestLabDetector testLab = null)
         {
             _initializer = initializer;
             _collectionEnabled = options.CollectionEnabledByDefault;
             _consent = consent;
-            _gate = consent == null ? AnalyticsConsent.Granted : AnalyticsConsent.Unknown;
+            _isTestLab = testLab != null && testLab.IsTestLab;
+
+            if (_isTestLab)
+            {
+                // 처음부터 거부다. 초기화 전 이벤트도 버퍼에 넣지 않는다.
+                _gate = AnalyticsConsent.Denied;
+                Debug.Log("[AnalyticsService] Firebase Test Lab 기기라 수집하지 않는다.");
+            }
+            else
+            {
+                _gate = consent == null ? AnalyticsConsent.Granted : AnalyticsConsent.Unknown;
+            }
         }
 
         public bool IsInitialized { get; private set; }
@@ -180,7 +195,13 @@ namespace DarkNaku.FoundationDI
 
             if (succeeded)
             {
-                if (_consent == null)
+                if (_isTestLab)
+                {
+                    // flush 훅을 부르지 않는다 — Adjust는 첫 세션 지연이 풀리지 않아 인스톨을 보내지 않는다.
+                    IsInitialized = true;
+                    Fanout(p => p.SetCollectionEnabled(false));
+                }
+                else if (_consent == null)
                 {
                     IsInitialized = true;
                     Flush();

@@ -1,5 +1,17 @@
 # plan.md
 
+## 완료: AnalyticsService — Firebase Test Lab(Play 사전 출시 보고서) 기기 제외
+
+사전 출시 보고서의 Test Lab 기기가 GA4 신규 사용자·Adjust 인스톨로 잡혀 리텐션을 흐린다.
+`ITestLabDetector`로 판별해 동의 거부처럼 수집을 막고, 빌드 후처리가 Firebase 자동 수집 기본값을 끈다.
+
+- [x] Test Lab 기기면 이벤트를 보내지 않고 SDK 수집을 끈다
+- [x] Test Lab 기기면 동의를 묻지 않는다
+- [x] Test Lab 기기면 flush 훅을 부르지 않는다
+- [x] Test Lab 기기면 게임이 수집을 켜도 켜지지 않는다
+- [x] Test Lab 기기가 아니면 평소대로 보낸다
+- [x] Test Lab 제외가 켜져 있으면 동의를 기다리지 않아도 Firebase 수집을 기본으로 끈다
+
 ## 완료: ConsentService (약관 + UMP + ATT) — 0.12.0
 
 상세 계획: `docs/superpowers/plans/2026-10-14-consent-service.md` (Task 0~19).
