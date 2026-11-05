@@ -22,6 +22,9 @@ public class UnityIAPStoreHarness
     // true면 RestoreTransactions가 뒤따르는 조회를 쏘지 않는다. 테스트가 RaisePurchasesFetched로 쏜다.
     public bool HoldRestoreFetch;
 
+    // true면 FetchPurchases가 결과를 쏘지 않는다. 테스트가 RaisePurchasesFetched로 쏜다.
+    public bool HoldPurchasesFetch;
+
     // true면 PurchaseProduct 안에서 곧바로 주문을 쏜다. 에디터의 FakeStore가 이렇게 동기로 끝난다.
     public bool CompletePurchaseSynchronously;
     private int _sequence;
@@ -81,7 +84,7 @@ public class UnityIAPStoreHarness
         Purchases.When(p => p.FetchPurchases()).Do(_ =>
         {
             Calls.Add("FetchPurchases");
-            RaisePurchasesFetched();
+            if (!HoldPurchasesFetch) RaisePurchasesFetched();
         });
 
         Purchases.When(p => p.ProcessPendingOrdersOnPurchasesFetched(Arg.Any<bool>()))

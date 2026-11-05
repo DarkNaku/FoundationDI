@@ -1,3 +1,5 @@
+using UnityEngine.Purchasing;
+
 namespace DarkNaku.FoundationDI
 {
     // 구독은 범위 밖이다. 스토어가 소모성/비소모성을 다르게 취급하고(재구매 가능 여부,
@@ -25,6 +27,14 @@ namespace DarkNaku.FoundationDI
         public const int NotInitialized = -1004;
         public const int RestoreFailed = -1005;
         public const int RestoreInProgress = -1006;
+
+        // 지급 처리기(IIAPFulfillmentGate)가 아직 준비되지 않아 구매를 붙잡아 두었다. 결제는 끝났고 확정하지
+        // 않았다 — 준비 뒤 ProcessUnconfirmedAsync()가 지급하고 Purchased 이벤트를 낸다.
+        public const int FulfillmentNotReady = -1007;
+
+        // 같은 소모성 상품의 미확정 구매가 남아 스토어가 새 구매를 거절했다(구글 ItemAlreadyOwned).
+        // 서비스가 곧바로 미확정 구매를 다시 처리하고, 지급되면 Purchased 이벤트가 온다.
+        public const int DuplicateTransaction = (int)PurchaseFailureReason.DuplicateTransaction;
     }
 
     public readonly struct IAPError

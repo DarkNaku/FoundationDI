@@ -21,6 +21,12 @@ public class FakeFulfillment : IIAPFulfillment
     }
 }
 
+// 진행 데이터가 늦게 준비되는 게임의 지급 처리기.
+public class GatedFulfillment : FakeFulfillment, IIAPFulfillmentGate
+{
+    public bool IsReady { get; set; }
+}
+
 public class FakeReceiptValidator : IReceiptValidator
 {
     public bool Result = true;
