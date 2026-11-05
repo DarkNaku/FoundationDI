@@ -11,12 +11,29 @@ namespace DarkNaku.FoundationDI
         public string Title { get; }
         public string Body { get; }
 
+        // 알림에 실어 두는 값. 알림을 눌러 앱을 열면 ILocalNotificationService.Opened로 돌아온다. 없으면 null.
+        public string Data { get; }
+
         public LocalNotification(DateTime fireTime, string title, string body)
+            : this(fireTime, title, body, null)
+        {
+        }
+
+        public LocalNotification(DateTime fireTime, string title, string body, string data)
         {
             FireTime = fireTime;
             Title = title;
             Body = body;
+            Data = data;
         }
+    }
+
+    // 처음 권한을 물었을 때의 결과(TryRequestPermissionOnce). 설치마다 한 번 알린다.
+    public enum LocalNotificationPermissionResult
+    {
+        Granted,
+        Denied,
+        AlreadyGranted
     }
 
     // 무엇을 언제 보낼지는 게임이 정한다. 서비스는 다시 예약할 때마다 등록된 planner를 전부 불러
@@ -42,6 +59,9 @@ namespace DarkNaku.FoundationDI
         void CancelAll();
 
         void Schedule(LocalNotification notification);
+
+        // 알림을 눌러 앱을 열었으면 그 알림의 Data, 아니면 null.
+        Awaitable<string> GetLastOpenedDataAsync();
     }
 
     // 알림 켜기/끄기(게임 설정)와 권한을 물었는지를 영속화한다.
@@ -49,6 +69,9 @@ namespace DarkNaku.FoundationDI
     {
         bool IsEnabled { get; set; }
         bool HasAskedPermission { get; set; }
+
+        // OS는 마지막으로 누른 알림을 앱을 열 때마다 계속 돌려준다. 처음 보는 알림이면 기록하고 true.
+        bool TryMarkOpened(string data);
     }
 
     // 다시 예약하는 시점(앱이 포커스를 잃을 때)의 seam. Application.focusChanged는 테스트가 발화할 수 없다.
@@ -72,6 +95,12 @@ namespace DarkNaku.FoundationDI
             AndroidChannelName = androidChannelName;
             AndroidChannelDescription = androidChannelDescription;
             AndroidSmallIcon = androidSmallIcon;
+        }
+
+        // 채널 이름·설명만 바꾼 사본. 게임이 현지화한 문구를 넣는다. 채널 ID는 출시 뒤 바꾸면 안 되므로 그대로 둔다.
+        public LocalNotificationOptions WithAndroidChannel(string name, string description)
+        {
+            return new LocalNotificationOptions(AndroidChannelId, name, description, AndroidSmallIcon);
         }
     }
 }

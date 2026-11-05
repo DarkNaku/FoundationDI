@@ -30,12 +30,29 @@ public class LocalNotificationServiceTest
         }
 
         public void Schedule(LocalNotification notification) => Scheduled.Add(notification);
+
+        public string LastOpenedData;
+        public Exception LastOpenedError;
+        public int LastOpenedQueryCount;
+
+        public Awaitable<string> GetLastOpenedDataAsync()
+        {
+            LastOpenedQueryCount++;
+            if (LastOpenedError != null) throw LastOpenedError;
+
+            var source = new AwaitableCompletionSource<string>();
+            source.SetResult(LastOpenedData);
+            return source.Awaitable;
+        }
     }
 
     private class FakeStorage : ILocalNotificationStorage
     {
         public bool IsEnabled { get; set; } = true;
         public bool HasAskedPermission { get; set; }
+        public readonly HashSet<string> Opened = new();
+
+        public bool TryMarkOpened(string data) => data != null && Opened.Add(data);
     }
 
     private class FakeFocus : IApplicationFocusSource
@@ -230,4 +247,127 @@ public class LocalNotificationServiceTest
         Assert.AreEqual(0, _notifier.RequestCount);
         Assert.AreEqual(1, _notifier.Scheduled.Count);
     }
+
+    [Test]
+    public void 알림에_실은_데이터를_그대로_예약한다()
+    {
+        _planner.Items.Add(new LocalNotification(Now.AddHours(1), "t", "b", "daily|3600"));
+
+        _sut.Reschedule();
+
+        Assert.AreEqual("daily|3600", _notifier.Scheduled[0].Data);
+    }
+
+    [UnityTest]
+    public IEnumerator Start하면_알림을_눌러_연_것을_한_번만_알린다() => AwaitableTest.Run(async () =>
+    {
+        var opened = new List<string>();
+        _sut.Opened += opened.Add;
+        _notifier.LastOpenedData = "daily|3600";
+
+        _sut.Start();
+        await AwaitableTest.NextFrame();
+
+        CollectionAssert.AreEqual(new[] { "daily|3600" }, opened);
+        Assert.IsTrue(_storage.Opened.Contains("daily|3600"), "다음 실행에서 다시 알리지 않게 기록한다");
+
+        // OS는 마지막으로 누른 알림을 계속 돌려준다.
+        _focus.Raise(true);
+        await AwaitableTest.NextFrame();
+
+        Assert.AreEqual(1, opened.Count);
+    });
+
+    [UnityTest]
+    public IEnumerator 앱이_포커스를_되찾으면_새로_누른_알림을_알린다() => AwaitableTest.Run(async () =>
+    {
+        var opened = new List<string>();
+        _sut.Opened += opened.Add;
+        _sut.Start();
+        await AwaitableTest.NextFrame();
+
+        _notifier.LastOpenedData = "daily|7200";
+        _focus.Raise(true);
+        await AwaitableTest.NextFrame();
+
+        CollectionAssert.AreEqual(new[] { "daily|7200" }, opened);
+    });
+
+    [UnityTest]
+    public IEnumerator 알림으로_열지_않았으면_알리지_않는다() => AwaitableTest.Run(async () =>
+    {
+        var opened = new List<string>();
+        _sut.Opened += opened.Add;
+
+        _sut.Start();
+        await AwaitableTest.NextFrame();
+
+        Assert.IsEmpty(opened);
+        Assert.AreEqual(1, _notifier.LastOpenedQueryCount);
+    });
+
+    [Test]
+    public void 연_알림을_읽다_예외가_나도_예약은_한다()
+    {
+        _notifier.LastOpenedError = new InvalidOperationException("boom");
+        _planner.Items.Add(At(1));
+
+        LogAssert.Expect(LogType.Warning, new Regex("연 알림을 읽지 못했다"));
+        _sut.Start();
+
+        Assert.AreEqual(1, _notifier.Scheduled.Count);
+    }
+
+    [Test]
+    public void 처음_물을_때_이미_권한이_있으면_AlreadyGranted를_알린다()
+    {
+        var answers = new List<LocalNotificationPermissionResult>();
+        _sut.PermissionAnswered += answers.Add;
+
+        _sut.TryRequestPermissionOnce();
+        _sut.TryRequestPermissionOnce();
+
+        CollectionAssert.AreEqual(new[] { LocalNotificationPermissionResult.AlreadyGranted }, answers);
+    }
+
+    [UnityTest]
+    public IEnumerator 권한_창에서_허용하면_Granted를_알린다() => AwaitableTest.Run(async () =>
+    {
+        var answers = new List<LocalNotificationPermissionResult>();
+        _sut.PermissionAnswered += answers.Add;
+        _notifier.HasPermission = false;
+
+        _sut.TryRequestPermissionOnce();
+        _notifier.Permission.SetResult(true);
+        await AwaitableTest.NextFrame();
+
+        CollectionAssert.AreEqual(new[] { LocalNotificationPermissionResult.Granted }, answers);
+    });
+
+    [UnityTest]
+    public IEnumerator 권한_창에서_거절하면_Denied를_알린다() => AwaitableTest.Run(async () =>
+    {
+        var answers = new List<LocalNotificationPermissionResult>();
+        _sut.PermissionAnswered += answers.Add;
+        _notifier.HasPermission = false;
+
+        _sut.TryRequestPermissionOnce();
+        _notifier.Permission.SetResult(false);
+        await AwaitableTest.NextFrame();
+
+        CollectionAssert.AreEqual(new[] { LocalNotificationPermissionResult.Denied }, answers);
+    });
+
+    [UnityTest]
+    public IEnumerator 설정_화면에서_다시_물은_결과는_알리지_않는다() => AwaitableTest.Run(async () =>
+    {
+        var answers = new List<LocalNotificationPermissionResult>();
+        _sut.PermissionAnswered += answers.Add;
+        _notifier.HasPermission = false;
+        _notifier.Permission.SetResult(true);
+
+        await _sut.RequestPermissionAsync();
+
+        Assert.IsEmpty(answers, "설치마다 한 번(TryRequestPermissionOnce)만 알린다");
+    });
 }

@@ -22,5 +22,12 @@ namespace DarkNaku.FoundationDI
         public void Schedule(LocalNotification notification)
         {
         }
+
+        public Awaitable<string> GetLastOpenedDataAsync()
+        {
+            var source = new AwaitableCompletionSource<string>();
+            source.SetResult(null);
+            return source.Awaitable;
+        }
     }
 }

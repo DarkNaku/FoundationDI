@@ -131,6 +131,8 @@ DI 코어는 **Reflex 14.3.1**이다. `Assets/Scripts/Installers/RootInstaller.c
   - 예약은 늘 **전부 지우고 다시 넣는다**. 지난 시각은 서비스가 거르고, planner 예외는 그 planner에 가둔다. 알림 창구는 처음 쓸 때 만든다(모바일 알림 센터 초기화가 저사양에서 0.5~1초).
   - OS 창구는 `com.unity.mobile.notifications`가 있을 때만 옵셔널 어셈블리 `FoundationDI.MobileNotifications`(`FOUNDATIONDI_MOBILENOTIFICATIONS`, 마커 `Unity.Notifications.Unified`)가 `LocalNotifierRegistry`에 등록한다. 없거나 에디터면 `UnsupportedLocalNotifier`(권한 있음·예약 안 함). 권한 확인만 플랫폼 API — 공통 API `RequestPermission`은 창을 띄워 확인용으로 못 쓴다.
   - 빌드 직전 `MobileNotificationSettingsApplier`(`FoundationDI.MobileNotifications.Editor`)가 iOS 앱 시작 시 권한 요청을 끄고, Android 재부팅 뒤 재예약을 켜고, 설정의 작은 아이콘을 `fdi_notification_small`로 등록한다. 패키지가 drawable 목록 공개 API를 주지 않아 등록 여부는 `ProjectSettings/NotificationsSettings.asset` 텍스트로 본다(없는 ID를 지우면 경고가 나서).
+  - **알림 데이터·연 알림·첫 권한 결과(0.16)**: `LocalNotification.Data`를 실어 예약하고, `Start`와 포커스 복귀 때 `ILocalNotifier.GetLastOpenedDataAsync`로 앱을 연 알림을 읽어 `Opened`로 알린다. OS가 같은 알림을 계속 돌려주므로 `ILocalNotificationStorage.TryMarkOpened`가 처음 보는 것만 통과시킨다. `PermissionAnswered`는 `TryRequestPermissionOnce` 경로에서만(설치마다 한 번).
+  - **게임 저장소·채널 문구(0.16)**: `ILocalNotificationStorage`를 등록 호출보다 먼저 등록하면 그것을 쓴다(`HasBinding`) — 켜기/끄기를 게임 세이브에 두던 프로젝트가 유저 설정을 잃지 않고 옮겨 온다. `configureOptions`는 창구를 처음 만들 때 불러 채널 이름·설명을 현지화한다(ID는 그대로).
   - 호스트에 2.5.0을 설치했다(심볼 동기화가 켬). 이식 후 실기 미검증.
   - 상세: `Assets/FoundationDI/Runtime/Services/LocalNotificationService/README.md`.
 - **ReviewService** (`Services/ReviewService/`): OS 앱 내 리뷰 창구(BlockAway `IStoreReview` 이식). 0.14.

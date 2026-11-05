@@ -41,6 +41,9 @@ namespace DarkNaku.FoundationDI
 
         private ILocalNotifier Notifier => _notifier ??= _notifierFactory() ?? new UnsupportedLocalNotifier();
 
+        public event Action<string> Opened;
+        public event Action<LocalNotificationPermissionResult> PermissionAnswered;
+
         public bool IsEnabled
         {
             get => _storage.IsEnabled;
@@ -80,6 +83,7 @@ namespace DarkNaku.FoundationDI
             }
 
             Reschedule();
+            _ = CheckOpenedAsync();
         }
 
         public int Reschedule()
@@ -127,11 +131,12 @@ namespace DarkNaku.FoundationDI
 
                 if (Notifier.HasPermission)
                 {
+                    PermissionAnswered?.Invoke(LocalNotificationPermissionResult.AlreadyGranted);
                     Reschedule();
                     return false;
                 }
 
-                _ = RequestPermissionAsync();
+                _ = RequestFirstPermissionAsync();
                 return true;
             }
             catch (Exception e)
@@ -175,6 +180,34 @@ namespace DarkNaku.FoundationDI
             }
         }
 
+        private async Awaitable RequestFirstPermissionAsync()
+        {
+            var granted = await RequestPermissionAsync();
+
+            if (_isDisposed) return;
+
+            PermissionAnswered?.Invoke(granted
+                ? LocalNotificationPermissionResult.Granted
+                : LocalNotificationPermissionResult.Denied);
+        }
+
+        // OS는 마지막으로 누른 알림을 앱을 열 때마다 계속 돌려준다. 저장소가 처음 보는 것만 통과시킨다.
+        private async Awaitable CheckOpenedAsync()
+        {
+            try
+            {
+                var data = await Notifier.GetLastOpenedDataAsync();
+
+                if (_isDisposed || string.IsNullOrEmpty(data) || !_storage.TryMarkOpened(data)) return;
+
+                Opened?.Invoke(data);
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[LocalNotificationService] 연 알림을 읽지 못했다: {e.Message}");
+            }
+        }
+
         // planner 하나가 터져도 나머지 일정은 나가야 한다.
         private List<LocalNotification> CollectPlans(DateTime now)
         {
@@ -196,9 +229,16 @@ namespace DarkNaku.FoundationDI
             return result;
         }
 
+        // 포커스를 잃으면 다시 예약하고, 되찾으면 알림을 눌러 돌아왔는지 본다.
         private void OnFocusChanged(bool isFocused)
         {
-            if (!isFocused) Reschedule();
+            if (isFocused)
+            {
+                _ = CheckOpenedAsync();
+                return;
+            }
+
+            Reschedule();
         }
     }
 }

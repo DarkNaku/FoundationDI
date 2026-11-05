@@ -57,9 +57,24 @@ namespace DarkNaku.FoundationDI
 
         public void Schedule(LocalNotification notification)
         {
-            var native = new Notification { Title = notification.Title, Text = notification.Body };
+            var native = new Notification { Title = notification.Title, Text = notification.Body, Data = notification.Data };
 
             NotificationCenter.ScheduleNotification(native, new NotificationDateTimeSchedule(notification.FireTime));
+        }
+
+        public async Awaitable<string> GetLastOpenedDataAsync()
+        {
+            // iOS 네임스페이스에도 같은 이름이 있어 공통 API의 형식을 적어 준다.
+            var query = NotificationCenter.QueryLastRespondedNotification();
+
+            while (query.keepWaiting)
+            {
+                await Awaitable.NextFrameAsync();
+            }
+
+            return query.State == Unity.Notifications.QueryLastRespondedNotificationState.HaveRespondedNotification
+                ? query.Notification.Data
+                : null;
         }
     }
 }
