@@ -1,3 +1,5 @@
+using UnityEngine.Purchasing;
+
 namespace DarkNaku.FoundationDI
 {
     // 구독은 범위 밖이다. 스토어가 소모성/비소모성을 다르게 취급하고(재구매 가능 여부,
@@ -14,6 +16,34 @@ namespace DarkNaku.FoundationDI
         NotReady,        // 초기화 안 됨 / 카탈로그에 없음 / 중복 호출
         InvalidReceipt,  // 영수증 검증 실패 — 지급도 확정도 하지 않았다
         Failed,          // 그 외 스토어 실패 및 지급 실패
+    }
+
+    // IAPError.Code 중 이 서비스가 정한 값. 0 이상은 Unity IAP의 PurchaseFailureReason 값 그대로다.
+    public static class IAPErrorCodes
+    {
+        // 지급 처리기가 false를 돌려주거나 예외를 던졌다. 확정하지 않았으므로 스토어가 다시 준다.
+        public const int FulfillmentFailed = -1001;
+        public const int Disposed = -1003;
+        public const int NotInitialized = -1004;
+        public const int RestoreFailed = -1005;
+        public const int RestoreInProgress = -1006;
+
+        // 지급 처리기(IIAPFulfillmentGate)가 아직 준비되지 않아 구매를 붙잡아 두었다. 결제는 끝났고 확정하지
+        // 않았다 — 준비 뒤 ProcessUnconfirmedAsync()가 지급하고 Purchased 이벤트를 낸다.
+        public const int FulfillmentNotReady = -1007;
+
+        // 구매 결과가 PurchaseTimeoutSeconds 안에 오지 않았다. 결제가 끝났다면 늦게라도 지급되고 Purchased가 온다.
+        public const int Timeout = -1008;
+
+        // 서버 검증(IAsyncReceiptValidator)이 RetryLater를 돌려줬다. 확정하지 않았으므로 다시 시도된다.
+        public const int ValidationRetryLater = -1009;
+
+        // 서버 검증이 Invalid를 돌려줬다. 로컬 검증 실패는 검증기가 준 코드를 그대로 쓴다.
+        public const int ReceiptRejected = -1010;
+
+        // 같은 소모성 상품의 미확정 구매가 남아 스토어가 새 구매를 거절했다(구글 ItemAlreadyOwned).
+        // 서비스가 곧바로 미확정 구매를 다시 처리하고, 지급되면 Purchased 이벤트가 온다.
+        public const int DuplicateTransaction = (int)PurchaseFailureReason.DuplicateTransaction;
     }
 
     public readonly struct IAPError

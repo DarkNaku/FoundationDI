@@ -10,21 +10,17 @@ namespace DarkNaku.FoundationDI
     // 이중 처리 방지)을 여기 한 곳에 둔다.
     public sealed class IAPService : IIAPService
     {
-        // 지급 실패는 스토어 실패와 구분되는 원인이지만 결과 enum을 늘리는 대신 에러 코드로 남긴다 —
-        // 호출부가 분기할 이유가 없다(둘 다 "이번엔 못 줬다"이고 재시도는 스토어가 알아서 한다).
-        internal const int FulfillmentFailedCode = -1001;
-        internal const int DisposedCode = -1003;
-        internal const int NotInitializedCode = -1004;
-        internal const int RestoreFailedCode = -1005;
-        internal const int RestoreInProgressCode = -1006;
-
         private readonly IStoreService _store;
         private readonly IProductService _productService;
         private readonly IPurchaseService _purchaseService;
         private readonly List<ProductDefinition> _catalog;
         private readonly IIAPFulfillment _fulfillment;
         private readonly IReceiptValidator _validator;
+        private readonly IAsyncReceiptValidator _asyncValidator;
         private readonly IEntitlementStorage _entitlements;
+        private readonly IAPServiceOptions _options;
+        private readonly Func<IMainThreadDispatcher> _dispatcherFactory;
+        private IMainThreadDispatcher _dispatcher;
         private readonly bool _verboseLogging;
 
         // 조회된 상품. 게임 코드에 내보낼 값과 구매에 쓸 Unity 객체를 공용 ID로 함께 들고 있는다.
@@ -50,6 +46,17 @@ namespace DarkNaku.FoundationDI
         // 아직 미확정으로 돌려줄 수 있다 — 다시 지급하면 이중 지급이고, 소유 목록에서 빠지면 회수된다.
         private readonly HashSet<string> _confirmedInSession = new();
 
+        // 지급 처리기(IIAPFulfillmentGate)가 준비되기 전에 온 주문. 트랜잭션 ID마다 하나, 온 순서대로.
+        // 확정하지 않았으므로 앱이 죽어도 스토어가 다음 실행에 다시 준다 — 이 목록은 이번 실행 안의 지름길이다.
+        private readonly List<HeldOrder> _held = new();
+
+        // ProcessUnconfirmedAsync가 기다리는 조회. 여러 번 불려도 조회는 하나만 진행한다.
+        private readonly List<AwaitableCompletionSource> _refetchWaiters = new();
+        private bool _refetching;
+
+        // 검증 실패 로그를 남긴 트랜잭션. 위조 영수증은 매 조회 재전달되므로 세션당 한 번만 남긴다.
+        private readonly HashSet<string> _invalidLogged = new();
+
         // 복원. RestoreTransactions의 콜백과 뒤따르는 조회 결과가 둘 다 와야 끝난다 — 순서는 스토어마다
         // 다를 수 있어서, 먼저 온 쪽을 기억해 두었다가 나중에 온 쪽에서 끝낸다.
         private AwaitableCompletionSource<bool> _restoring;
@@ -73,15 +80,25 @@ namespace DarkNaku.FoundationDI
                                IReceiptValidator validator = null,
                                IEntitlementStorage entitlements = null,
                                bool verboseLogging = false)
-            : this(UnityIAPServices.StoreController(), LoadCatalog(),
-                   fulfillment, validator, entitlements, verboseLogging)
+            : this(new IAPServiceDependencies
+            {
+                Fulfillment = fulfillment,
+                Validator = validator,
+                Entitlements = entitlements,
+                Options = new IAPServiceOptions { VerboseLogging = verboseLogging },
+            })
+        {
+        }
+
+        internal IAPService(IAPServiceDependencies dependencies)
+            : this(UnityIAPServices.StoreController(), UnityIAPCatalog.Resolve(dependencies?.Options, CurrentStoreName()),
+                   dependencies)
         {
         }
 
         private IAPService(StoreController controller, IReadOnlyList<ProductDefinition> catalog,
-                                IIAPFulfillment fulfillment, IReceiptValidator validator,
-                                IEntitlementStorage entitlements, bool verboseLogging)
-            : this(controller, controller, controller, catalog, fulfillment, validator, entitlements, verboseLogging)
+                                IAPServiceDependencies dependencies)
+            : this(controller, controller, controller, catalog, dependencies)
         {
         }
 
@@ -89,15 +106,32 @@ namespace DarkNaku.FoundationDI
                                  IReadOnlyList<ProductDefinition> catalog,
                                  IIAPFulfillment fulfillment, IReceiptValidator validator,
                                  IEntitlementStorage entitlements, bool verboseLogging)
+            : this(store, products, purchases, catalog, new IAPServiceDependencies
+            {
+                Fulfillment = fulfillment,
+                Validator = validator,
+                Entitlements = entitlements,
+                Options = new IAPServiceOptions { VerboseLogging = verboseLogging },
+            })
         {
+        }
+
+        internal IAPService(IStoreService store, IProductService products, IPurchaseService purchases,
+                                 IReadOnlyList<ProductDefinition> catalog, IAPServiceDependencies dependencies)
+        {
+            dependencies ??= new IAPServiceDependencies();
+
             _store = store ?? throw new ArgumentNullException(nameof(store));
             _productService = products ?? throw new ArgumentNullException(nameof(products));
             _purchaseService = purchases ?? throw new ArgumentNullException(nameof(purchases));
             _catalog = catalog != null ? new List<ProductDefinition>(catalog) : new List<ProductDefinition>();
-            _fulfillment = fulfillment ?? new AutoConfirmFulfillment();
-            _validator = validator ?? new CrossPlatformReceiptValidator();
-            _entitlements = entitlements ?? new PlayerPrefsEntitlementStorage();
-            _verboseLogging = verboseLogging;
+            _fulfillment = dependencies.Fulfillment ?? new AutoConfirmFulfillment();
+            _validator = dependencies.Validator ?? new CrossPlatformReceiptValidator();
+            _asyncValidator = dependencies.AsyncValidator;
+            _entitlements = dependencies.Entitlements ?? new PlayerPrefsEntitlementStorage();
+            _options = dependencies.Options ?? new IAPServiceOptions();
+            _dispatcherFactory = dependencies.Dispatcher;
+            _verboseLogging = _options.VerboseLogging;
         }
 
         public bool IsInitialized { get; private set; }
@@ -172,6 +206,17 @@ namespace DarkNaku.FoundationDI
             // 조회한 Product로 산다 — catalogListingId 규칙에 의존하지 않는다.
             _purchaseService.PurchaseProduct(product);
 
+            var seconds = _options.PurchaseTimeoutSeconds;
+
+            using var timeout = StartTimeout(seconds, () =>
+            {
+                if (_pendingSource != source) return;
+
+                Debug.LogWarning($"[IAPService] 구매 결과가 {seconds}초 안에 오지 않았다: {productId}. " +
+                                 "결제가 끝났다면 늦게라도 지급된다.");
+                CompletePending(IAPPurchaseResult.Failed(new IAPError(IAPErrorCodes.Timeout, "구매 결과를 기다리다 시간이 초과됐다")));
+            });
+
             return await source.Awaitable;
         }
 
@@ -182,13 +227,13 @@ namespace DarkNaku.FoundationDI
         {
             if (_disposed || !IsInitialized)
             {
-                return IAPRestoreResult.Fail(new IAPError(NotInitializedCode, "초기화되지 않았다"));
+                return IAPRestoreResult.Fail(new IAPError(IAPErrorCodes.NotInitialized, "초기화되지 않았다"));
             }
 
             if (_restoring != null)
             {
                 Debug.LogWarning("[IAPService] 복원이 이미 진행 중이다.");
-                return IAPRestoreResult.Fail(new IAPError(RestoreInProgressCode, "복원이 이미 진행 중이다"));
+                return IAPRestoreResult.Fail(new IAPError(IAPErrorCodes.RestoreInProgress, "복원이 이미 진행 중이다"));
             }
 
             _restoredCount = 0;
@@ -216,10 +261,31 @@ namespace DarkNaku.FoundationDI
 
             if (!await source.Awaitable)
             {
-                return IAPRestoreResult.Fail(new IAPError(RestoreFailedCode, "복원에 실패했다"));
+                return IAPRestoreResult.Fail(new IAPError(IAPErrorCodes.RestoreFailed, "복원에 실패했다"));
             }
 
             return IAPRestoreResult.Ok(_restoredCount);
+        }
+
+        public Awaitable ProcessUnconfirmedAsync()
+        {
+            if (_disposed || !IsInitialized) return CompletedAwaitable();
+
+            ReleaseHeld();
+
+            var waiter = new AwaitableCompletionSource();
+            _refetchWaiters.Add(waiter);
+
+            // 복원이 조회 결과를 기다리는 중이면 거기에 편승한다 — 미확정 구매는 그 조회에도 실려 온다.
+            var restoreFetching = _restoring != null && !_restoreFetchResult.HasValue;
+
+            if (!_refetching && !restoreFetching)
+            {
+                _refetching = true;
+                _purchaseService.FetchPurchases();
+            }
+
+            return waiter.Awaitable;
         }
 
         public void Dispose()
@@ -230,9 +296,13 @@ namespace DarkNaku.FoundationDI
             Unsubscribe();
 
             // 대기 중인 구매·복원이 영원히 매달리지 않게 끊어준다.
-            CompletePending(IAPPurchaseResult.Failed(new IAPError(DisposedCode, "서비스가 해제됐다")));
+            CompletePending(IAPPurchaseResult.Failed(new IAPError(IAPErrorCodes.Disposed, "서비스가 해제됐다")));
             FinishRestore(false);
             CompleteInitWaiters(false);
+
+            _held.Clear();
+            _refetching = false;
+            CompleteRefetchWaiters();
         }
 
         private async Awaitable<bool> RunInitializeAsync()
@@ -240,6 +310,8 @@ namespace DarkNaku.FoundationDI
             // 미확정 주문을 SDK가 임의로 재처리하지 않게 한다. 확정 시점은 이 서비스 소관이고,
             // 재전달된 주문에는 "복원됨" 표시를 붙여야 하는데 자동 경로로는 그 구분이 사라진다.
             _purchaseService.ProcessPendingOrdersOnPurchasesFetched(false);
+
+            WarnIfConsumablesAutoConfirmed();
 
             // Unity IAP는 Connect 전에 구독을 끝낼 것을 요구하고, 미확정 구매가 연결 직후에
             // 재전달되기도 한다.
@@ -262,20 +334,6 @@ namespace DarkNaku.FoundationDI
 
             CompleteInitWaiters(success);
             return success;
-        }
-
-        private static List<ProductDefinition> LoadCatalog()
-        {
-            var catalog = ProductCatalog.LoadDefaultCatalog();
-
-            UnityIAPCatalog.WarnIfCodelessAutoInitialization(catalog);
-
-            if (catalog.IsEmpty())
-            {
-                Debug.LogWarning("[IAPService] IAP Catalog가 비어 있다. Services > In-App Purchasing > IAP Catalog에서 상품을 추가할 것.");
-            }
-
-            return UnityIAPCatalog.ToDefinitions(catalog, CurrentStoreName());
         }
 
         // 에디터에서는 빌드 타깃을 따라간다 — 에디터 실행 중에도 현재 타깃의 스토어 ID가 나온다.
@@ -302,28 +360,60 @@ namespace DarkNaku.FoundationDI
 
         private Awaitable<bool> ConnectAsync()
         {
-            _connecting = new AwaitableCompletionSource<bool>();
+            var source = new AwaitableCompletionSource<bool>();
+            _connecting = source;
 
             // Connect()가 돌려주는 Task를 직접 await 하지 않는다. 성공/실패가 모두
             // OnStoreConnected/OnStoreDisconnected로 오기 때문에 이벤트 하나로 받는 편이
             // 스레드 문맥에 대한 가정이 없다.
             _ = _store.Connect();
 
-            return _connecting.Awaitable;
+            return WithTimeout(source, _options.ConnectTimeoutSeconds, "스토어 연결");
         }
 
         private Awaitable<bool> FetchProductsAsync()
         {
-            _fetchingProducts = new AwaitableCompletionSource<bool>();
+            var source = new AwaitableCompletionSource<bool>();
+            _fetchingProducts = source;
+            _products.Clear();
+            _unityProducts.Clear();
+
             _productService.FetchProducts(new List<ProductDefinition>(_catalog));
-            return _fetchingProducts.Awaitable;
+
+            return WithTimeout(source, _options.FetchTimeoutSeconds, "상품 조회");
         }
 
         private Awaitable<bool> FetchPurchasesAsync()
         {
-            _fetchingPurchases = new AwaitableCompletionSource<bool>();
+            var source = new AwaitableCompletionSource<bool>();
+            _fetchingPurchases = source;
             _purchaseService.FetchPurchases();
-            return _fetchingPurchases.Awaitable;
+
+            return WithTimeout(source, _options.FetchTimeoutSeconds, "구매 조회");
+        }
+
+        // 늦게 온 이벤트는 그대로 처리된다 — 완료 소스만 먼저 끝낸다. 연결은 다음 초기화가 새 소스로 다시 시도한다.
+        private async Awaitable<bool> WithTimeout(AwaitableCompletionSource<bool> source, float seconds, string what)
+        {
+            // 완료되면 곧바로 이 시간 제한이 해제되므로 콜백이 불렸다면 아직 끝나지 않은 것이다. 로그를 먼저 남긴다 —
+            // 완료가 동기로 이어져 초기화 실패 로그가 먼저 찍히면 원인이 뒤에 보인다.
+            using var timeout = StartTimeout(seconds, () =>
+            {
+                Debug.LogWarning($"[IAPService] {what}이 {seconds}초 안에 끝나지 않았다.");
+                source.TrySetResult(false);
+            });
+
+            return await source.Awaitable;
+        }
+
+        // 디스패처가 없으면(직접 생성) 시간 제한 없이 기다린다.
+        private IDisposable StartTimeout(float seconds, Action onTimeout)
+        {
+            if (seconds <= 0f || _disposed) return null;
+
+            _dispatcher ??= _dispatcherFactory?.Invoke();
+
+            return _dispatcher?.Delay(seconds, onTimeout);
         }
 
         private void Subscribe()
@@ -391,11 +481,31 @@ namespace DarkNaku.FoundationDI
             _fetchingProducts?.TrySetResult(true);
         }
 
+        // Unity IAP 5.4는 일부만 받으면 받은 것으로 OnProductsFetched를 먼저, 빠진 것으로 이 이벤트를 뒤에 쏜다.
+        // 스토어 콘솔에 없는(심사 전·삭제된) 상품 하나 때문에 상점 전체를 닫지 않는다 — 받은 것이 있으면 진행한다.
         private void HandleProductsFetchFailed(ProductFetchFailed failure)
         {
-            Debug.LogError($"[IAPService] 상품 조회에 실패했다: {failure?.FailureReason}");
+            var failed = failure?.FailedFetchProducts;
+            var failedCount = failed?.Count ?? 0;
+            var isPartial = _products.Count > 0 || (failedCount > 0 && failedCount < _catalog.Count);
 
-            _fetchingProducts?.TrySetResult(false);
+            if (!isPartial)
+            {
+                Debug.LogError($"[IAPService] 상품 조회에 실패했다: {failure?.FailureReason}");
+                _fetchingProducts?.TrySetResult(false);
+                return;
+            }
+
+            var ids = new List<string>();
+            if (failed != null)
+            {
+                foreach (var definition in failed) ids.Add(definition?.id);
+            }
+
+            Debug.LogWarning($"[IAPService] 일부 상품을 조회하지 못해 빼고 진행한다(스토어 콘솔에 없거나 비활성): " +
+                             string.Join(", ", ids));
+
+            // 순서가 뒤집혀 받은 상품이 아직 오지 않았으면 그걸 기다린다(오지 않으면 시간 제한이 끝낸다).
         }
 
         private void HandlePurchasesFetched(Orders orders)
@@ -422,7 +532,7 @@ namespace DarkNaku.FoundationDI
                     continue;
                 }
 
-                ProcessPending(order, isRestored: true);
+                _ = ProcessPendingAsync(order, isRestored: true);
             }
 
             foreach (var order in orders.ConfirmedOrders)
@@ -435,6 +545,7 @@ namespace DarkNaku.FoundationDI
 
             _fetchingPurchases?.TrySetResult(true);
             CompleteRestoreFetch(true);
+            FinishRefetch();
         }
 
         // 스토어의 확정 목록이 진실이다. 목록에 있으면 소유(재설치·기기 변경), 없으면 회수(환불)한다.
@@ -462,6 +573,7 @@ namespace DarkNaku.FoundationDI
 
             _fetchingPurchases?.TrySetResult(false);
             CompleteRestoreFetch(false);
+            FinishRefetch();
         }
 
         private void CompleteRestoreFetch(bool success)
@@ -480,9 +592,28 @@ namespace DarkNaku.FoundationDI
             _restoreFetchResult = null;
 
             source?.TrySetResult(success);
+
+            // 복원이 조회 없이 끝났다(콜백 실패). 그 조회에 편승한 재처리 대기를 풀어 준다.
+            if (!_refetching) CompleteRefetchWaiters();
         }
 
-        private void HandlePurchasePending(PendingOrder order) => ProcessPending(order, isRestored: false);
+        private void FinishRefetch()
+        {
+            _refetching = false;
+            CompleteRefetchWaiters();
+        }
+
+        private void CompleteRefetchWaiters()
+        {
+            if (_refetchWaiters.Count == 0) return;
+
+            var waiters = new List<AwaitableCompletionSource>(_refetchWaiters);
+            _refetchWaiters.Clear();
+
+            foreach (var waiter in waiters) waiter.TrySetResult();
+        }
+
+        private void HandlePurchasePending(PendingOrder order) => _ = ProcessPendingAsync(order, isRestored: false);
 
         // 확정 결과. 실패해도 할 일은 없다 — 스토어가 다음 실행에 같은 구매를 미확정으로 다시 주고,
         // 그때 지급 핸들러가 TransactionId로 중복 지급을 막는다. 다만 조용히 넘기면 발견이 늦다.
@@ -521,10 +652,18 @@ namespace DarkNaku.FoundationDI
             Debug.LogWarning($"[IAPService] 구매에 실패했다: {productId} {error}");
 
             CompletePendingFor(productId, IAPPurchaseResult.Failed(error));
+
+            // 같은 소모성 상품의 미확정 구매가 새 구매를 막고 있다(구글 ItemAlreadyOwned). 그 구매를 지금
+            // 처리해야 막힘이 풀린다 — 다음 실행까지 기다리면 그동안 이 상품을 살 수 없다.
+            if (order.FailureReason == PurchaseFailureReason.DuplicateTransaction &&
+                ProductOf(order)?.definition?.type == ProductType.Consumable)
+            {
+                _ = ProcessUnconfirmedAsync();
+            }
         }
 
-        // 주문 이벤트 핸들러라 반환값을 기다릴 주체가 없다 — 예외는 전부 안에서 잡는다.
-        private async void ProcessPending(PendingOrder order, bool isRestored)
+        // 주문 이벤트 핸들러에서 기다리지 않고 부른다 — 예외는 전부 안에서 잡는다.
+        private async Awaitable ProcessPendingAsync(PendingOrder order, bool isRestored)
         {
             var product = ProductOf(order);
             var productId = product?.definition?.id;
@@ -545,15 +684,90 @@ namespace DarkNaku.FoundationDI
                 return;
             }
 
-            if (!_inFlight.Add(transactionId)) return;
+            // 이미 확정했다 — 보류 목록과 조회가 같은 주문을 함께 실어 와도 두 번 지급하지 않는다.
+            if (_confirmedInSession.Contains(transactionId)) return;
+            if (_inFlight.Contains(transactionId)) return;
+
+            if (!IsFulfillmentReady())
+            {
+                Hold(order, isRestored);
+                CompleteOwnPurchase(productId, isRestored, IAPPurchaseResult.Failed(
+                    new IAPError(IAPErrorCodes.FulfillmentNotReady, "지급 처리기가 준비되지 않아 보류했다")));
+                return;
+            }
+
+            _inFlight.Add(transactionId);
 
             try
             {
                 await FulfillAndConfirmAsync(order, product, isRestored);
             }
+            catch (Exception e)
+            {
+                Debug.LogError($"[IAPService] 구매를 처리하다 예외가 났다. 확정하지 않는다: {productId} {e}");
+                CompleteOwnPurchase(productId, isRestored, IAPPurchaseResult.Failed(
+                    new IAPError(IAPErrorCodes.FulfillmentFailed, e.Message)));
+            }
             finally
             {
                 _inFlight.Remove(transactionId);
+            }
+        }
+
+        private bool IsFulfillmentReady()
+        {
+            if (_fulfillment is not IIAPFulfillmentGate gate) return true;
+
+            try
+            {
+                return gate.IsReady;
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[IAPService] 지급 처리기의 IsReady가 예외를 던졌다. 준비되지 않은 것으로 본다: {e}");
+                return false;
+            }
+        }
+
+        private void Hold(PendingOrder order, bool isRestored)
+        {
+            var transactionId = order.Info.TransactionID;
+
+            foreach (var entry in _held)
+            {
+                if (entry.Order.Info?.TransactionID == transactionId) return;
+            }
+
+            _held.Add(new HeldOrder(order, isRestored));
+
+            if (_verboseLogging)
+            {
+                Debug.Log($"[IAPService] 지급 처리기가 준비되지 않아 구매를 보류했다: {ProductOf(order)?.definition?.id} {transactionId}");
+            }
+        }
+
+        private void ReleaseHeld()
+        {
+            if (_held.Count == 0 || !IsFulfillmentReady()) return;
+
+            var held = new List<HeldOrder>(_held);
+            _held.Clear();
+
+            foreach (var entry in held) _ = ProcessPendingAsync(entry.Order, entry.IsRestored);
+        }
+
+        // 소모성을 지급 없이 확정하면 결제만 되고 재화가 없다. 등록을 빠뜨려도 조용히 동작해 늦게 발견된다.
+        private void WarnIfConsumablesAutoConfirmed()
+        {
+            if (_fulfillment is not AutoConfirmFulfillment) return;
+
+            foreach (var definition in _catalog)
+            {
+                if (definition.type != ProductType.Consumable) continue;
+
+                Debug.LogWarning("[IAPService] 소모성 상품이 있는데 지급 처리기(IIAPFulfillment)가 등록되지 않았다. " +
+                                 "구매가 지급 없이 확정된다.");
+                return;
             }
         }
 
@@ -565,9 +779,31 @@ namespace DarkNaku.FoundationDI
 
             if (!_validator.Validate(purchase, out var validationError))
             {
-                Debug.LogError($"[IAPService] 영수증 검증에 실패했다: {purchase.ProductId} {validationError}");
-                CompletePendingFor(productId, IAPPurchaseResult.InvalidReceipt(validationError));
+                RejectInvalidReceipt(order, purchase, isRestored, validationError);
                 return;
+            }
+
+            if (_asyncValidator != null)
+            {
+                var validation = await ValidateOnServerAsync(purchase);
+
+                // 검증을 기다리는 사이 해제됐다. 확정하지 않으면 스토어가 다음 실행에 다시 준다.
+                if (_disposed) return;
+
+                if (validation.Status == IAPValidationStatus.Invalid)
+                {
+                    RejectInvalidReceipt(order, purchase, isRestored,
+                                         new IAPError(IAPErrorCodes.ReceiptRejected, validation.Message));
+                    return;
+                }
+
+                if (validation.Status == IAPValidationStatus.RetryLater)
+                {
+                    Debug.LogWarning($"[IAPService] 서버 검증을 나중에 다시 한다. 확정하지 않는다: {productId} {validation.Message}");
+                    CompleteOwnPurchase(productId, isRestored, IAPPurchaseResult.Failed(
+                        new IAPError(IAPErrorCodes.ValidationRetryLater, validation.Message)));
+                    return;
+                }
             }
 
             bool fulfilled;
@@ -588,8 +824,8 @@ namespace DarkNaku.FoundationDI
             if (!fulfilled)
             {
                 // 확정하지 않는다 — 스토어가 다음 실행에 같은 구매를 다시 내려준다.
-                CompletePendingFor(productId, IAPPurchaseResult.Failed(
-                    new IAPError(FulfillmentFailedCode, "지급에 실패해 확정하지 않았다")));
+                CompleteOwnPurchase(productId, isRestored, IAPPurchaseResult.Failed(
+                    new IAPError(IAPErrorCodes.FulfillmentFailed, "지급에 실패해 확정하지 않았다")));
                 return;
             }
 
@@ -606,7 +842,40 @@ namespace DarkNaku.FoundationDI
 
             Purchased?.Invoke(purchase);
 
-            CompletePendingFor(productId, IAPPurchaseResult.Purchased(purchase));
+            CompleteOwnPurchase(productId, isRestored, IAPPurchaseResult.Purchased(purchase));
+        }
+
+        private async Awaitable<IAPValidationResult> ValidateOnServerAsync(IAPPurchase purchase)
+        {
+            try
+            {
+                return await _asyncValidator.ValidateAsync(purchase);
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[IAPService] 서버 검증기가 예외를 던졌다. 나중에 다시 검증한다: {e}");
+                return IAPValidationResult.RetryLater(e.Message);
+            }
+        }
+
+        private void RejectInvalidReceipt(PendingOrder order, IAPPurchase purchase, bool isRestored, IAPError error)
+        {
+            var transactionId = order.Info.TransactionID;
+
+            if (_invalidLogged.Add(transactionId))
+            {
+                Debug.LogError($"[IAPService] 영수증 검증에 실패했다: {purchase.ProductId} {error}");
+            }
+
+            if (_options.InvalidReceiptPolicy == InvalidReceiptPolicy.ConfirmWithoutGrant &&
+                purchase.Type == IAPProductType.Consumable)
+            {
+                // 지급하지 않았으므로 Purchased도 내지 않는다. 세션 확정 목록에 넣어 재전달돼도 다시 보지 않는다.
+                _confirmedInSession.Add(transactionId);
+                _purchaseService.ConfirmPurchase(order);
+            }
+
+            CompleteOwnPurchase(purchase.ProductId, isRestored, IAPPurchaseResult.InvalidReceipt(error));
         }
 
         private IAPPurchase BuildPurchase(Product product, Order order, bool isRestored)
@@ -638,6 +907,16 @@ namespace DarkNaku.FoundationDI
             if (_pendingSource == null || _pendingProductId != productId) return;
 
             CompletePending(result);
+        }
+
+        // 재전달된 주문(isRestored)의 결과로는 진행 중인 구매를 끝내지 않는다. 주문 이벤트에는 "어느 호출의
+        // 결과인가"가 없어 상품 ID로만 맞추는데, 같은 상품의 예전 미확정 구매가 그 사이 처리되면 지금 진행 중인
+        // 구매가 남의 결과로 끝나고 진짜 새 구매는 기다리는 호출자 없이 처리된다.
+        private void CompleteOwnPurchase(string productId, bool isRestored, IAPPurchaseResult result)
+        {
+            if (isRestored) return;
+
+            CompletePendingFor(productId, result);
         }
 
         private void CompletePending(IAPPurchaseResult result)
@@ -692,6 +971,25 @@ namespace DarkNaku.FoundationDI
             var source = new AwaitableCompletionSource<T>();
             source.SetResult(value);
             return source.Awaitable;
+        }
+
+        private static Awaitable CompletedAwaitable()
+        {
+            var source = new AwaitableCompletionSource();
+            source.SetResult();
+            return source.Awaitable;
+        }
+
+        private readonly struct HeldOrder
+        {
+            public readonly PendingOrder Order;
+            public readonly bool IsRestored;
+
+            public HeldOrder(PendingOrder order, bool isRestored)
+            {
+                Order = order;
+                IsRestored = isRestored;
+            }
         }
     }
 }

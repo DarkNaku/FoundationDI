@@ -22,6 +22,12 @@ namespace DarkNaku.FoundationDI
 
         Awaitable<IAPPurchaseResult> PurchaseAsync(string productId);
 
+        // 미확정 구매를 지금 처리한다 — 지급 처리기 준비 전에 보류한 구매를 지급하고, 스토어에 미확정 구매를
+        // 다시 물어 지급에 실패했던 구매를 재시도한다. 앱 재시작을 기다리지 않게 하는 경로다.
+        // 진행 데이터 준비가 끝났을 때, 상점을 열 때, 포그라운드로 돌아올 때 부른다. 초기화 전에는 아무것도
+        // 하지 않는다. 조회 결과가 오면 끝나며, 지급 결과는 Purchased 이벤트로 받는다.
+        Awaitable ProcessUnconfirmedAsync();
+
         // iOS 심사가 요구하는 "구매 복원" 버튼의 구현. 비소모성 소유를 되살린다.
         Awaitable<IAPRestoreResult> RestoreAsync();
 

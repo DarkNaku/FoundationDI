@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Purchasing;
@@ -9,6 +10,74 @@ namespace DarkNaku.FoundationDI
     // 대부분의 게임이 양 스토어에 같은 ID를 올리기 때문이다.
     internal static class UnityIAPCatalog
     {
+        // 옵션에 상품 목록이 있으면 그것을, 없으면 IAP Catalog를 쓴다.
+        public static List<ProductDefinition> Resolve(IAPServiceOptions options, string storeName)
+        {
+            if (options?.CatalogSource == null) return LoadDefault(storeName);
+
+            IEnumerable<IAPProductDefinition> products;
+
+            try
+            {
+                products = options.CatalogSource();
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[IAPService] 상품 목록(CatalogSource)을 읽지 못했다. 상품 없이 시작한다: {e.Message}\n{e}");
+                return new List<ProductDefinition>();
+            }
+
+            return ToDefinitions(products, storeName);
+        }
+
+        public static List<ProductDefinition> ToDefinitions(IEnumerable<IAPProductDefinition> products, string storeName)
+        {
+            var definitions = new List<ProductDefinition>();
+            var ids = new HashSet<string>();
+
+            if (products == null) return definitions;
+
+            foreach (var product in products)
+            {
+                if (string.IsNullOrEmpty(product.Id))
+                {
+                    Debug.LogWarning("[IAPService] 빈 ID의 상품 정의를 건너뛴다.");
+                    continue;
+                }
+
+                if (!ids.Add(product.Id))
+                {
+                    Debug.LogWarning($"[IAPService] 상품 ID가 중복돼 뒤의 정의를 건너뛴다: {product.Id}");
+                    continue;
+                }
+
+                var storeId = storeName == GooglePlay.Name ? product.GooglePlayId
+                            : storeName == AppleAppStore.Name ? product.AppleId
+                            : null;
+                if (string.IsNullOrEmpty(storeId)) storeId = product.Id;
+
+                var type = product.Type == IAPProductType.NonConsumable ? ProductType.NonConsumable : ProductType.Consumable;
+
+                definitions.Add(new ProductDefinition(product.Id, storeId, type));
+            }
+
+            return definitions;
+        }
+
+        private static List<ProductDefinition> LoadDefault(string storeName)
+        {
+            var catalog = ProductCatalog.LoadDefaultCatalog();
+
+            WarnIfCodelessAutoInitialization(catalog);
+
+            if (catalog.IsEmpty())
+            {
+                Debug.LogWarning("[IAPService] IAP Catalog가 비어 있다. Services > In-App Purchasing > IAP Catalog에서 상품을 추가할 것.");
+            }
+
+            return ToDefinitions(catalog, storeName);
+        }
+
         public static List<ProductDefinition> ToDefinitions(ProductCatalog catalog, string storeName)
         {
             var definitions = new List<ProductDefinition>();

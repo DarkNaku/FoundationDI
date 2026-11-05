@@ -5,12 +5,13 @@ using UnityEngine.Purchasing;
 
 public class IAPServiceRegistrationTest
 {
-    private System.Func<IIAPFulfillment, IReceiptValidator, IEntitlementStorage, bool, IIAPService> _original;
+    private System.Func<IAPServiceDependencies, IIAPService> _original;
 
     private IIAPFulfillment _fulfillment;
     private IReceiptValidator _validator;
     private IEntitlementStorage _entitlements;
     private bool _verboseLogging;
+    private IAPServiceDependencies _dependencies;
     private int _created;
 
     [SetUp]
@@ -20,17 +21,18 @@ public class IAPServiceRegistrationTest
         _created = 0;
 
         // 에디트 모드에서는 StoreController를 만들 수 없다 — 배선만 검증하고 서비스는 대체 스토어로 만든다.
-        IAPServiceRegistration.ServiceFactory = (fulfillment, validator, entitlements, verboseLogging) =>
+        IAPServiceRegistration.ServiceFactory = dependencies =>
         {
             _created++;
-            _fulfillment = fulfillment;
-            _validator = validator;
-            _entitlements = entitlements;
-            _verboseLogging = verboseLogging;
+            _dependencies = dependencies;
+            _fulfillment = dependencies.Fulfillment;
+            _validator = dependencies.Validator;
+            _entitlements = dependencies.Entitlements;
+            _verboseLogging = dependencies.Options.VerboseLogging;
 
             var store = new UnityIAPStoreHarness();
             return new IAPService(store.Store, store.Products, store.Purchases, new ProductDefinition[0],
-                                       fulfillment, validator, entitlements, verboseLogging);
+                                  dependencies);
         };
     }
 
@@ -88,5 +90,27 @@ public class IAPServiceRegistrationTest
         Assert.AreSame(validator, _validator);
         Assert.AreSame(entitlements, _entitlements);
         Assert.IsTrue(_verboseLogging);
+    }
+
+    [Test]
+    public void 서버_검증기와_옵션이_전달되고_없으면_서버_검증을_하지_않는다()
+    {
+        var builder = new ContainerBuilder();
+        builder.RegisterIAPService();
+        builder.Build().Resolve<IIAPService>();
+
+        Assert.IsNull(_dependencies.AsyncValidator);
+        Assert.IsNotNull(_dependencies.Dispatcher, "시간 제한용 디스패처를 넘기지 않았다");
+
+        var asyncValidator = new FakeAsyncReceiptValidator();
+        var options = new IAPServiceOptions { PurchaseTimeoutSeconds = 10f };
+
+        builder = new ContainerBuilder();
+        builder.RegisterValue(asyncValidator, new[] { typeof(IAsyncReceiptValidator) });
+        builder.RegisterIAPService(options);
+        builder.Build().Resolve<IIAPService>();
+
+        Assert.AreSame(asyncValidator, _dependencies.AsyncValidator);
+        Assert.AreSame(options, _dependencies.Options);
     }
 }

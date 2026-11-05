@@ -66,4 +66,69 @@ public class UnityIAPCatalogTest
         UnityIAPCatalog.WarnIfCodelessAutoInitialization(catalog);
         LogAssert.NoUnexpectedReceived();
     }
+
+    [Test]
+    public void 코드로_넘긴_상품을_스토어별_ID와_Unity_타입으로_바꾼다()
+    {
+        var products = new[]
+        {
+            new IAPProductDefinition("gems_100", IAPProductType.Consumable, googlePlayId: "gp_gems_100", appleId: "ios_gems_100"),
+            new IAPProductDefinition("remove_ads", IAPProductType.NonConsumable),
+        };
+
+        var google = UnityIAPCatalog.ToDefinitions(products, GooglePlay.Name);
+        var apple = UnityIAPCatalog.ToDefinitions(products, AppleAppStore.Name);
+
+        Assert.AreEqual("gp_gems_100", google.Single(d => d.id == "gems_100").storeSpecificId);
+        Assert.AreEqual("ios_gems_100", apple.Single(d => d.id == "gems_100").storeSpecificId);
+        Assert.AreEqual(ProductType.Consumable, google.Single(d => d.id == "gems_100").type);
+        Assert.AreEqual("remove_ads", google.Single(d => d.id == "remove_ads").storeSpecificId,
+                        "스토어별 ID가 비면 공용 ID를 쓴다");
+        Assert.AreEqual(ProductType.NonConsumable, apple.Single(d => d.id == "remove_ads").type);
+    }
+
+    [Test]
+    public void 코드로_넘긴_상품의_중복_ID와_빈_ID는_경고하고_뺀다()
+    {
+        var products = new[]
+        {
+            new IAPProductDefinition("gems", IAPProductType.Consumable),
+            new IAPProductDefinition("gems", IAPProductType.Consumable, googlePlayId: "other"),
+            new IAPProductDefinition("", IAPProductType.Consumable),
+        };
+
+        LogAssert.Expect(LogType.Warning, new Regex("IAPService.*gems"));
+        LogAssert.Expect(LogType.Warning, new Regex("IAPService.*빈"));
+
+        var definitions = UnityIAPCatalog.ToDefinitions(products, GooglePlay.Name);
+
+        Assert.AreEqual(1, definitions.Count);
+        Assert.AreEqual("gems", definitions[0].storeSpecificId, "먼저 나온 정의를 쓴다");
+    }
+
+    [Test]
+    public void 옵션에_상품_목록을_넘기면_IAP_Catalog_대신_쓴다()
+    {
+        var options = new IAPServiceOptions
+        {
+            CatalogSource = () => new[] { new IAPProductDefinition("from_code", IAPProductType.Consumable) },
+        };
+
+        var definitions = UnityIAPCatalog.Resolve(options, GooglePlay.Name);
+
+        CollectionAssert.AreEqual(new[] { "from_code" }, definitions.Select(d => d.id).ToArray());
+    }
+
+    [Test]
+    public void 상품_목록_공급자가_예외를_던지면_에러를_남기고_빈_카탈로그로_둔다()
+    {
+        var options = new IAPServiceOptions
+        {
+            CatalogSource = () => throw new System.InvalidOperationException("표를 읽지 못했다"),
+        };
+
+        LogAssert.Expect(LogType.Error, new Regex("IAPService.*표를 읽지 못했다"));
+
+        Assert.IsEmpty(UnityIAPCatalog.Resolve(options, GooglePlay.Name));
+    }
 }

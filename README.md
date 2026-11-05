@@ -140,6 +140,16 @@ public class TitleFlow
 }
 ```
 
+## 변경 (0.16.x → 0.17.0)
+
+IAPService 기능 추가입니다(`docs/TODO.md` 6~12, PaperHero 요청). 기존 코드는 그대로 동작하지만 `IIAPService`에 멤버가 늘어 **직접 구현한 대체 객체는 `ProcessUnconfirmedAsync`를 추가**해야 합니다.
+
+- **미확정 구매 보류·재처리** — 지급 처리기에 `IIAPFulfillmentGate`를 구현하면 진행 데이터 준비 전에 온 구매를 확정하지 않고 붙잡아 두고, `IIAPService.ProcessUnconfirmedAsync()`로 보류분 지급과 미확정 구매 재시도를 앱 재시작 없이 합니다.
+- **시간 제한·일부 상품 누락** — `RegisterIAPService(new IAPServiceOptions { ... })`로 연결·조회(기본 30초)·구매(기본 끔) 시간 제한. 스토어 콘솔에 없는 상품이 있어도 받은 상품으로 초기화합니다.
+- **같은 상품의 재전달 구매가 진행 중인 구매를 대신 끝내지 않습니다.** 구글이 미확정 구매 때문에 새 구매를 거절하면(`IAPErrorCodes.DuplicateTransaction`) 그 구매를 곧바로 재처리합니다.
+- **서버 영수증 검증 `IAsyncReceiptValidator`**, 검증 실패 처리 방식 `InvalidReceiptPolicy`, 코드로 상품 목록 넘기기 `CatalogSource`.
+- 에러 코드를 `IAPErrorCodes`로 공개했습니다. 자세한 내용은 [IAPService README](Assets/FoundationDI/Runtime/Services/IAPService/README.md).
+
 ## 변경 (0.14.x → 0.15.0)
 
 하위 호환입니다. 새 옵션 두 개와 Android 빌드 수정입니다.

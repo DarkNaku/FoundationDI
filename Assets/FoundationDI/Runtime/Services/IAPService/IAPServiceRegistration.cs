@@ -5,12 +5,24 @@ using Resolution = Reflex.Enums.Resolution;
 
 namespace DarkNaku.FoundationDI
 {
+    // 등록이 해석한 것들. 테스트 seam(ServiceFactory)에 한 덩어리로 넘긴다.
+    internal sealed class IAPServiceDependencies
+    {
+        public IIAPFulfillment Fulfillment;
+        public IReceiptValidator Validator;
+        public IAsyncReceiptValidator AsyncValidator;
+        public IEntitlementStorage Entitlements;
+        public IAPServiceOptions Options;
+
+        // 시간 제한을 처음 걸 때 해석한다. 에디트 모드에서 해석하면 러너의 DontDestroyOnLoad가 던진다.
+        public Func<IMainThreadDispatcher> Dispatcher;
+    }
+
     public static class IAPServiceRegistration
     {
         // 테스트 seam. 에디트 모드에서는 Unity IAP가 스토어 팩토리를 등록하지 않아(런타임 초기화에서
         // 등록한다) StoreController를 만들 수 없다. 등록 테스트는 이걸 바꿔 배선만 검증한다.
-        internal static Func<IIAPFulfillment, IReceiptValidator, IEntitlementStorage, bool, IIAPService> ServiceFactory =
-            CreateDefault;
+        internal static Func<IAPServiceDependencies, IIAPService> ServiceFactory = CreateDefault;
 
         // 루트 IInstaller의 InstallBindings에서 호출한다. 상품은 Unity IAP Catalog에서 읽는다.
         //   builder.RegisterIAPService();
@@ -18,8 +30,15 @@ namespace DarkNaku.FoundationDI
         // 지급 핸들러를 쓰려면 같은 InstallBindings 어디서든(순서 무관) 함께 등록한다.
         //   builder.RegisterType(typeof(MyFulfillment), new[] { typeof(IIAPFulfillment) },
         //                        Lifetime.Singleton, Resolution.Lazy);
-        public static ContainerBuilder RegisterIAPService(this ContainerBuilder builder, bool verboseLogging = false)
+        public static ContainerBuilder RegisterIAPService(this ContainerBuilder builder, bool verboseLogging = false) =>
+            builder.RegisterIAPService(new IAPServiceOptions { VerboseLogging = verboseLogging });
+
+        public static ContainerBuilder RegisterIAPService(this ContainerBuilder builder, IAPServiceOptions options)
         {
+            options ??= new IAPServiceOptions();
+
+            builder.RegisterMainThreadDispatcher();
+
             return builder.RegisterFactory<IIAPService>(container =>
             {
                 // 셋 다 선택 등록이다. 게임이 등록하지 않았으면 기본 구현으로 폴백하므로
@@ -34,16 +53,27 @@ namespace DarkNaku.FoundationDI
                     ? container.Resolve<IReceiptValidator>()
                     : new CrossPlatformReceiptValidator();
 
+                var asyncValidator = container.HasBinding<IAsyncReceiptValidator>()
+                    ? container.Resolve<IAsyncReceiptValidator>()
+                    : null;
+
                 var entitlements = container.HasBinding<IEntitlementStorage>()
                     ? container.Resolve<IEntitlementStorage>()
                     : new PlayerPrefsEntitlementStorage();
 
-                return ServiceFactory(fulfillment, validator, entitlements, verboseLogging);
+                return ServiceFactory(new IAPServiceDependencies
+                {
+                    Fulfillment = fulfillment,
+                    Validator = validator,
+                    AsyncValidator = asyncValidator,
+                    Entitlements = entitlements,
+                    Options = options,
+                    Dispatcher = container.Resolve<IMainThreadDispatcher>,
+                });
             }, Lifetime.Singleton, Resolution.Lazy);
         }
 
-        private static IIAPService CreateDefault(IIAPFulfillment fulfillment, IReceiptValidator validator,
-                                                 IEntitlementStorage entitlements, bool verboseLogging) =>
-            new IAPService(fulfillment, validator, entitlements, verboseLogging);
+        private static IIAPService CreateDefault(IAPServiceDependencies dependencies) =>
+            new IAPService(dependencies);
     }
 }

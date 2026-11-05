@@ -1,5 +1,57 @@
 # plan.md
 
+## 완료: IAPService — 미확정 구매 보류·재처리, 시간 제한, 서버 검증 (0.17.0)
+
+PaperHero 요청(docs/TODO.md 6~12). 진행 데이터가 씬에서 늦게 준비되는 방치형 RPG, 결제 상품 49개 전부 소모성.
+
+보류·재처리 (IAPServiceUnconfirmedTest)
+- [x] 지급 처리기가 준비되지 않았으면 재전달된 구매를 보류한다
+- [x] 준비된 뒤 ProcessUnconfirmedAsync를 부르면 보류한 구매를 지급하고 확정한다
+- [x] 보류 중에 같은 트랜잭션이 다시 와도 한 번만 지급한다
+- [x] 준비되지 않았을 때 한 구매는 FulfillmentNotReady로 끝나고 준비되면 지급된다
+- [x] 소모성 상품이 있는데 지급 처리기가 없으면 초기화 때 경고한다
+- [x] 지급이 실패한 구매를 ProcessUnconfirmedAsync로 다시 처리한다
+- [x] ProcessUnconfirmedAsync를 연달아 불러도 조회는 한 번만 한다
+- [x] 초기화 전에는 ProcessUnconfirmedAsync가 아무것도 하지 않는다
+- [x] 구매 대기 중에 같은 상품의 재전달 주문이 처리돼도 대기 중인 구매는 끝나지 않는다
+- [x] 미확정 구매 때문에 거절되면 DuplicateTransaction으로 끝나고 미확정 구매를 다시 처리한다
+
+시간 제한·일부 누락 (IAPServiceTimeoutTest)
+- [x] 일부 상품만 조회되면 받은 상품으로 초기화하고 빠진 ID를 경고한다
+- [x] 일부 누락이 먼저 와도 받은 상품을 기다려 초기화한다
+- [x] 상품이 하나도 조회되지 않으면 초기화가 실패한다
+- [x] 연결 이벤트가 오지 않으면 시간 제한 뒤 실패하고 다시 부르면 재시도한다
+- [x] 상품 조회가 끝나지 않으면 시간 제한 뒤 초기화가 실패한다
+- [x] 구매 조회가 끝나지 않아도 시간 제한 뒤 초기화는 성공한다
+- [x] 구매 결과가 오지 않으면 시간 제한 뒤 Timeout으로 끝나고 늦게 온 주문은 지급된다
+- [x] 구매 시간 제한은 기본으로 꺼져 있다
+
+서버 검증·검증 실패 정책 (IAPServiceValidationTest)
+- [x] 비동기 검증기가 Valid면 지급하고 확정한다
+- [x] 비동기 검증기가 Invalid면 지급도 확정도 하지 않고 InvalidReceipt로 끝난다
+- [x] 비동기 검증기가 RetryLater면 확정하지 않고 재처리 때 다시 검증한다
+- [x] 비동기 검증기가 예외를 던지면 RetryLater로 본다
+- [x] 로컬 검증이 실패하면 비동기 검증기를 부르지 않는다
+- [x] 비동기 검증을 기다리는 사이 해제되면 확정하지 않는다
+- [x] 기본 정책은 검증 실패 구매를 확정하지 않고 로그는 트랜잭션마다 한 번만 남긴다
+- [x] ConfirmWithoutGrant면 검증 실패한 소모성 구매를 지급 없이 확정한다
+- [x] ConfirmWithoutGrant여도 비소모성은 확정하지 않는다
+
+코드 상품 목록 (UnityIAPCatalogTest)
+- [x] 코드로 넘긴 상품을 스토어별 ID와 Unity 타입으로 바꾼다
+- [x] 코드로 넘긴 상품의 중복 ID와 빈 ID는 경고하고 뺀다
+- [x] 옵션에 상품 목록을 넘기면 IAP Catalog 대신 쓴다
+- [x] 상품 목록 공급자가 예외를 던지면 에러를 남기고 빈 카탈로그로 둔다
+
+등록 (IAPServiceRegistrationTest)
+- [x] 서버 검증기와 옵션이 전달되고 없으면 서버 검증을 하지 않는다
+
+실기 확인
+- [ ] Android: 콘솔에 없는 상품 ID 를 섞어도 상점이 열리고 경고에 그 ID 가 남는다(Unity IAP 5.4 의 이벤트 순서)
+- [ ] Android: 소모성 미확정 구매가 남은 채 같은 상품을 사면 DuplicateTransaction 뒤 미확정 구매가 지급된다
+- [ ] PaperHero: 진행 데이터 로드 전 재전달 → 로드 뒤 ProcessUnconfirmedAsync 로 지급
+
+
 ## 완료: LocalNotificationService — 알림 데이터·연 알림·첫 권한 결과·게임 저장소 (0.16.0)
 
 BlockAway·BigTopSmash 의 LocalNotifications 를 기능 손실 없이 옮기기 위해 필요한 것들.
