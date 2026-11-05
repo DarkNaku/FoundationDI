@@ -140,6 +140,10 @@ public class TitleFlow
 }
 ```
 
+## 변경 (0.17.0 → 0.17.1)
+
+- **ConsentService: UMP iOS 의존성을 Swift Package로도 선언** — Firebase 14·LevelPlay 9.7처럼 EDM4U가 Swift Package 모드로 iOS 의존성을 넣으면 Google Mobile Ads(SPM)가 UMP를 함께 가져옵니다. 이전에는 UMP를 포드로만 선언해 두 벌이 들어갈 수 있었습니다. Use UMP를 켠 프로젝트는 의존성 XML이 다시 생성됩니다(설정 인스펙터·메뉴·빌드 직전).
+
 ## 변경 (0.16.x → 0.17.0)
 
 IAPService 기능 추가입니다(`docs/TODO.md` 6~12, PaperHero 요청). 기존 코드는 그대로 동작하지만 `IIAPService`에 멤버가 늘어 **직접 구현한 대체 객체는 `ProcessUnconfirmedAsync`를 추가**해야 합니다.

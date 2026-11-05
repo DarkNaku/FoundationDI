@@ -33,7 +33,9 @@ UMP의 공식 Unity 바인딩은 Google Mobile Ads(GMA) Unity 플러그인 안�
 | iOS | `Google-Mobile-Ads-SDK = 13.11.0` (정확히 고정) | `~> 13.9` → 버전이 어긋나면 CocoaPods 해석 실패 |
 
 이 패키지는 UMP 네이티브 SDK(`com.google.android.ump:user-messaging-platform`, `GoogleUserMessagingPlatform`
-포드)만 얇게 부릅니다. 광고 SDK와 별개 artifact라 어댑터 버전과 상관없이 충돌하지 않습니다.
+포드 또는 Swift Package)만 얇게 부릅니다. EDM4U가 Swift Package 모드(1.2.187+, Firebase 14·LevelPlay가 이 모드)면
+UMP도 Swift Package(`swift-package-manager-google-user-messaging-platform` 3.x)로 들어가 Google Mobile Ads가 가져오는
+UMP와 한 벌로 합쳐집니다. 광고 SDK와 별개 artifact라 어댑터 버전과 상관없이 충돌하지 않습니다.
 
 ## 2. 설치
 
