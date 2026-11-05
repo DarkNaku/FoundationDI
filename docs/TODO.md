@@ -9,6 +9,13 @@
 | 3 | 배너 높이를 실제로 그려진 배너 뷰 기준으로(적응형 컨테이너 높이·dp 환산) | AdService (LevelPlay·Dummy) | MahjongTile (2026-10-14) | 완료 (0.13.0, Android 실기 미검증) |
 | 4 | 플레이 모드를 끝내도 Dummy 광고 캔버스가 남지 않게 | AdService (Dummy) | CannonPuzzle (2026-10-23) | 완료 (0.13.0) |
 | 5 | 영수증 검증기가 Unity IAP 5 의 `GooglePlayTangle`(네임스페이스 안)을 찾게 | IAPService (UnityIAP) | CannonPuzzle (2026-10-26) | 완료 (0.13.0) |
+| 6 | 지급 처리기가 준비될 때까지 미확정 구매를 보류 | IAPService | PaperHero (2026-11-05) | 요청 |
+| 7 | 실행 중에 미확정 구매를 다시 처리하는 API | IAPService | PaperHero (2026-11-05) | 요청 |
+| 8 | 상품 조회 일부 실패 허용, 연결·조회·구매 시간 제한 | IAPService | PaperHero (2026-11-05) | 요청 |
+| 9 | 재전달된 구매가 진행 중인 같은 상품 구매를 대신 끝내지 않게 | IAPService | PaperHero (2026-11-05) | 요청 |
+| 10 | 비동기 영수증 검증(서버 검증) 훅 | IAPService | PaperHero (2026-11-05) | 요청 (서버를 붙일 때) |
+| 11 | 영수증 검증 실패 구매 처리 방식 선택 | IAPService | PaperHero (2026-11-05) | 요청 |
+| 12 | 상품 목록을 코드(게임 스펙 표)에서 넘기기 | IAPService | PaperHero (2026-11-05) | 요청 (선택) |
 
 ---
 
@@ -159,3 +166,163 @@ public static ContainerBuilder RegisterResourceService(this ContainerBuilder bui
 - EditMode: 네임스페이스 안의 가짜 `UnityEngine.Purchasing.Security.GooglePlayTangle`(테스트 어셈블리)만 있을 때 찾아야 하고,
   전역 이름만 있을 때도 찾아야 한다(찾는 로직을 테스트할 수 있게 타입 해석 부분을 떼어 낸다).
 - 빌드 확인(README §9.2 와 같은 방법): `global-metadata.dat` 에 `UnityEngine.Purchasing.Security|GooglePlayTangle` 이 남아 있어야 한다.
+
+---
+
+## 6~12 공통 배경 (PaperHero, 2026-11-05)
+
+- PaperHero 는 TailedDemonSlayer(TDS) 기획을 따르는 방치형 RPG 다. 상품은 TDS 상점 표(shop.csv, 결제 상품 49개, **전부 소모성**: 보석·패키지·시즌패스)를 그대로 쓴다.
+- 진행 데이터(`PlayerProgress`, Easy Save 3)는 루트 컨테이너가 아니라 **Play 씬의 핸들러가 불러온다**. IAP 서비스는 루트 싱글턴이라, 루트에서 초기화하면 진행 데이터보다 먼저 미확정 구매가 재전달될 수 있다.
+- TDS 흐름(참고): 구매 → 로컬 영수증 검증 → 서버 `payment` 검증 → 응답 200(또는 10005 이미 처리됨)이면 클라이언트 지급·저장 → `ConfirmPendingPurchase`. 서버 실패면 확정하지 않아 다음 실행에 재전달된다.
+- 검토 기준 코드: 0.16.0(`50d2dfd`)의 `Runtime/Services/IAPService/IAPService.cs`. PaperHero 는 아직 예전 버전(`1db581f`, `RegisterIAPService(IAPServiceSettings)`)을 쓰고 있어 올릴 때 등록 코드가 바뀐다.
+- 이미 갖춰진 것(요청 아님): 검증 → 지급 → 확정 순서, 지급 실패·예외 시 미확정 유지, 앱 재시작 때 `PendingOrders` 재전달(`isRestored`), 같은 트랜잭션 동시 처리 방지(`_inFlight`), 이번 세션 확정 목록(`_confirmedInSession`), 현지화 가격·거래 ID·영수증 노출, 취소·보류 구분. 세션을 넘는 중복 지급 방지(처리한 TransactionId 저장)는 지급 처리기(게임) 몫이라는 현재 설계를 유지한다.
+
+---
+
+## 6. 지급 처리기가 준비될 때까지 미확정 구매를 보류
+
+### 왜 필요한가
+- `RegisterIAPService` 는 서비스를 만들 때 `IIAPFulfillment` 를 **한 번** 해석하고, 등록돼 있지 않으면 `AutoConfirmFulfillment`(지급 없이 확정)로 떨어진다(`IAPServiceRegistration.cs`).
+- 지급 처리기는 게임 진행 데이터가 있어야 지급할 수 있다. 진행 데이터가 씬에서 늦게 준비되는 게임은
+  (a) 지급 처리기를 루트에 등록하지 않으면 재전달된 구매가 **지급 없이 확정**되고(결제만 되고 보석 없음),
+  (b) 등록해도 준비 전이면 `false` 를 돌려줄 수밖에 없는데, 그러면 그 구매는 **다음 실행까지** 다시 오지 않는다(7번).
+- `InitializeAsync` 를 진행 데이터 준비 뒤로 미루는 것만으로는 부족하다. 초기화 이후 씬 전환(진행 데이터 해제·재로드) 중에도 `OnPurchasePending` 이 올 수 있다.
+
+### 제안 API (택1, a 권장)
+```csharp
+// (a) 지급 처리기가 스스로 준비 여부를 알린다. 선택 인터페이스라 기존 구현은 그대로 동작한다.
+public interface IIAPFulfillmentGate
+{
+    bool IsReady { get; }
+}
+
+public interface IIAPService
+{
+    // 기존 멤버 생략
+    // 보류해 둔 미확정 구매를 지금 처리한다(7번과 같은 진입점).
+    Awaitable ProcessUnconfirmedAsync();
+}
+
+// (b) 지급 처리기를 나중에 꽂는다. null 이면 보류.
+void SetFulfillment(IIAPFulfillment fulfillment);
+```
+
+### 동작
+1. 주문(`HandlePurchasePending`, `HandlePurchasesFetched` 의 `PendingOrders`)이 오면 지급 처리기가 `IIAPFulfillmentGate` 이고 `IsReady == false` 이면 검증·지급·확정을 하지 않고 **보류 목록**(트랜잭션 ID 기준, 중복 없이)에 넣는다.
+2. 사용자가 시작한 구매(`PurchaseAsync`)가 보류되면 결과는 `Deferred` 와 구분되는 값으로 끝낸다(예: `IAPPurchaseResultType.Pending` 추가, 또는 `Failed` + 전용 코드 `FulfillmentNotReadyCode`).
+3. `ProcessUnconfirmedAsync()` 가 보류 목록을 순서대로 기존 `ProcessPending` 경로로 흘려보낸다. 아직 준비되지 않았으면 그대로 둔다.
+4. `AutoConfirmFulfillment` 폴백은 유지하되, 소모성 상품이 카탈로그에 있는데 지급 처리기가 등록되지 않았으면 초기화 때 **경고 로그**를 남긴다(지급 없이 확정되는 것을 놓치기 쉽다).
+
+### 테스트
+- 준비 전 재전달 → 지급·확정 0회, 보류 1건. `IsReady = true` 후 `ProcessUnconfirmedAsync()` → 지급 1회·확정 1회·`Purchased` 1회.
+- 같은 트랜잭션이 보류 중에 다시 와도 보류 1건.
+- 게이트가 없는 기존 지급 처리기 → 지금과 같은 동작.
+- 소모성 상품 + 지급 처리기 미등록 → 경고 로그 1회.
+
+---
+
+## 7. 실행 중에 미확정 구매를 다시 처리하는 API
+
+### 왜 필요한가
+- 지급 실패(`FulfillAsync` 가 false·예외)면 확정하지 않고 끝나며, 그 구매는 **다음 실행의 `FetchPurchases`** 에서만 다시 온다. 이번 실행 안에 재시도할 공개 경로가 없다.
+- 일시적 실패(서버 검증 지연, 저장 실패, 6번의 준비 전 상태) 뒤 사용자가 앱을 계속 쓰면 결제한 보석을 받을 때까지 재시작해야 한다. Google Play 는 3일 안에 확정하지 않으면 자동 환불한다.
+
+### 제안 API
+```csharp
+// 스토어에 미확정 구매를 다시 묻고(FetchPurchases), 받은 PendingOrders 를 지급 파이프라인으로 보낸다.
+// 6번의 보류 목록도 함께 처리한다. 초기화 전·해제 후에는 아무것도 하지 않는다.
+Awaitable ProcessUnconfirmedAsync();
+```
+
+### 동작
+- 내부적으로 `FetchPurchasesAsync()` 를 다시 부른다(이미 `_inFlight`·`_confirmedInSession` 이 이중 지급을 막는다). 복원(`RestoreAsync`) 진행 중이면 그 조회에 편승하거나 끝날 때까지 기다린다.
+- 동시에 여러 번 불려도 조회는 하나만 진행한다(초기화 편승과 같은 방식).
+- 게임은 포그라운드 복귀, 상점 열기, 6번의 준비 완료 시점에 부른다. README 에 권장 호출 시점을 적는다.
+
+### 테스트
+- 지급 실패 1회 뒤 `ProcessUnconfirmedAsync()` → 같은 주문 재처리, 지급 성공 시 확정 1회.
+- 연속 2번 호출 → `FetchPurchases` 1회.
+- 초기화 전 호출 → 아무 일도 없음.
+
+---
+
+## 8. 상품 조회 일부 실패 허용, 연결·조회·구매 시간 제한
+
+### 왜 필요한가
+- `HandleProductsFetchFailed` 가 오면 `_fetchingProducts` 를 false 로 끝내 **초기화 전체가 실패**한다. 스토어 콘솔에 아직 없는(심사 전·삭제된) 상품 ID 가 하나만 있어도 상점 전체가 열리지 않을 수 있다. TDS 처럼 결제 상품이 49개면 일부 미등록이 흔하다.
+  - 확인할 것: Unity IAP 5.4 에서 일부 상품이 없을 때 `OnProductsFetched`(받은 것만)와 `OnProductsFetchFailed` 가 둘 다 오는지, 순서는 어떤지. 실기(Android·iOS)에서 확인한다.
+- `ConnectAsync`·`FetchProductsAsync`·`FetchPurchasesAsync`·`PurchaseAsync` 는 이벤트가 오지 않으면 영원히 기다린다. 스토어 앱 문제·네트워크 끊김에서 로딩 화면이 멈춘다(TDS 는 구매 로딩을 10초로 끊었다).
+
+### 바꿀 것
+- 조회에 성공한 상품이 하나라도 있으면 초기화는 성공으로 둔다. 실패한 ID 는 `IAPProduct.IsAvailable == false`(또는 `Products` 에서 제외)로 두고 경고 로그에 ID 목록을 남긴다. 받은 것이 없을 때만 실패.
+- 시간 제한: `InitializeAsync(float timeoutSeconds = 30f)`(연결·조회 각각), `PurchaseAsync` 는 스토어 UI 가 떠 있는 동안이라 길게 두거나 설정값으로. 시간 초과면 `IAPPurchaseResult.Failed(TimeoutCode)`, 늦게 도착한 주문은 그대로 파이프라인을 탄다(지급·`Purchased` 는 일어난다 — README 에 명시).
+- 연결 실패 뒤 다시 `InitializeAsync` 를 부르면 처음부터 재시도되는지 확인하고, 안 되면 상태를 초기화한다.
+
+### 테스트
+- 조회 결과 2개 + 실패 1개 → 초기화 성공, `Products` 2개, 실패 ID 경고.
+- 연결 이벤트가 오지 않음 → 시간 제한 뒤 false, 다시 호출하면 재시도.
+- 구매 이벤트가 오지 않음 → 시간 제한 뒤 `Failed(TimeoutCode)`, 이후 도착한 주문은 정상 지급.
+
+---
+
+## 9. 재전달된 구매가 진행 중인 같은 상품 구매를 대신 끝내지 않게
+
+### 왜 필요한가
+- `CompletePendingFor(productId, …)` 는 **상품 ID 만** 비교한다. 사용자가 상품 A 를 구매하는 중에 같은 상품 A 의 예전 미확정 구매가 재전달(`isRestored: true`)되거나, 그 처리 결과(검증 실패·지급 실패)가 나오면 지금 진행 중인 `PurchaseAsync` 가 그 결과로 끝난다. 실제 새 구매는 결과를 기다리는 호출자 없이 나중에 처리된다.
+
+### 바꿀 것
+- `isRestored == true` 인 주문의 결과로는 대기 중인 구매를 끝내지 않는다(`FulfillAndConfirmAsync` 에서 `CompletePendingFor` 를 `!isRestored` 일 때만).
+- 단, Google 은 같은 소모성 상품이 미확정이면 새 구매를 `ItemAlreadyOwned`(또는 v5 의 대응 실패)로 거절한다. 그 실패가 오면 재전달 처리(7번)를 바로 시도하고 결과를 그 구매에 돌려줄지 정한다 — 최소한 실패 사유를 호출자가 구분할 수 있게 코드로 남긴다.
+
+### 테스트
+- 상품 A 구매 대기 중 A 의 재전달 주문 처리 완료 → 대기 중 구매는 계속 대기.
+- 상품 A 구매 대기 중 A 의 새 주문 → 그 결과로 완료.
+
+---
+
+## 10. 비동기 영수증 검증(서버 검증) 훅
+
+### 왜 필요한가
+- `IReceiptValidator.Validate(purchase, out error)` 가 동기라 서버 검증(TDS `payment` 요청 같은)을 넣을 수 없다. 지급 처리기 안에서 서버를 부르면 검증 실패와 지급 실패가 섞이고, "나중에 다시"(서버 장애)를 표현할 수 없다.
+
+### 제안 API
+```csharp
+public enum IAPValidationResult { Valid, Invalid, RetryLater }
+
+public interface IAsyncReceiptValidator
+{
+    Awaitable<(IAPValidationResult Result, string Error)> ValidateAsync(IAPPurchase purchase);
+}
+```
+
+### 동작
+- 등록돼 있으면 로컬 검증(`IReceiptValidator`) 뒤에 부른다. `Valid` → 지급, `Invalid` → 11번 정책, `RetryLater` → 확정하지 않고 끝내며 7번으로 재시도할 수 있게 둔다(결과 코드 구분).
+- 기다리는 사이 해제되면 확정하지 않는다(지금 지급 대기와 같은 처리).
+
+---
+
+## 11. 영수증 검증 실패 구매 처리 방식 선택
+
+### 왜 필요한가
+- 지금은 검증 실패면 지급도 확정도 하지 않는다. 그 구매는 매 실행 재전달되고 매번 에러 로그가 남는다(위조 영수증이면 영원히). TDS 는 검증 실패를 확정해서 버렸다.
+
+### 바꿀 것
+- 등록 옵션으로 고른다: `InvalidReceiptPolicy.KeepPending`(지금 동작, 기본) / `ConfirmWithoutGrant`(확정만 하고 지급하지 않음, 로그 1회). 같은 트랜잭션의 검증 실패 로그는 세션당 1회로 줄인다.
+
+---
+
+## 12. 상품 목록을 코드(게임 스펙 표)에서 넘기기 (선택)
+
+### 왜 필요한가
+- 상품은 Unity IAP Catalog(`ProductCatalog.LoadDefaultCatalog()`)에서만 읽는다. 게임이 상품을 스펙 표(PaperHero `shop.csv`, pid 49개)로 관리하면 Catalog 와 표가 따로 놀아, 표에 상품을 더하고 Catalog 를 빠뜨리는 실수가 생긴다.
+
+### 제안 API
+```csharp
+// 지정하면 IAP Catalog 대신 이 목록을 쓴다.
+public static ContainerBuilder RegisterIAPService(this ContainerBuilder builder,
+                                                  Func<IEnumerable<IAPProductDefinition>> catalogSource,
+                                                  bool verboseLogging = false);
+// 또는 선택 등록 인터페이스 IIAPCatalogSource
+```
+- `IAPProductDefinition`(공용 ID, 타입, 스토어별 ID 선택)을 공개하고 내부에서 `ProductDefinition` 으로 바꾼다. 상수 생성기는 Catalog 를 쓸 때만 동작해도 된다.
+
