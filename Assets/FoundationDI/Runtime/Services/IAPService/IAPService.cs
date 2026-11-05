@@ -10,14 +10,6 @@ namespace DarkNaku.FoundationDI
     // 이중 처리 방지)을 여기 한 곳에 둔다.
     public sealed class IAPService : IIAPService
     {
-        // 지급 실패는 스토어 실패와 구분되는 원인이지만 결과 enum을 늘리는 대신 에러 코드로 남긴다 —
-        // 호출부가 분기할 이유가 없다(둘 다 "이번엔 못 줬다"이고 재시도는 스토어가 알아서 한다).
-        internal const int FulfillmentFailedCode = -1001;
-        internal const int DisposedCode = -1003;
-        internal const int NotInitializedCode = -1004;
-        internal const int RestoreFailedCode = -1005;
-        internal const int RestoreInProgressCode = -1006;
-
         private readonly IStoreService _store;
         private readonly IProductService _productService;
         private readonly IPurchaseService _purchaseService;
@@ -25,6 +17,8 @@ namespace DarkNaku.FoundationDI
         private readonly IIAPFulfillment _fulfillment;
         private readonly IReceiptValidator _validator;
         private readonly IEntitlementStorage _entitlements;
+        private readonly IAPServiceOptions _options;
+        private readonly Func<IMainThreadDispatcher> _dispatcherFactory;
         private readonly bool _verboseLogging;
 
         // 조회된 상품. 게임 코드에 내보낼 값과 구매에 쓸 Unity 객체를 공용 ID로 함께 들고 있는다.
@@ -73,15 +67,24 @@ namespace DarkNaku.FoundationDI
                                IReceiptValidator validator = null,
                                IEntitlementStorage entitlements = null,
                                bool verboseLogging = false)
-            : this(UnityIAPServices.StoreController(), LoadCatalog(),
-                   fulfillment, validator, entitlements, verboseLogging)
+            : this(new IAPServiceDependencies
+            {
+                Fulfillment = fulfillment,
+                Validator = validator,
+                Entitlements = entitlements,
+                Options = new IAPServiceOptions { VerboseLogging = verboseLogging },
+            })
+        {
+        }
+
+        internal IAPService(IAPServiceDependencies dependencies)
+            : this(UnityIAPServices.StoreController(), LoadCatalog(), dependencies)
         {
         }
 
         private IAPService(StoreController controller, IReadOnlyList<ProductDefinition> catalog,
-                                IIAPFulfillment fulfillment, IReceiptValidator validator,
-                                IEntitlementStorage entitlements, bool verboseLogging)
-            : this(controller, controller, controller, catalog, fulfillment, validator, entitlements, verboseLogging)
+                                IAPServiceDependencies dependencies)
+            : this(controller, controller, controller, catalog, dependencies)
         {
         }
 
@@ -89,15 +92,31 @@ namespace DarkNaku.FoundationDI
                                  IReadOnlyList<ProductDefinition> catalog,
                                  IIAPFulfillment fulfillment, IReceiptValidator validator,
                                  IEntitlementStorage entitlements, bool verboseLogging)
+            : this(store, products, purchases, catalog, new IAPServiceDependencies
+            {
+                Fulfillment = fulfillment,
+                Validator = validator,
+                Entitlements = entitlements,
+                Options = new IAPServiceOptions { VerboseLogging = verboseLogging },
+            })
         {
+        }
+
+        internal IAPService(IStoreService store, IProductService products, IPurchaseService purchases,
+                                 IReadOnlyList<ProductDefinition> catalog, IAPServiceDependencies dependencies)
+        {
+            dependencies ??= new IAPServiceDependencies();
+
             _store = store ?? throw new ArgumentNullException(nameof(store));
             _productService = products ?? throw new ArgumentNullException(nameof(products));
             _purchaseService = purchases ?? throw new ArgumentNullException(nameof(purchases));
             _catalog = catalog != null ? new List<ProductDefinition>(catalog) : new List<ProductDefinition>();
-            _fulfillment = fulfillment ?? new AutoConfirmFulfillment();
-            _validator = validator ?? new CrossPlatformReceiptValidator();
-            _entitlements = entitlements ?? new PlayerPrefsEntitlementStorage();
-            _verboseLogging = verboseLogging;
+            _fulfillment = dependencies.Fulfillment ?? new AutoConfirmFulfillment();
+            _validator = dependencies.Validator ?? new CrossPlatformReceiptValidator();
+            _entitlements = dependencies.Entitlements ?? new PlayerPrefsEntitlementStorage();
+            _options = dependencies.Options ?? new IAPServiceOptions();
+            _dispatcherFactory = dependencies.Dispatcher;
+            _verboseLogging = _options.VerboseLogging;
         }
 
         public bool IsInitialized { get; private set; }
@@ -182,13 +201,13 @@ namespace DarkNaku.FoundationDI
         {
             if (_disposed || !IsInitialized)
             {
-                return IAPRestoreResult.Fail(new IAPError(NotInitializedCode, "초기화되지 않았다"));
+                return IAPRestoreResult.Fail(new IAPError(IAPErrorCodes.NotInitialized, "초기화되지 않았다"));
             }
 
             if (_restoring != null)
             {
                 Debug.LogWarning("[IAPService] 복원이 이미 진행 중이다.");
-                return IAPRestoreResult.Fail(new IAPError(RestoreInProgressCode, "복원이 이미 진행 중이다"));
+                return IAPRestoreResult.Fail(new IAPError(IAPErrorCodes.RestoreInProgress, "복원이 이미 진행 중이다"));
             }
 
             _restoredCount = 0;
@@ -216,7 +235,7 @@ namespace DarkNaku.FoundationDI
 
             if (!await source.Awaitable)
             {
-                return IAPRestoreResult.Fail(new IAPError(RestoreFailedCode, "복원에 실패했다"));
+                return IAPRestoreResult.Fail(new IAPError(IAPErrorCodes.RestoreFailed, "복원에 실패했다"));
             }
 
             return IAPRestoreResult.Ok(_restoredCount);
@@ -230,7 +249,7 @@ namespace DarkNaku.FoundationDI
             Unsubscribe();
 
             // 대기 중인 구매·복원이 영원히 매달리지 않게 끊어준다.
-            CompletePending(IAPPurchaseResult.Failed(new IAPError(DisposedCode, "서비스가 해제됐다")));
+            CompletePending(IAPPurchaseResult.Failed(new IAPError(IAPErrorCodes.Disposed, "서비스가 해제됐다")));
             FinishRestore(false);
             CompleteInitWaiters(false);
         }
@@ -589,7 +608,7 @@ namespace DarkNaku.FoundationDI
             {
                 // 확정하지 않는다 — 스토어가 다음 실행에 같은 구매를 다시 내려준다.
                 CompletePendingFor(productId, IAPPurchaseResult.Failed(
-                    new IAPError(FulfillmentFailedCode, "지급에 실패해 확정하지 않았다")));
+                    new IAPError(IAPErrorCodes.FulfillmentFailed, "지급에 실패해 확정하지 않았다")));
                 return;
             }
 

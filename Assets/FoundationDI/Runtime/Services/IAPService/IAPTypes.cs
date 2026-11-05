@@ -16,6 +16,17 @@ namespace DarkNaku.FoundationDI
         Failed,          // 그 외 스토어 실패 및 지급 실패
     }
 
+    // IAPError.Code 중 이 서비스가 정한 값. 0 이상은 Unity IAP의 PurchaseFailureReason 값 그대로다.
+    public static class IAPErrorCodes
+    {
+        // 지급 처리기가 false를 돌려주거나 예외를 던졌다. 확정하지 않았으므로 스토어가 다시 준다.
+        public const int FulfillmentFailed = -1001;
+        public const int Disposed = -1003;
+        public const int NotInitialized = -1004;
+        public const int RestoreFailed = -1005;
+        public const int RestoreInProgress = -1006;
+    }
+
     public readonly struct IAPError
     {
         public int Code { get; }

@@ -5,7 +5,7 @@ using UnityEngine.Purchasing;
 
 public class IAPServiceRegistrationTest
 {
-    private System.Func<IIAPFulfillment, IReceiptValidator, IEntitlementStorage, bool, IIAPService> _original;
+    private System.Func<IAPServiceDependencies, IIAPService> _original;
 
     private IIAPFulfillment _fulfillment;
     private IReceiptValidator _validator;
@@ -20,17 +20,17 @@ public class IAPServiceRegistrationTest
         _created = 0;
 
         // 에디트 모드에서는 StoreController를 만들 수 없다 — 배선만 검증하고 서비스는 대체 스토어로 만든다.
-        IAPServiceRegistration.ServiceFactory = (fulfillment, validator, entitlements, verboseLogging) =>
+        IAPServiceRegistration.ServiceFactory = dependencies =>
         {
             _created++;
-            _fulfillment = fulfillment;
-            _validator = validator;
-            _entitlements = entitlements;
-            _verboseLogging = verboseLogging;
+            _fulfillment = dependencies.Fulfillment;
+            _validator = dependencies.Validator;
+            _entitlements = dependencies.Entitlements;
+            _verboseLogging = dependencies.Options.VerboseLogging;
 
             var store = new UnityIAPStoreHarness();
             return new IAPService(store.Store, store.Products, store.Purchases, new ProductDefinition[0],
-                                       fulfillment, validator, entitlements, verboseLogging);
+                                  dependencies);
         };
     }
 
