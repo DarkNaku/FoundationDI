@@ -36,11 +36,20 @@ namespace DarkNaku.FoundationDI
 
                 var ump = settings.UseUmp ? UmpConsentFactory.Create(dispatcher) : new UnsupportedUmpConsent();
                 var tracking = TrackingAuthorizationRegistry.Create(dispatcher);
-                var resolvedPrompt = prompt ?? new DefaultPolicyAgreementPrompt(settings.PromptPrefab, new UnityUrlOpener());
+                var resolvedPrompt = prompt ?? CreatePrompt(settings, dispatcher);
 
                 return new ConsentService(settings.ToOptions(Debug.isDebugBuild), resolvedPrompt, storage, ump,
                                           tracking, dispatcher, prerequisites);
             }, Lifetime.Singleton, Resolution.Lazy);
+        }
+
+        private static IPolicyAgreementPrompt CreatePrompt(ConsentServiceSettings settings, IMainThreadDispatcher dispatcher)
+        {
+            var prefabPrompt = new DefaultPolicyAgreementPrompt(settings.PromptPrefab, new UnityUrlOpener());
+
+            if (!settings.UseNativePrompt) return prefabPrompt;
+
+            return new NativePolicyAgreementPrompt(NativePolicyDialogFactory.Create(dispatcher), prefabPrompt);
         }
     }
 }

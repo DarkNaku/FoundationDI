@@ -32,10 +32,18 @@ public class UmpBuildRulesTest
     [Test]
     public void Firebase_수집_기본값은_동의를_기다리고_Firebase가_있고_아직_없을_때만_넣는다()
     {
-        Assert.IsTrue(UmpBuildRules.ShouldDisableFirebaseCollection(true, true, false));
-        Assert.IsFalse(UmpBuildRules.ShouldDisableFirebaseCollection(false, true, false));
-        Assert.IsFalse(UmpBuildRules.ShouldDisableFirebaseCollection(true, false, false));
-        Assert.IsFalse(UmpBuildRules.ShouldDisableFirebaseCollection(true, true, true));
+        Assert.IsTrue(UmpBuildRules.ShouldDisableFirebaseCollection(true, false, true, false));
+        Assert.IsFalse(UmpBuildRules.ShouldDisableFirebaseCollection(false, false, true, false));
+        Assert.IsFalse(UmpBuildRules.ShouldDisableFirebaseCollection(true, false, false, false));
+        Assert.IsFalse(UmpBuildRules.ShouldDisableFirebaseCollection(true, false, true, true));
+    }
+
+    [Test]
+    public void Test_Lab_제외가_켜져_있으면_동의를_기다리지_않아도_Firebase_수집을_기본으로_끈다()
+    {
+        Assert.IsTrue(UmpBuildRules.ShouldDisableFirebaseCollection(false, true, true, false));
+        Assert.IsFalse(UmpBuildRules.ShouldDisableFirebaseCollection(false, true, false, false));
+        Assert.IsFalse(UmpBuildRules.ShouldDisableFirebaseCollection(false, true, true, true));
     }
 
     [TestCase("/proj/unityLibrary/src/main/AndroidManifest.xml", true)]

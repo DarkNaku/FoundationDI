@@ -50,7 +50,8 @@ namespace DarkNaku.FoundationDI.Editor
                 }
             }
 
-            if (UmpBuildRules.ShouldDisableFirebaseCollection(AnyAnalyticsWaitsForConsent(), IsFirebaseActive(),
+            if (UmpBuildRules.ShouldDisableFirebaseCollection(AnyAnalyticsWaitsForConsent(), AnyAnalyticsExcludesTestLab(),
+                                                              IsFirebaseActive(),
                                                               AnyHas(UmpBuildRules.AndroidFirebaseCollectionKey)))
             {
                 xml = AndroidManifestEditor.AddMetaData(xml, UmpBuildRules.AndroidFirebaseCollectionKey, "false");
@@ -92,7 +93,8 @@ namespace DarkNaku.FoundationDI.Editor
                 }
             }
 
-            if (UmpBuildRules.ShouldDisableFirebaseCollection(AnyAnalyticsWaitsForConsent(), IsFirebaseActive(),
+            // Test Lab은 Android 전용이라 iOS에서는 동의 대기만 본다.
+            if (UmpBuildRules.ShouldDisableFirebaseCollection(AnyAnalyticsWaitsForConsent(), false, IsFirebaseActive(),
                                                               plist.root.values.ContainsKey(UmpBuildRules.IosFirebaseCollectionKey)))
             {
                 plist.root.SetBoolean(UmpBuildRules.IosFirebaseCollectionKey, false);
@@ -108,6 +110,13 @@ namespace DarkNaku.FoundationDI.Editor
             return AssetDatabase.FindAssets("t:" + nameof(AnalyticsServiceSettings))
                                 .Select(g => AssetDatabase.LoadAssetAtPath<AnalyticsServiceSettings>(AssetDatabase.GUIDToAssetPath(g)))
                                 .Any(s => s != null && s.WaitForConsent);
+        }
+
+        private static bool AnyAnalyticsExcludesTestLab()
+        {
+            return AssetDatabase.FindAssets("t:" + nameof(AnalyticsServiceSettings))
+                                .Select(g => AssetDatabase.LoadAssetAtPath<AnalyticsServiceSettings>(AssetDatabase.GUIDToAssetPath(g)))
+                                .Any(s => s != null && s.ExcludeFirebaseTestLab);
         }
 
         private static bool IsFirebaseActive()

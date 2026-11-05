@@ -1,5 +1,46 @@
 # plan.md
 
+## 완료: ConsentService — 네이티브 약관 창 (본문 속 링크)
+
+시스템 알림창 모양의 약관 창에서 본문 속 "이용약관"·"개인정보 처리방침" 글자를 링크로 만든다.
+iOS는 커스텀 뷰 컨트롤러(Liquid Glass), Android는 AlertDialog. `Use Native Prompt`로 켠다.
+
+PolicyMessageFormatter 테스트
+- [x] 자리표시자를 라벨로 바꾸고 그 자리에 링크를 건다
+- [x] 자리표시자가 없으면 본문에 있는 라벨 첫 위치에 링크를 건다
+- [x] 본문에 라벨이 없으면 줄을 바꿔 붙이고 링크를 건다
+- [x] URL이 비어 있으면 라벨만 넣고 링크를 걸지 않는다
+
+NativePolicyAgreementPrompt 테스트
+- [x] 링크가 걸린 본문으로 네이티브 창을 띄우고 동의하면 완료된다
+- [x] 네이티브 창을 못 띄우면 대체 창을 쓴다
+- [x] 닫으면 네이티브 창을 정리하고 늦게 온 동의는 무시한다
+
+PolicyContentSelector 테스트 (Localized Texts)
+- [x] 기기 언어와 같은 항목의 문구를 쓴다
+- [x] 맞는 언어가 없으면 기본 문구를 쓴다
+- [x] 항목의 빈 칸은 기본값으로 채운다
+- [x] 중국어는 간체·번체·통합 항목끼리 서로 대신한다
+- [x] 중국어는 정확히 맞는 항목을 먼저 쓴다
+
+실기 확인
+- [ ] iOS 26+: Liquid Glass 카드, 링크 탭 → Safari, OK → 다음 단계(UMP·ATT)
+- [ ] iOS 25 이하: 블러 카드 폴백
+- [ ] Android: 링크 탭 → 브라우저, 뒤로가기·바깥 탭으로 닫히지 않음, OK → 다음 단계
+- [ ] Android R8(minify) 빌드에서 창이 뜸
+
+## 완료: AnalyticsService — Firebase Test Lab(Play 사전 출시 보고서) 기기 제외
+
+사전 출시 보고서의 Test Lab 기기가 GA4 신규 사용자·Adjust 인스톨로 잡혀 리텐션을 흐린다.
+`ITestLabDetector`로 판별해 동의 거부처럼 수집을 막고, 빌드 후처리가 Firebase 자동 수집 기본값을 끈다.
+
+- [x] Test Lab 기기면 이벤트를 보내지 않고 SDK 수집을 끈다
+- [x] Test Lab 기기면 동의를 묻지 않는다
+- [x] Test Lab 기기면 flush 훅을 부르지 않는다
+- [x] Test Lab 기기면 게임이 수집을 켜도 켜지지 않는다
+- [x] Test Lab 기기가 아니면 평소대로 보낸다
+- [x] Test Lab 제외가 켜져 있으면 동의를 기다리지 않아도 Firebase 수집을 기본으로 끈다
+
 ## 완료: ConsentService (약관 + UMP + ATT) — 0.12.0
 
 상세 계획: `docs/superpowers/plans/2026-10-14-consent-service.md` (Task 0~19).

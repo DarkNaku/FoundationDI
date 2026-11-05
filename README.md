@@ -1,7 +1,7 @@
 # FoundationDI
 
 ![Unity](https://img.shields.io/badge/Unity-6000.3%2B-black?logo=unity)
-![Version](https://img.shields.io/badge/version-0.14.0-blue)
+![Version](https://img.shields.io/badge/version-0.15.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Author](https://img.shields.io/badge/author-DarkNaku-orange)
 
@@ -139,6 +139,15 @@ public class TitleFlow
     public void Open() => _ui.Page<TitlePresenter>();
 }
 ```
+
+## 변경 (0.14.x → 0.15.0)
+
+하위 호환입니다. 새 옵션 두 개와 Android 빌드 수정입니다.
+
+- **AnalyticsService: Firebase Test Lab 기기 제외 (`Exclude Firebase Test Lab`, 기본 켜짐)** — Google Play 사전 출시 보고서 기기를 GA4·Adjust에서 뺍니다. 켜져 있으면 `Wait For Consent`가 꺼져 있어도 Android 빌드의 Firebase 자동 수집 기본값이 꺼집니다(일반 기기는 초기화 때 켭니다).
+- **ConsentService: 네이티브 약관 창 (`Use Native Prompt`, 기본 꺼짐)** — iOS 알림창 모양(iOS 26+ Liquid Glass)/Android AlertDialog로 띄우고 본문 속 "이용약관"·"개인정보 처리방침"을 링크로 겁니다. Message에 `{terms}`/`{privacy}`를 쓸 수 있습니다.
+- **ConsentService: 언어별 약관 문구 (`Localized Texts`)** — 기기 언어에 맞는 문구를 코드 없이 자동으로 고릅니다. 맞는 언어가 없으면 기본 문구입니다.
+- **ReviewService: Android 플레이어 빌드 컴파일 에러 수정** — 0.14.0은 Android 빌드에서 `UnityEngine.iOS` 참조로 컴파일이 실패합니다.
 
 ## 변경 (0.13.x → 0.14.0)
 

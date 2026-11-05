@@ -58,6 +58,7 @@ UMP의 공식 Unity 바인딩은 Google Mobile Ads(GMA) Unity 플러그인 안�
 |---|---|---|
 | Policy Version | 1 | 약관을 바꾸면 올립니다. 저장된 수락 버전보다 크면 다시 묻습니다. **0이면 약관 단계를 쓰지 않습니다.** |
 | 문구 (Title 등) | 영어 | 기본 프리팹의 TMP 기본 폰트에 CJK 글리프가 없어 영어가 기본입니다(5장). |
+| Localized Texts | 비어 있음 | 언어별 문구. 기기 언어와 같은 항목을 자동으로 고릅니다(5.2). |
 | Terms/Privacy Url | 비어 있음 | 비면 그 링크 버튼이 숨겨집니다. |
 | Use UMP | 끔 | 켜면 의존성 XML을 만들고 런타임이 UMP 동의를 받습니다. |
 | AdMob App Id | 비어 있음 | `ca-app-pub-XXXX~YYYY`. |
@@ -90,7 +91,7 @@ UMP 폼의 내용은 코드가 아니라 AdMob 콘솔 **개인 정보 보호 및
 // 기존 유저(이전 버전에서 업데이트)는 약관을 다시 묻지 않으려면 판단해서 먼저 수락 처리한다.
 if (_save.HasAnyProgress) _consent.AcceptPolicy();
 
-// 현지화 문구(RequestAsync 전에).
+// 현지화 문구(RequestAsync 전에). 기기 언어로만 고르면 되면 코드 없이 Localized Texts를 쓴다(5.2).
 _consent.SetPolicyContent(new PolicyAgreementContent(
     title: L("policy.title"), message: L("policy.body"), acceptLabel: L("policy.accept"),
     termsLabel: L("policy.terms"), termsUrl: "https://example.com/terms",
@@ -150,6 +151,47 @@ builder.RegisterConsentService(_consentServiceSettings, prompt: new MyPolicyProm
   루트보다 먼저 떠야 할 수 있습니다.
 - 기본 구현은 씬에 EventSystem이 없으면 표시하는 동안만 임시로 만듭니다(Input System이 있으면
   `InputSystemUIInputModule`).
+
+### 5.1 네이티브 약관 창 (Use Native Prompt)
+
+설정의 **Use Native Prompt**를 켜면 프리팹 대신 OS 네이티브 창을 띄웁니다. 본문 속 글자가 링크입니다.
+
+| 플랫폼 | 창 | 링크 |
+|---|---|---|
+| iOS | 시스템 알림창 모양의 커스텀 뷰 컨트롤러(`FDI_PolicyDialog.mm`). iOS 26+ Liquid Glass(`UIGlassEffect`), 그 아래는 머티리얼 블러 | `UITextView` 링크 → Safari |
+| Android | `AlertDialog`(`FoundationDIPolicyDialog.androidlib`). 기기의 Material 스타일을 따른다 | `LinkMovementMethod` → 브라우저 |
+| 에디터·플러그인 누락 | 프리팹 창으로 대신한다 | 버튼 |
+
+UIAlertController를 그대로 쓰지 않는 이유: 본문에 링크를 거는 공개 API가 없습니다(비공개 키 `attributedMessage`는
+링크가 눌리지 않고 심사 위험이 있습니다).
+
+**링크 자리** — 설정의 Message에서 이 순서로 찾습니다.
+
+1. `{terms}` / `{privacy}` 자리표시자 → 라벨(Terms Label / Privacy Label)로 바꾸고 그 자리에 링크
+2. 자리표시자가 없으면 본문에 있는 라벨의 **첫 위치**에 링크
+3. 본문에 라벨도 없으면 끝에 줄을 바꿔 라벨을 붙이고 링크
+4. URL이 비어 있으면 링크를 걸지 않습니다
+
+예) Title `Notice`, Message `"OK" 버튼을 누르시면 당사의 {terms}과 {privacy}에 대해 읽고 확인한 것으로 간주합니다.`,
+Accept Label `OK`, Terms Label `이용약관`, Privacy Label `개인정보 처리방침`.
+
+- OK 말고는 닫히지 않습니다(Android 뒤로가기·바깥 탭 포함). 링크를 열고 돌아와도 창이 남아 있습니다.
+- iOS는 앱이 Active가 되고 0.5초 안정된 뒤 띄웁니다(UMP·ATT와 같은 이유 — Inactive에서 띄운 모달은 버려진다).
+- Android Java 클래스는 JNI로만 불리므로 androidlib의 consumer R8 규칙(`proguard-rules.pro`)으로 keep합니다.
+- 네이티브 창은 시스템 폰트를 쓰므로 프리팹 창과 달리 한국어 폰트를 따로 넣을 필요가 없습니다.
+
+### 5.2 언어별 문구 (Localized Texts)
+
+설정의 **Localized Texts**에 언어마다 한 줄씩 넣으면 기기 언어(`Application.systemLanguage`)에 맞는 줄을 골라
+씁니다. 코드는 필요 없습니다.
+
+- 맞는 언어가 없으면 위의 기본 문구(Title, Message …)를 씁니다. 기본 문구를 영어로 두면 나머지 언어의 대체가 됩니다.
+- **빈 칸은 기본 문구로 채웁니다.** 언어마다 URL이 같으면 URL은 비워 두세요.
+- 중국어: 기기는 `ChineseSimplified`/`ChineseTraditional`로 보고합니다. 정확히 맞는 줄이 먼저이고, 없으면 통합
+  `Chinese` 줄을 씁니다(반대로 기기가 `Chinese`면 간체 → 번체 순). 간체와 번체끼리는 서로 대신하지 않습니다.
+- 언어마다 Message에 `{terms}`/`{privacy}`를 넣으면 어순이 달라도 링크가 맞는 자리에 걸립니다(5.1).
+- 언어는 서비스를 만들 때 한 번 고릅니다. 게임 안 언어 설정을 따르려면 `SetPolicyContent`로 넘기세요 — 이쪽이 우선합니다.
+- 프리팹 창은 해당 언어 글리프가 있는 TMP 폰트가 필요합니다. 네이티브 창(5.1)은 필요 없습니다.
 
 ## 6. 광고·분석 연동
 
@@ -352,6 +394,8 @@ AdMob 어댑터 5.31.0.0, UMP 4.0.0, Google 샘플 AdMob 앱 ID)로 확인했습
 - [ ] R8 난독화 빌드에서 UMP JNI 호출 정상 (실패하면 `-keep class com.google.android.ump.** { *; }`)
 - [x] Android: LevelPlay AdMob 어댑터(Next-Gen `ads-mobile-sdk:1.5.0`)와 함께 Gradle 해석·빌드 성공 (`play-services-ads` 미포함)
 - [ ] iOS: LevelPlay AdMob 어댑터와 함께 CocoaPods 해석 성공
+- [ ] 네이티브 약관 창(5.1): iOS 26+ Glass·이하 블러, 링크 탭, OK 후 UMP·ATT 진행
+- [ ] 네이티브 약관 창(5.1): Android 링크 탭, 뒤로가기로 안 닫힘, R8 빌드에서 표시
 
 **테스트 기기 등록**: Debug Geography는 테스트 기기에서만 적용됩니다. 첫 실행 logcat의
 `UserMessagingPlatform: Use new ConsentDebugSettings.Builder().addTestDeviceHashedId("…")` 값을 설정의

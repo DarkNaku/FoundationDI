@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 권한·컴포넌트 없음. 라이브러리 모듈에 필요한 빈 매니페스트다. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+</manifest>

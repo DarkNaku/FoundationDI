@@ -337,3 +337,32 @@ public class ConsentFixture
     public ConsentService Build() =>
         new(Options, Prompt, Storage, Ump, Tracking, Dispatcher, Prerequisites);
 }
+
+public class FakeNativePolicyDialog : INativePolicyDialog
+{
+    private Action _onAccepted;
+
+    public bool IsSupported = true;
+    public int ShowCount { get; private set; }
+    public int CloseCount { get; private set; }
+    public PolicyAgreementContent LastContent { get; private set; }
+    public PolicyMessage LastMessage { get; private set; }
+
+    bool INativePolicyDialog.IsSupported => IsSupported;
+
+    public void Show(PolicyAgreementContent content, PolicyMessage message, Action onAccepted)
+    {
+        ShowCount++;
+        LastContent = content;
+        LastMessage = message;
+        _onAccepted = onAccepted;
+    }
+
+    public void Close()
+    {
+        CloseCount++;
+    }
+
+    // 네이티브 OK 버튼. 닫힌 뒤에도 늦게 도착할 수 있어 콜백을 비우지 않는다.
+    public void Accept() => _onAccepted?.Invoke();
+}
