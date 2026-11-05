@@ -1,5 +1,31 @@
 # plan.md
 
+## 완료: LocalNotificationService — 알림 데이터·연 알림·첫 권한 결과·게임 저장소 (0.16.0)
+
+BlockAway·BigTopSmash 의 LocalNotifications 를 기능 손실 없이 옮기기 위해 필요한 것들.
+
+LocalNotificationService 테스트
+- [x] 알림에 실은 데이터를 그대로 예약한다
+- [x] Start하면 알림을 눌러 연 것을 한 번만 알린다
+- [x] 앱이 포커스를 되찾으면 새로 누른 알림을 알린다
+- [x] 알림으로 열지 않았으면 알리지 않는다
+- [x] 연 알림을 읽다 예외가 나도 예약은 한다
+- [x] 처음 물을 때 이미 권한이 있으면 AlreadyGranted를 알린다
+- [x] 권한 창에서 허용하면 Granted, 거절하면 Denied를 알린다
+- [x] 설정 화면에서 다시 물은 결과는 알리지 않는다
+
+PlayerPrefsLocalNotificationStorage 테스트
+- [x] 처음 보는 알림만 연 것으로 기록하고 새 인스턴스에서도 기억한다
+- [x] 데이터가 없는 알림은 기록하지 않는다
+
+등록 테스트
+- [x] 게임이 저장소를 먼저 등록했으면 그것을 쓴다
+- [x] 채널 옵션은 알림 창구를 처음 만들 때 바꾼다
+
+실기 확인
+- [ ] Android·iOS: 알림을 눌러 열면 Opened 가 한 번 오고, 다시 켜도 오지 않는다
+
+
 ## 완료: ConsentService — 네이티브 약관 창 (본문 속 링크)
 
 시스템 알림창 모양의 약관 창에서 본문 속 "이용약관"·"개인정보 처리방침" 글자를 링크로 만든다.

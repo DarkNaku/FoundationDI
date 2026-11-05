@@ -62,6 +62,28 @@ if (!asked) _review.Request();                            // 같은 때 두 OS �
 _notifications.IsEnabled = isOn;                          // 설정 화면 토글 (끄면 예약을 지운다)
 ```
 
+### 알림을 눌러 연 것·권한 결과 (0.16)
+
+```csharp
+// planner가 알림에 값을 싣는다. 같은 알림이 두 번 알려지지 않도록 울릴 시각처럼 알림마다 다른 값을 넣는다.
+yield return new LocalNotification(fireTime, "오늘의 선물", "받으러 오세요", $"daily|{fireTime.Ticks}");
+
+_notifications.Opened += data => _analytics.LogEvent("notification_open", ...);          // Start·포커스 복귀 때 확인
+_notifications.PermissionAnswered += result => _analytics.LogEvent("notification_permission", ...); // 설치마다 한 번
+```
+
+### 게임 저장소와 채널 문구 (0.16)
+
+```csharp
+// 켜기/끄기·권한 물음·연 알림 기록을 게임 세이브에 둔다 — RegisterLocalNotificationService보다 먼저 등록한다.
+builder.RegisterFactory<ILocalNotificationStorage>(c => new UserNotificationStorage(c.Resolve<UserService>()),
+                                                   Lifetime.Singleton, Resolution.Lazy);
+
+// 채널 이름은 알림 창구를 처음 만들 때 정한다(게임 문구가 준비된 뒤). 채널 ID는 바꾸지 않는다.
+builder.RegisterLocalNotificationService(_notificationSettings,
+                                         options => options.WithAndroidChannel(GameText.Get("noti_channel"), GameText.Get("noti_channel_desc")));
+```
+
 ## 3. API
 
 | 멤버 | 설명 |
@@ -72,6 +94,8 @@ _notifications.IsEnabled = isOn;                          // 설정 화면 토�
 | `Reschedule()` | 전부 지우고 다시 예약. 권한이 없거나 꺼져 있으면 지우기만 함. 예약 수를 반환 |
 | `TryRequestPermissionOnce()` | 처음 부를 때만 권한 창(기다리지 않음). 창이 떠 있는 동안 앱이 꺼져도 다시 묻지 않게 먼저 기록. 이미 권한이 있으면 창 없이 예약. **이번에 창을 띄웠으면 true** |
 | `RequestPermissionAsync()` | 물었는지와 무관하게 권한 요청(설정 화면의 "알림 켜기" 등). 허용되면 예약 |
+| `Opened` (이벤트) | 알림을 눌러 앱을 열었다. 값은 그 알림의 `Data`. `Start`와 앱이 포커스를 되찾을 때 확인하고, 같은 알림은 `ILocalNotificationStorage.TryMarkOpened`로 한 번만 알린다. `Data`가 없는 알림은 알리지 않는다 |
+| `PermissionAnswered` (이벤트) | `TryRequestPermissionOnce`의 결과(`Granted`/`Denied`/`AlreadyGranted`). 설치마다 한 번 — `RequestPermissionAsync` 결과는 알리지 않는다 |
 
 ## 4. 구조
 
@@ -83,5 +107,5 @@ _notifications.IsEnabled = isOn;                          // 설정 화면 토�
 
 ## 5. 알려진 범위 밖
 
-- 알림을 눌러 앱을 연 경우의 처리(`NotificationCenter.LastRespondedNotification`)와 반복 알림, 알림 ID 관리는 다루지 않습니다.
+- 반복 알림과 알림 ID 관리는 다루지 않습니다. (알림을 눌러 연 경우는 0.16부터 `Opened`로 알립니다.)
 - 실기 검증은 BlockAway의 같은 구현으로만 되어 있습니다(이 패키지 이식 후 실기 미검증).
