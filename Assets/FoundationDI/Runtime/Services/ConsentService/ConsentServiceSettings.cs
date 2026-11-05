@@ -25,6 +25,10 @@ namespace DarkNaku.FoundationDI
         [Tooltip("약관 수락 창 프리팹. 루트에 PolicyAgreementView가 있어야 한다. 비우면 기본 프리팹을 쓴다.")]
         [SerializeField] private PolicyAgreementView _promptPrefab;
 
+        [Tooltip("켜면 OS 네이티브 창(iOS 알림창 모양, Android AlertDialog)으로 띄운다. 본문의 {terms}·{privacy} " +
+                 "자리(없으면 본문 속 라벨 글자)에 링크가 걸린다. 에디터에서는 프리팹 창으로 대신한다.")]
+        [SerializeField] private bool _useNativePrompt;
+
         [Header("Google UMP")]
         [Tooltip("켜면 에디터가 UMP 네이티브 의존성 XML을 생성하고 런타임이 UMP 동의를 받는다. " +
                  "AdMob 콘솔의 '개인 정보 보호 및 메시지'에서 GDPR 메시지를 만들어 둬야 한다.")]
@@ -51,6 +55,7 @@ namespace DarkNaku.FoundationDI
         public string AdMobAppIdAndroid => _adMobAppIdAndroid;
         public string AdMobAppIdIos => _adMobAppIdIos;
         public PolicyAgreementView PromptPrefab => _promptPrefab;
+        public bool UseNativePrompt => _useNativePrompt;
 
         public ConsentServiceOptions ToOptions(bool isDebugBuild)
         {

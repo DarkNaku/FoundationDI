@@ -151,6 +151,34 @@ builder.RegisterConsentService(_consentServiceSettings, prompt: new MyPolicyProm
 - 기본 구현은 씬에 EventSystem이 없으면 표시하는 동안만 임시로 만듭니다(Input System이 있으면
   `InputSystemUIInputModule`).
 
+### 5.1 네이티브 약관 창 (Use Native Prompt)
+
+설정의 **Use Native Prompt**를 켜면 프리팹 대신 OS 네이티브 창을 띄웁니다. 본문 속 글자가 링크입니다.
+
+| 플랫폼 | 창 | 링크 |
+|---|---|---|
+| iOS | 시스템 알림창 모양의 커스텀 뷰 컨트롤러(`FDI_PolicyDialog.mm`). iOS 26+ Liquid Glass(`UIGlassEffect`), 그 아래는 머티리얼 블러 | `UITextView` 링크 → Safari |
+| Android | `AlertDialog`(`FoundationDIPolicyDialog.androidlib`). 기기의 Material 스타일을 따른다 | `LinkMovementMethod` → 브라우저 |
+| 에디터·플러그인 누락 | 프리팹 창으로 대신한다 | 버튼 |
+
+UIAlertController를 그대로 쓰지 않는 이유: 본문에 링크를 거는 공개 API가 없습니다(비공개 키 `attributedMessage`는
+링크가 눌리지 않고 심사 위험이 있습니다).
+
+**링크 자리** — 설정의 Message에서 이 순서로 찾습니다.
+
+1. `{terms}` / `{privacy}` 자리표시자 → 라벨(Terms Label / Privacy Label)로 바꾸고 그 자리에 링크
+2. 자리표시자가 없으면 본문에 있는 라벨의 **첫 위치**에 링크
+3. 본문에 라벨도 없으면 끝에 줄을 바꿔 라벨을 붙이고 링크
+4. URL이 비어 있으면 링크를 걸지 않습니다
+
+예) Title `Notice`, Message `"OK" 버튼을 누르시면 당사의 {terms}과 {privacy}에 대해 읽고 확인한 것으로 간주합니다.`,
+Accept Label `OK`, Terms Label `이용약관`, Privacy Label `개인정보 처리방침`.
+
+- OK 말고는 닫히지 않습니다(Android 뒤로가기·바깥 탭 포함). 링크를 열고 돌아와도 창이 남아 있습니다.
+- iOS는 앱이 Active가 되고 0.5초 안정된 뒤 띄웁니다(UMP·ATT와 같은 이유 — Inactive에서 띄운 모달은 버려진다).
+- Android Java 클래스는 JNI로만 불리므로 androidlib의 consumer R8 규칙(`proguard-rules.pro`)으로 keep합니다.
+- 네이티브 창은 시스템 폰트를 쓰므로 프리팹 창과 달리 한국어 폰트를 따로 넣을 필요가 없습니다.
+
 ## 6. 광고·분석 연동
 
 ### 6.1 AdService
@@ -352,6 +380,8 @@ AdMob 어댑터 5.31.0.0, UMP 4.0.0, Google 샘플 AdMob 앱 ID)로 확인했습
 - [ ] R8 난독화 빌드에서 UMP JNI 호출 정상 (실패하면 `-keep class com.google.android.ump.** { *; }`)
 - [x] Android: LevelPlay AdMob 어댑터(Next-Gen `ads-mobile-sdk:1.5.0`)와 함께 Gradle 해석·빌드 성공 (`play-services-ads` 미포함)
 - [ ] iOS: LevelPlay AdMob 어댑터와 함께 CocoaPods 해석 성공
+- [ ] 네이티브 약관 창(5.1): iOS 26+ Glass·이하 블러, 링크 탭, OK 후 UMP·ATT 진행
+- [ ] 네이티브 약관 창(5.1): Android 링크 탭, 뒤로가기로 안 닫힘, R8 빌드에서 표시
 
 **테스트 기기 등록**: Debug Geography는 테스트 기기에서만 적용됩니다. 첫 실행 logcat의
 `UserMessagingPlatform: Use new ConsentDebugSettings.Builder().addTestDeviceHashedId("…")` 값을 설정의

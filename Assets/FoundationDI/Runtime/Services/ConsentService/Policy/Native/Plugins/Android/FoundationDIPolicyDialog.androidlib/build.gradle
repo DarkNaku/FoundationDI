@@ -1,0 +1,16 @@
+// FoundationDI 네이티브 약관 창(FDIPolicyDialog)을 담는 Android 라이브러리 플러그인.
+// 클래스는 C#에서 JNI로만 불려 R8이 쓰지 않는 코드로 보고 지운다 — consumer 규칙으로 앱 빌드에 keep을 싣는다.
+apply plugin: 'com.android.library'
+
+android {
+    // AGP 8/9는 매니페스트의 package 속성을 허용하지 않으므로 namespace로 지정해야 한다.
+    namespace 'com.darknaku.foundationdi.consent'
+
+    // 프로젝트(Unity 6000.3.x)의 compileSdk와 맞춘다.
+    // Unity가 SDK를 올리면 이 값도 함께 갱신한다.
+    compileSdk 36
+
+    defaultConfig {
+        consumerProguardFiles 'proguard-rules.pro'
+    }
+}

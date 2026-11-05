@@ -1,5 +1,27 @@
 # plan.md
 
+## 완료: ConsentService — 네이티브 약관 창 (본문 속 링크)
+
+시스템 알림창 모양의 약관 창에서 본문 속 "이용약관"·"개인정보 처리방침" 글자를 링크로 만든다.
+iOS는 커스텀 뷰 컨트롤러(Liquid Glass), Android는 AlertDialog. `Use Native Prompt`로 켠다.
+
+PolicyMessageFormatter 테스트
+- [x] 자리표시자를 라벨로 바꾸고 그 자리에 링크를 건다
+- [x] 자리표시자가 없으면 본문에 있는 라벨 첫 위치에 링크를 건다
+- [x] 본문에 라벨이 없으면 줄을 바꿔 붙이고 링크를 건다
+- [x] URL이 비어 있으면 라벨만 넣고 링크를 걸지 않는다
+
+NativePolicyAgreementPrompt 테스트
+- [x] 링크가 걸린 본문으로 네이티브 창을 띄우고 동의하면 완료된다
+- [x] 네이티브 창을 못 띄우면 대체 창을 쓴다
+- [x] 닫으면 네이티브 창을 정리하고 늦게 온 동의는 무시한다
+
+실기 확인
+- [ ] iOS 26+: Liquid Glass 카드, 링크 탭 → Safari, OK → 다음 단계(UMP·ATT)
+- [ ] iOS 25 이하: 블러 카드 폴백
+- [ ] Android: 링크 탭 → 브라우저, 뒤로가기·바깥 탭으로 닫히지 않음, OK → 다음 단계
+- [ ] Android R8(minify) 빌드에서 창이 뜸
+
 ## 완료: AnalyticsService — Firebase Test Lab(Play 사전 출시 보고서) 기기 제외
 
 사전 출시 보고서의 Test Lab 기기가 GA4 신규 사용자·Adjust 인스톨로 잡혀 리텐션을 흐린다.
