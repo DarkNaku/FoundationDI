@@ -411,7 +411,9 @@ unzip -p app.apk assets/bin/Data/Managed/Metadata/global-metadata.dat \
    EDM4U가 `PurchaseDependencies.xml`로 받는다. 플러그인의 EDM4U·샘플은 가져오지 않는다.
 2. `Tools/FoundationDI/IAP/Create OneStore Assembly Definition`을 실행한다. 플러그인에는 asmdef가 없어
    Assembly-CSharp로 컴파일되고, 패키지는 Assembly-CSharp를 참조할 수 없다 — 플러그인 폴더에
-   `OneStoreCorpPlugins.asmdef`를 만들어 잇는다.
+   `OneStoreCorpPlugins.asmdef`를 만들어 잇는다. 이 asmdef는 `UNITY_ANDROID`에서만 컴파일된다 — 플러그인의
+   `StoreEnvironment`가 안드로이드 전용 `JniHelper`를 조건 없이 써서 iOS 타깃에서는 컴파일되지 않는다. 그래서 iOS 타깃
+   에디터에서는 심볼이 꺼지고 어댑터도 빠진다(원스토어 등록 코드는 원스토어 빌드 심볼과 `FOUNDATIONDI_ONESTORE`로 감싼다).
 3. asmdef가 생기면 `SdkDefineSynchronizer`가 `FOUNDATIONDI_ONESTORE`를 켠다. 어댑터(`FoundationDI.OneStore`,
    `IAPService/OneStore/`)는 `IIAPService`를 구현하므로 `FOUNDATIONDI_UNITYIAP`도 있어야 한다.
 4. 라이선스 키는 원스토어 개발자센터 > 앱 > 인앱 > 라이선스 관리의 공개 키다. SDK가 구매 서명 검증에 쓴다.
