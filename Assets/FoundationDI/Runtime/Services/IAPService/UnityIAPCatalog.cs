@@ -10,6 +10,9 @@ namespace DarkNaku.FoundationDI
     // 대부분의 게임이 양 스토어에 같은 ID를 올리기 때문이다.
     internal static class UnityIAPCatalog
     {
+        // OneStoreIAPService.StoreName과 같은 값. 그 어셈블리는 옵셔널이라 여기서 참조할 수 없다.
+        public const string OneStoreStoreName = "OneStore";
+
         // 옵션에 상품 목록이 있으면 그것을, 없으면 IAP Catalog를 쓴다.
         public static List<ProductDefinition> Resolve(IAPServiceOptions options, string storeName)
         {
@@ -53,6 +56,7 @@ namespace DarkNaku.FoundationDI
 
                 var storeId = storeName == GooglePlay.Name ? product.GooglePlayId
                             : storeName == AppleAppStore.Name ? product.AppleId
+                            : storeName == OneStoreStoreName ? product.OneStoreId
                             : null;
                 if (string.IsNullOrEmpty(storeId)) storeId = product.Id;
 

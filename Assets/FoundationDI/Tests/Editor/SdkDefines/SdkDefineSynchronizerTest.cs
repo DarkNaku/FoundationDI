@@ -11,6 +11,7 @@ public class SdkDefineSynchronizerTest
     private const string Adjust = "FOUNDATIONDI_ADJUST";
     private const string IosSupport = "FOUNDATIONDI_IOSSUPPORT";
     private const string MobileNotifications = "FOUNDATIONDI_MOBILENOTIFICATIONS";
+    private const string OneStore = "FOUNDATIONDI_ONESTORE";
 
     private static Dictionary<string, bool> Present(bool firebase = false, bool unityIAP = false,
                                                     bool appLovin = false) =>
@@ -127,7 +128,7 @@ public class SdkDefineSynchronizerTest
             symbols.Add(entry.Symbol);
         }
 
-        CollectionAssert.AreEquivalent(new[] { Firebase, UnityIAP, AppLovin, LevelPlay, Adjust, IosSupport, MobileNotifications },
+        CollectionAssert.AreEquivalent(new[] { Firebase, UnityIAP, AppLovin, LevelPlay, Adjust, IosSupport, MobileNotifications, OneStore },
                                         symbols);
     }
 
@@ -162,6 +163,16 @@ public class SdkDefineSynchronizerTest
 
         Assert.IsTrue(present[IosSupport]);
         Assert.IsFalse(present[AppLovin]);
+    }
+
+    [Test]
+    public void OneStore_심볼은_게임이_만든_OneStoreCorpPlugins_어셈블리로_판정한다()
+    {
+        // 원스토어 플러그인에는 asmdef가 없다 — Create OneStore Assembly Definition 메뉴가 만드는 이름이다.
+        var present = SdkDefineSynchronizer.DetectPresent(new[] { "OneStoreCorpPlugins" });
+
+        Assert.IsTrue(present[OneStore]);
+        Assert.IsFalse(present[UnityIAP]);
     }
 
     [Test]

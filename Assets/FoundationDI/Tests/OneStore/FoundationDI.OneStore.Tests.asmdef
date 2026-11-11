@@ -1,0 +1,34 @@
+{
+    "name": "FoundationDI.OneStore.Tests",
+    "rootNamespace": "",
+    "references": [
+        "FoundationDI",
+        "FoundationDI.UnityIAP",
+        "FoundationDI.UnityIAP.Tests",
+        "FoundationDI.OneStore",
+        "FoundationDI.TestSupport",
+        "Unity.Purchasing",
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner",
+        "Reflex"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll",
+        "NSubstitute.dll",
+        "Castle.Core.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS",
+        "FOUNDATIONDI_UNITYIAP",
+        "FOUNDATIONDI_ONESTORE"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
