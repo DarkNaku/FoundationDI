@@ -1,5 +1,55 @@
 # plan.md
 
+## 완료: IAPService — 원스토어 어댑터 (0.18.0)
+
+BlockAway 요청. 한국 원스토어 빌드에서 같은 `IIAPService`로 결제한다. 원스토어 Unity 플러그인 v1.3.4(SDK 21.04.00)은
+asmdef가 없어 게임이 `OneStoreCorpPlugins.asmdef`를 만들고(에디터 메뉴), `FOUNDATIONDI_ONESTORE`(SdkDefineTable) 게이트의
+`FoundationDI.OneStore` 어셈블리가 그 이름을 참조한다. 정책 계층(`OneStoreIAPService`)은 `IOneStoreClient` seam으로
+테스트하고, SDK 번역 계층(`OneStorePurchaseClient`)은 기기에서 확인한다.
+
+초기화 (OneStoreIAPServiceTest)
+- [x] 상품을 조회해 공용 ID와 원화 가격으로 초기화한다
+- [x] 일부 상품만 조회되면 받은 상품으로 초기화하고 빠진 ID를 경고한다
+- [x] 상품 조회가 실패하면 초기화가 실패한다
+- [x] 연결과 상품 조회가 끝나지 않으면 두 시간 제한을 더한 뒤 실패한다
+
+구매
+- [x] 소모성을 사면 지급하고 소비한다
+- [x] 비소모성을 사면 지급하고 승인하며 소유로 기록한다
+- [x] 이미 소유한 비소모성은 결제 화면을 띄우지 않는다
+- [x] 사용자가 취소하면 UserCancelled로 끝나고 로그를 남기지 않는다
+- [x] 그 밖의 실패는 원스토어 응답 코드로 끝난다
+- [x] 진행 중인 구매가 있으면 두 번째 구매는 NotReady다
+- [x] 지급이 실패하면 확정하지 않는다
+- [x] 영수증 검증이 실패하면 지급도 확정도 하지 않는다
+- [x] 이미 소유 응답이면 DuplicateTransaction으로 끝나고 미확정 구매를 지급한다
+- [x] 결제 완료 상태가 아닌 구매는 지급하지 않는다
+- [x] 요청 없이 온 구매도 지급하고 확정한다
+
+미확정 구매·소유 동기화
+- [x] 초기화 때 미확정 구매를 재전달로 지급하고 확정한다
+- [x] 승인된 비소모성은 지급 없이 소유로 맞추고 목록에 없으면 회수한다
+- [x] 복원은 구매 조회로 소유를 되살리고 수를 센다
+- [x] 복원 조회가 실패하면 RestoreFailed로 끝난다
+- [x] 지급 처리기가 준비되지 않으면 보류했다가 ProcessUnconfirmedAsync로 지급한다
+- [x] 확정이 반영되기 전에 조회에 다시 와도 두 번 지급하지 않는다
+- [x] ProcessUnconfirmedAsync를 연달아 불러도 조회는 한 번만 한다
+- [x] 해제하면 대기 중인 구매가 Disposed로 끝나고 클라이언트를 닫는다
+- [x] 가격은 통화에 맞춰 찍고 기호가 있으면 그대로 쓴다
+
+등록·카탈로그 (OneStoreIAPServiceRegistrationTest)
+- [x] 등록하면 IIAPService가 싱글턴으로 해석되고 라이선스 키가 전달된다
+- [x] 검증기를 등록하지 않으면 원스토어 검증기를 쓴다
+- [x] 게임이 등록한 지급 처리기와 검증기를 쓴다
+- [x] 코드로 넘긴 상품은 원스토어 ID를 쓰고 비면 공용 ID를 쓴다
+
+실기 확인
+- [ ] BlockAway 원스토어 빌드: 로그인 안 된 기기에서 초기화 → 로그인 화면 → 상품 조회
+- [ ] 소모성 구매 → 지급 → 소비 뒤 같은 상품 재구매
+- [ ] 비소모성(광고 제거) 구매 → 승인 → 재설치 뒤 초기화로 소유 복구
+- [ ] 결제 직후 앱 강제 종료 → 다음 실행에서 지급·확정
+- [ ] IL2CPP 릴리스 빌드에서 AndroidJavaProxy 콜백이 살아 있다(OneStoreCorpPlugins 보존)
+
 ## 완료: IAPService — 미확정 구매 보류·재처리, 시간 제한, 서버 검증 (0.17.0)
 
 PaperHero 요청(docs/TODO.md 6~12). 진행 데이터가 씬에서 늦게 준비되는 방치형 RPG, 결제 상품 49개 전부 소모성.

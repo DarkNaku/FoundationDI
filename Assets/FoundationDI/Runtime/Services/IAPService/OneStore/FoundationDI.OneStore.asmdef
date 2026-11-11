@@ -1,0 +1,23 @@
+{
+    "name": "FoundationDI.OneStore",
+    "rootNamespace": "",
+    "references": [
+        "FoundationDI",
+        "FoundationDI.UnityIAP",
+        "Reflex",
+        "Unity.Purchasing",
+        "OneStoreCorpPlugins"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "FOUNDATIONDI_UNITYIAP",
+        "FOUNDATIONDI_ONESTORE"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

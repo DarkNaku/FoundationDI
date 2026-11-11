@@ -15,4 +15,6 @@ using UnityEngine.Scripting;
 
 [assembly: InternalsVisibleTo("FoundationDI.UnityIAP.Editor")]
 [assembly: InternalsVisibleTo("FoundationDI.UnityIAP.Tests")]
+[assembly: InternalsVisibleTo("FoundationDI.OneStore")]
+[assembly: InternalsVisibleTo("FoundationDI.OneStore.Tests")]
 [assembly: InternalsVisibleTo("DynamicProxyGenAssembly2")]

@@ -8,13 +8,16 @@ namespace DarkNaku.FoundationDI
         public IAPProductType Type { get; }
         public string GooglePlayId { get; }
         public string AppleId { get; }
+        public string OneStoreId { get; }
 
-        public IAPProductDefinition(string id, IAPProductType type, string googlePlayId = null, string appleId = null)
+        public IAPProductDefinition(string id, IAPProductType type, string googlePlayId = null, string appleId = null,
+                                    string oneStoreId = null)
         {
             Id = id;
             Type = type;
             GooglePlayId = googlePlayId;
             AppleId = appleId;
+            OneStoreId = oneStoreId;
         }
     }
 }

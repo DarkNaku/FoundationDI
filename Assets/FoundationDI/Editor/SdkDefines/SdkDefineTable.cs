@@ -82,6 +82,15 @@ namespace DarkNaku.FoundationDI.Editor
                                "FoundationDI.UnityIAP",
                                new[] { "Unity.Purchasing", "Unity.Purchasing.Security", "Unity.Purchasing.SecurityCore" }),
 
+            // 원스토어 플러그인에는 asmdef가 없다. 게임이 플러그인 폴더에 이 이름의 asmdef를 만들면
+            // (Tools/FoundationDI/IAP/Create OneStore Assembly Definition) 심볼이 켜진다. 어댑터는 IIAPService를
+            // 구현하므로 FOUNDATIONDI_UNITYIAP도 함께 있어야 컴파일된다.
+            new SdkDefineEntry("FOUNDATIONDI_ONESTORE",
+                               "OneStoreCorpPlugins",
+                               "ONE store In-App Purchase",
+                               "FoundationDI.OneStore",
+                               new[] { "OneStoreCorpPlugins", "FoundationDI.UnityIAP", "Unity.Purchasing" }),
+
             new SdkDefineEntry("FOUNDATIONDI_APPLOVIN",
                                "MaxSdk.Scripts",
                                "AppLovin MAX",

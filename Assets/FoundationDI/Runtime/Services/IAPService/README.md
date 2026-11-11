@@ -15,6 +15,7 @@ if (result.IsSuccess) _ads.AdsRemoved = true;
   **Unity IAP가 없으면 `IIAPService` 타입 자체가 없다.** 설치 여부가 프로젝트마다 다른 공용 코드만
   `#if FOUNDATIONDI_UNITYIAP`로 감싼다.
 - **상품 카탈로그**: Unity IAP Catalog(`Assets/Resources/IAPProductCatalog.json`).
+- **원스토어**: 같은 `IIAPService`의 원스토어 구현이 있다(`FOUNDATIONDI_ONESTORE`, 10장).
 
 Unity IAP를 그대로 넘겨주는 래퍼가 아니다. Unity IAP만으로는 매번 직접 맞춰야 하고 틀리면 조용히
 돈이나 소유가 새는 규율 — 지급 후 확정, 소유 동기화, 복원 완료 시점, 같은 주문의 이중 처리 방지 — 을
@@ -390,13 +391,72 @@ unzip -p app.apk assets/bin/Data/Managed/Metadata/global-metadata.dat \
 
 ---
 
-## 10. 범위 밖
+## 10. 원스토어 (0.18)
+
+한국 원스토어 빌드는 `RegisterIAPService` 대신 `RegisterOneStoreIAPService`로 등록한다. 게임 코드는 그대로
+`IIAPService`만 본다 — 지급 처리기·검증기·소유 저장소·옵션도 같은 것을 쓴다.
+
+```csharp
+#if FOUNDATIONDI_ONESTORE && ONESTORE_BUILD   // 원스토어 빌드를 가르는 심볼은 게임이 정한다
+    builder.RegisterOneStoreIAPService(OneStoreLicenseKey);
+#else
+    builder.RegisterIAPService();
+#endif
+```
+
+**설치**
+
+1. 원스토어 Unity 플러그인(`ONE-store/unity_plugins` 릴리스의 `integrated-inapp-*.unitypackage`, SDK v21)에서
+   `OneStoreCorpPlugins/Common`·`Authentication`·`Purchase`를 가져온다. Android 의존성(`com.onestorecorp.sdk:sdk-iap`)은
+   EDM4U가 `PurchaseDependencies.xml`로 받는다. 플러그인의 EDM4U·샘플은 가져오지 않는다.
+2. `Tools/FoundationDI/IAP/Create OneStore Assembly Definition`을 실행한다. 플러그인에는 asmdef가 없어
+   Assembly-CSharp로 컴파일되고, 패키지는 Assembly-CSharp를 참조할 수 없다 — 플러그인 폴더에
+   `OneStoreCorpPlugins.asmdef`를 만들어 잇는다.
+3. asmdef가 생기면 `SdkDefineSynchronizer`가 `FOUNDATIONDI_ONESTORE`를 켠다. 어댑터(`FoundationDI.OneStore`,
+   `IAPService/OneStore/`)는 `IIAPService`를 구현하므로 `FOUNDATIONDI_UNITYIAP`도 있어야 한다.
+4. 라이선스 키는 원스토어 개발자센터 > 앱 > 인앱 > 라이선스 관리의 공개 키다. SDK가 구매 서명 검증에 쓴다.
+
+**상품 ID**: IAP Catalog의 스토어 ID 키 `"OneStore"`(`OneStoreIAPService.StoreName`), 코드 목록이면
+`IAPProductDefinition`의 `oneStoreId`. 비어 있으면 공용 ID를 쓴다. 원스토어에는 관리형 상품(`inapp`)만 쓴다.
+
+**Unity IAP 구현과 다른 점**
+
+| | Unity IAP (`IAPService`) | 원스토어 (`OneStoreIAPService`) |
+|---|---|---|
+| 확정 | `ConfirmPurchase` | 소모성은 소비(`Consume`), 비소모성은 승인(`Acknowledge`). 승인하지 않은 구매는 3일 뒤 자동 환불 |
+| 소유 목록 | 확정 주문 목록 | 구매 조회에 남은 **승인된** 비소모성 |
+| 미확정 구매 | 미확정 주문 목록 | 구매 조회의 소비하지 않은 소모성 + 승인하지 않은 비소모성 |
+| 복원 | `RestoreTransactions` | 복원 API가 없다 — 구매 조회로 소유를 맞춘다 |
+| 로컬 검증 기본값 | `CrossPlatformReceiptValidator`(Tangle) | `OneStoreReceiptValidator`(통과) — SDK가 라이선스 키로 서명을 검증한다 |
+| 가격 문구 | 스토어가 준 문자열 | 원스토어는 숫자만 준다("1200") — 원화는 `₩1,200`, 그 밖은 `1.99 USD`로 만든다. 설명은 없다(빈 문자열) |
+| 이미 소유 거절 | `DuplicateTransaction` | `RESULT_ITEM_ALREADY_OWNED`를 같은 `IAPErrorCodes.DuplicateTransaction`으로 바꾸고 곧바로 재처리한다 |
+| 그 밖의 실패 코드 | `PurchaseFailureReason` 값 | 원스토어 `ResponseCode` 값 |
+| 에디터 | FakeStore | 동작하지 않는다 — 초기화가 false로 끝난다(게임은 IAP 없이 계속 돈다) |
+
+**연결·로그인**: SDK는 첫 요청에서 연결하므로 연결과 상품 조회가 한 요청이다 — 초기화는
+`ConnectTimeoutSeconds + FetchTimeoutSeconds`를 기다린다. 원스토어에 로그인하지 않았거나(`RESULT_NEED_LOGIN`)
+원스토어 서비스 앱이 낡았으면(`RESULT_NEED_UPDATE`) 클라이언트가 로그인·업데이트 화면을 띄우고 같은 요청을
+한 번 다시 보낸다. 사용자가 로그인 화면에 오래 머물면 초기화 시간 제한이 먼저 끝날 수 있다 — 다음 초기화가
+다시 시도한다.
+
+**SDK 번역 계층**(`OneStorePurchaseClient`): 플러그인의 `IPurchaseCallback`은 구매 조회와 구매 흐름의 결과를
+같은 `OnPurchaseSucceeded`로 보내고, 소비·승인 실패에 어느 구매인지를 싣지 않는다. 그래서 요청을 **하나씩만**
+보내고 콜백을 그 요청의 결과로 본다. 플러그인이 콜백을 끝내 부르지 않는 경로(연결 끊김 등)가 있어, 결제 화면
+밖의 요청은 60초 뒤 실패로 끝내고 플러그인 인스턴스를 새로 만든다. 이 계층은 단위 테스트가 없다 — 기기에서
+확인한다. 정책 계층(`OneStoreIAPService`)은 `IOneStoreClient` 대역으로 테스트한다(`Tests/OneStore/`).
+
+**스토어 체크리스트**: 개발자센터에 관리형 상품 등록 → 라이선스 키 복사 → 테스트 계정(인앱 테스트) 등록 →
+원스토어 서비스(OSS) 앱이 설치된 기기에서 확인. 패키지명이 개발자센터와 같아야 한다.
+
+---
+
+## 11. 범위 밖
 
 - 구독 상품 (별도 계획)
 - 프로모션 코드 / 가격 실험 / 스토어별 확장 API
 - 상점 UI
 
-## 11. 0.10.x에서 옮겨 오기 (0.11.0)
+## 12. 0.10.x에서 옮겨 오기 (0.11.0)
 
 1. Unity IAP가 없으면 `IIAPService`가 없다. IAP를 쓰는 프로젝트는 `com.unity.purchasing`을 설치한다.
 2. `IAPServiceSettings`의 상품을 **IAP Catalog로 옮긴다.** 공용 ID는 카탈로그의 ID로, Android/iOS 오버라이드는
