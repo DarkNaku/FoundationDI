@@ -60,7 +60,8 @@ namespace DarkNaku.FoundationDI.Editor
             return null;
         }
 
-        // 플러그인의 스크립트는 스스로 #if UNITY_ANDROID || !UNITY_EDITOR로 감싸여 있어 모든 플랫폼에 둔다.
+        // 안드로이드에서만 컴파일한다. 플러그인의 StoreEnvironment가 안드로이드 전용 JniHelper를 조건 없이 써서
+        // 빌드 타깃이 iOS인 에디터·iOS 빌드에서는 컴파일 에러가 난다.
         internal static string BuildJson() =>
             "{\n" +
             $"    \"name\": \"{AssemblyName}\",\n" +
@@ -72,7 +73,7 @@ namespace DarkNaku.FoundationDI.Editor
             "    \"overrideReferences\": false,\n" +
             "    \"precompiledReferences\": [],\n" +
             "    \"autoReferenced\": true,\n" +
-            "    \"defineConstraints\": [],\n" +
+            "    \"defineConstraints\": [ \"UNITY_ANDROID\" ],\n" +
             "    \"versionDefines\": [],\n" +
             "    \"noEngineReferences\": false\n" +
             "}\n";

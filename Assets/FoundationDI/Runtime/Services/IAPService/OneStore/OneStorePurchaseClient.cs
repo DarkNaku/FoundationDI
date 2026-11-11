@@ -1,5 +1,6 @@
-// 원스토어 플러그인과 같은 조건이다 — 에디터에서는 빌드 타깃이 안드로이드일 때만 SDK 타입이 있다.
-#if UNITY_ANDROID || !UNITY_EDITOR
+// 원스토어 플러그인 asmdef(OneStoreCorpPlugins)는 UNITY_ANDROID에서만 컴파일된다 — 플러그인의 StoreEnvironment가
+// 안드로이드 전용 JniHelper를 조건 없이 써서 다른 빌드 타깃에서는 컴파일되지 않는다.
+#if UNITY_ANDROID
 
 using System;
 using System.Collections.Generic;
