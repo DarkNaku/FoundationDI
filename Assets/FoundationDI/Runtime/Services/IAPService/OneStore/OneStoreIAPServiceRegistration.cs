@@ -67,7 +67,7 @@ namespace DarkNaku.FoundationDI
 
         private static IOneStoreClient CreateClient(string licenseKey, Func<IMainThreadDispatcher> dispatcher)
         {
-#if UNITY_ANDROID || !UNITY_EDITOR
+#if UNITY_ANDROID
             if (Application.platform == RuntimePlatform.Android) return new OneStorePurchaseClient(licenseKey, dispatcher);
 #endif
             return new UnsupportedOneStoreClient();
