@@ -123,7 +123,9 @@ _privacyButton.onClick.AddListener(async () => await _consent.ShowPrivacyOptions
 | `event Action ConsentChanged` | 옵션 폼이 닫혔거나 재판정 결과가 바뀌었을 때. |
 
 `ConsentResult`는 `PolicyAccepted`, `CanRequestAds`, `AnalyticsConsent`(`Unknown`/`Granted`/`Denied`),
-`TrackingStatus`, `Tcf`(`GdprApplies`, `PurposeConsents`)를 담습니다.
+`TrackingStatus`, `Tcf`(`GdprApplies`, `PurposeConsents`), `UmpStatus`(0.19, UMP를 쓰지 않으면 `NotRequired`)를
+담습니다. `IsAdConsentUndetermined`는 약관을 수락했는데 UMP 갱신이 실패해 상태가 `Unknown`이고 GDPR 적용 신호가
+없는 경우입니다 — `CanRequestAds`가 false인 이유가 "답하지 않았다"(`Required`)인지 "판정하지 못했다"인지 가릅니다.
 
 ## 5. 약관 창 바꾸기
 
@@ -202,7 +204,8 @@ Accept Label `OK`, Terms Label `이용약관`, Privacy Label `개인정보 처�
 `InitializeAsync`가 `RequestAsync()`를 먼저 기다리고, **`PolicyAccepted && CanRequestAds`일 때만** provider를
 초기화합니다(Google 지침: `canRequestAds`가 false면 광고를 요청하지 않는다). 아니면 경고를 남기고 `false`를
 돌려줍니다. 다시 부르면 동의 재판정부터 재시도합니다. ATT 결과는 `AdProviderContext.TrackingStatus`로 provider까지
-갑니다.
+갑니다. AdServiceSettings의 **Initialize When Consent Undetermined**(0.19, 기본 꺼짐)를 켜면
+`IsAdConsentUndetermined`인 경우만 개인 맞춤을 끈 채 초기화합니다(AdService README 6장).
 
 `IConsentService`를 등록하지 않으면 경고와 함께 약관·UMP 없이 ATT만 묻습니다(0.11 동작).
 
@@ -362,7 +365,8 @@ Inactive인 구간이 있습니다. 첫 씬이 바로 그 구간입니다. `OnAp
 ## 8. 실패 처리 — 게임을 막지 않는다
 
 - UMP 갱신·폼 실패, 예외, 네이티브 SDK 누락: 경고를 남기고 진행합니다. `CanRequestAds`는 UMP가 캐시한 이전
-  세션 값을 다시 읽습니다.
+  세션 값을 다시 읽습니다. **캐시가 없는 첫 실행에서 갱신이 실패하면 상태가 `Unknown`이라 `CanRequestAds`가
+  false입니다** — 광고를 어떻게 할지는 AdService 옵션이 정합니다(6.1).
 - UMP 정보 갱신에만 타임아웃(기본 10초)이 있습니다. 폼이 떠 있는 동안은 사용자가 읽는 시간이라 타임아웃이
   없습니다(Android는 폼이 떠 있어도 게임 루프가 돕니다).
 - iOS UMP 폼은 ATT와 같은 이유로 앱이 Active가 될 때까지 기다렸다가 띄웁니다.
