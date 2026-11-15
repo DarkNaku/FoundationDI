@@ -145,6 +145,14 @@ DI 코어는 **Reflex 14.3.1**이다. `Assets/Scripts/Installers/RootInstaller.c
   - **Play Review 의존성 XML은 `ReviewServiceSettings.UsePlayInAppReview`로 생성·삭제한다**(`Assets/FoundationDI.Data/Editor/FoundationDIPlayReviewDependencies.xml`, UMP와 같은 이유). 꺼져 있으면 Android에서 창을 띄우지 않는다(ClassNotFound 회피). 창구 생성 실패는 이후 요청을 `false`로 끝낸다.
   - 상세: `Assets/FoundationDI/Runtime/Services/ReviewService/README.md`.
 
+- **AppUpdateService** (`Services/AppUpdateService/`): 스토어 새 버전 확인 + 스토어 이동(서버 없음). 0.20. Google Play·App Store만(원스토어는 공개 조회 API가 없어 제외).
+  - **서비스는 확인과 이동만 한다** — 언제 확인할지·팝업·강제 여부는 게임이 정한다. 결과는 `Status`(Available/UpToDate/Unknown) + `DaysSinceRelease` + `Priority`(Android 전용). 실패는 던지지 않고 `Unknown`.
+  - **강제 업데이트는 `Available`일 때만 막아야 한다** — 단계적 출시에서 빠진 유저, iTunes Lookup CDN 캐시가 늦은 유저, 새 버전의 최소 iOS를 못 맞추는 기기(서비스가 `UpToDate`로 답한다)는 스토어에 새 버전이 보이지 않아 갇힌다. 최소 버전 비교는 `AppVersion.Compare`(마디별 숫자 비교, 숫자 아닌 마디면 null).
+  - Android는 확인만 Play In-App Updates(JNI `PlayAppUpdateStore`)로 하고 이동은 `market://` 페이지다 — 인앱 업데이트 흐름은 쓰지 않는다. Play 스토어 설치본에서만 동작(사이드로드는 Task 실패 → `Unknown`). 의존성 XML은 `Use Play App Update`로 생성·삭제(ReviewService와 같은 이유). `UpdateAvailability`는 `PlayAppUpdateMapper`로 번역하고 `updatePriority`는 `UPDATE_AVAILABLE`일 때만 싣는다(그때만 정의된 값).
+  - iOS는 `itunes.apple.com/lookup?bundleId&country`(`AppStoreAppUpdateStore`, HTTP seam). 국가는 설정값 — 비우면 미국 스토어라 미국 미출시 앱은 늘 `Unknown`. `OpenStore`는 마지막 조회의 `trackId`를 쓰므로 확인을 한 번 성공한 뒤에만 열린다.
+  - 실기 미검증.
+  - 상세: `Assets/FoundationDI/Runtime/Services/AppUpdateService/README.md`.
+
 - **PoolManager** (`Managers/PoolManager/`): 키 기반 GameObject 오브젝트 풀. **프리팹 로드는 `IResourceService`에 위임한다.** `ObjectPool<IPoolItem>` 기반이며 `PoolData`가 풀을, `PoolItem`(MonoBehaviour)이 풀 항목 생명주기 콜백(`OnGetItem`/`OnReleaseItem` 등)과 지연 반환(`Release(delay)`)을 담당. 풀 루트는 `DontDestroyOnLoad`가 아니라 씬 스코프에 귀속시켜 씬 언로드 시 함께 정리된다. 생성 시 계층 전체에 DI를 주입하며, **주입 실패는 인스턴스 단위로 격리**된다(격리가 없으면 생성 콜백이 반환하지 못해 인스턴스가 씬에 고아로 남는다). **`Prewarm(key, count)`는 `ObjectPool`을 거치지 않고 생성 콜백(`CreateItem`)만 불러 바로 `Release`한다** — `Get`→`Release`로 흉내 내면 `OnGetItem`(활성화)이 불필요하게 돈다. 그래서 Prewarm 인스턴스는 `OnCreateItem` → `OnReleaseItem` 순서로 콜백을 받는다.
 - **TutorialManager** (`Managers/TutorialManager/`): 조건 기반 튜토리얼 진행 엔진. "1레벨 시작 시 조작 안내, 3레벨에서 새 시스템, 5레벨에서 특정 아이템 등장 시" 같이 **게임 조건에 따라 나뉘어 발동**하는 튜토리얼을 다룬다. `Service`가 아니라 `Manager`인 이유는 씬 수명이기 때문이다(PoolManager와 같은 자리).
   - **시퀀스는 순차 리스트가 아니라 조건부 후보 집합**이다. 각 `TutorialSequence`가 자기 `StartTrigger`로 발동하며, 앞의 것이 끝나서 뜨는 게 아니다. 한 번에 하나만 실행되고 겹치면 `Order` 오름차순 대기열로 직렬화한다.

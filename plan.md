@@ -1,5 +1,55 @@
 # plan.md
 
+## 완료: AppUpdateService — 스토어 새 버전 확인 (0.20.0)
+
+스토어에 새 버전이 올라왔는지 서버 없이 확인하고 스토어로 보낸다. 대상은 Google Play·App Store뿐이다(원스토어 제외).
+서비스는 **확인과 이동만** 한다. 언제 확인할지, 팝업을 띄울지, 업데이트를 강제할지(최소 버전 비교 등)는 게임이 정한다.
+게임은 서비스가 `Available`일 때만 막아야 한다. 단계적 출시에서 빠진 유저나 iOS 조회 캐시가 늦은 유저를 가두지 않기 위해서다.
+
+- 공개 API: `IAppUpdateService { Awaitable<AppUpdateCheckResult> CheckAsync(); bool OpenStore(); }`
+- 결과: `Status`(Available / UpToDate / Unknown), `DaysSinceRelease`(int?), `Priority`(int?, Android 전용)
+- 플랫폼 창구 seam `IAppUpdateStore`. `AppUpdateStoreFactory`가 `Application.platform`으로 고른다(ReviewService와 같은 형태).
+- Android: Play In-App Updates(`com.google.android.play:app-update`)를 JNI로 부른다. 의존성 XML은 설정 `Use Play App Update`로 생성·삭제한다.
+  스토어 이동은 인앱 업데이트 흐름이 아니라 `market://` 스토어 페이지다(iOS와 동작을 맞춘다).
+- iOS: iTunes Lookup(`itunes.apple.com/lookup?bundleId=..&country=..`)을 HTTP seam으로 부른다. 국가는 설정값이다.
+  스토어 이동은 마지막 조회의 `trackId`로 `itms-apps://apps.apple.com/app/id<trackId>`를 연다.
+
+버전 비교 (AppVersionTest)
+- [x] 버전을 문자열이 아니라 숫자 단위로 비교한다(1.10.0 > 1.9.3)
+- [x] 자릿수가 다르면 빈 자리를 0으로 본다(1.2 = 1.2.0)
+- [x] 숫자가 아닌 마디가 있으면 비교하지 못한다
+
+서비스 (AppUpdateServiceTest)
+- [x] CheckAsync는 창구의 확인 결과를 그대로 돌려준다
+- [x] 창구가 확인 중 예외를 내면 Unknown을 돌려주고 경고만 남긴다
+- [x] 창구를 만들지 못하면 Unknown을 돌려주고 다시 만들지 않는다
+- [x] OpenStore는 창구에 넘기고 예외가 나면 false를 돌려준다
+- [x] 해제하면 창구를 해제한다
+- [x] 에디터·미지원 플랫폼 창구는 Unknown이고 스토어를 열지 않는다
+
+App Store 조회 (AppStoreLookupTest)
+- [x] 번들 ID와 설정한 국가로 조회 URL을 만든다
+- [x] 스토어 버전이 설치 버전보다 높으면 Available이고 출시 후 지난 날짜를 센다
+- [x] 스토어 버전이 같거나 낮으면 UpToDate다
+- [x] 조회 결과가 없으면(그 국가에 미출시) Unknown이다
+- [x] 응답이 비었거나 스토어 버전을 읽지 못하면 Unknown이다(요청 실패는 예외로 올려 서비스가 Unknown으로 바꾼다)
+- [x] 새 버전이 요구하는 OS보다 기기 OS가 낮으면 UpToDate다
+- [x] OpenStore는 마지막 조회의 trackId로 스토어를 열고 조회 전이면 false다
+
+Play 결과 번역 (PlayAppUpdateMapperTest)
+- [x] 업데이트 가능·개발자 시작 업데이트 진행 중은 Available, 없음은 UpToDate, 그 밖은 Unknown이다
+- [x] 경과 일수가 없으면 null이고 우선순위는 업데이트 가능일 때만 싣는다
+- [x] 스토어 페이지는 market URL이다
+
+등록·에디터
+- [x] 등록하면 IAppUpdateService가 싱글턴으로 해석된다 (AppUpdateServiceRegistrationTest)
+- [x] 설정이 null이면 에러를 남기고 등록하지 않는다
+- [x] Use Play App Update에 따라 의존성 XML을 만들고 지운다 (PlayAppUpdateDependenciesFileTest)
+
+실기 확인
+- [ ] Android: 내부 앱 공유로 낮은 버전 설치 → Available, 스토어 페이지 이동
+- [ ] iOS: 출시된 앱의 낮은 버전(TestFlight 등) → Available, 스토어 이동 / 최신 버전 → UpToDate
+
 ## 완료: IAPService — 원스토어 어댑터 (0.18.0)
 
 BlockAway 요청. 한국 원스토어 빌드에서 같은 `IIAPService`로 결제한다. 원스토어 Unity 플러그인 v1.3.4(SDK 21.04.00)은
