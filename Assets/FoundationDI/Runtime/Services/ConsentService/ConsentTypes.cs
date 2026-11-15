@@ -59,14 +59,27 @@ namespace DarkNaku.FoundationDI
 
         public TcfSignals Tcf { get; }
 
+        // CanRequestAds가 false인 이유를 가른다 — Required는 "물었는데 아직 답이 없다",
+        // Unknown은 "갱신이 실패·시간 초과해 판정조차 못 했다"(첫 실행 오프라인)이다.
+        public UmpConsentStatus UmpStatus { get; }
+
+        // 광고 동의를 판정하지 못했다 — 약관은 수락했는데 UMP 갱신이 실패·시간 초과해 상태를 모른다.
+        // 답변이 필요한 상태(Required)와 GDPR 적용 신호가 남아 있는 경우는 넣지 않는다. 그 유저에게
+        // 동의 없이 광고를 요청하면 안 되기 때문이다. AdService가 옵션에 따라 이 경우만 비개인화로 연다.
+        public bool IsAdConsentUndetermined =>
+            PolicyAccepted && !CanRequestAds && UmpStatus == UmpConsentStatus.Unknown &&
+            Tcf.GdprApplies != true;
+
         public ConsentResult(bool policyAccepted, bool canRequestAds, AnalyticsConsent analyticsConsent,
-                             TrackingAuthorizationStatus trackingStatus, TcfSignals tcf)
+                             TrackingAuthorizationStatus trackingStatus, TcfSignals tcf,
+                             UmpConsentStatus umpStatus = UmpConsentStatus.Unknown)
         {
             PolicyAccepted = policyAccepted;
             CanRequestAds = canRequestAds;
             AnalyticsConsent = analyticsConsent;
             TrackingStatus = trackingStatus;
             Tcf = tcf;
+            UmpStatus = umpStatus;
         }
 
         public bool Equals(ConsentResult other) =>
@@ -74,14 +87,16 @@ namespace DarkNaku.FoundationDI
             CanRequestAds == other.CanRequestAds &&
             AnalyticsConsent == other.AnalyticsConsent &&
             TrackingStatus == other.TrackingStatus &&
-            Tcf.Equals(other.Tcf);
+            Tcf.Equals(other.Tcf) &&
+            UmpStatus == other.UmpStatus;
 
         public override bool Equals(object obj) => obj is ConsentResult other && Equals(other);
 
         public override int GetHashCode() =>
-            HashCode.Combine(PolicyAccepted, CanRequestAds, AnalyticsConsent, TrackingStatus, Tcf);
+            HashCode.Combine(PolicyAccepted, CanRequestAds, AnalyticsConsent, TrackingStatus, Tcf, UmpStatus);
 
         public override string ToString() =>
-            $"Policy={PolicyAccepted} Ads={CanRequestAds} Analytics={AnalyticsConsent} ATT={TrackingStatus}";
+            $"Policy={PolicyAccepted} Ads={CanRequestAds} Ump={UmpStatus} Analytics={AnalyticsConsent} " +
+            $"ATT={TrackingStatus}";
     }
 }

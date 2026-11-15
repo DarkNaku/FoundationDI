@@ -1023,3 +1023,30 @@ MessagePipe 래퍼를 폐기하고 `Dictionary<Type, Delegate>` 기반 자체 �
 - [x] Prepare가 예외를 던져도 삼킨다
 - [x] Play In-App Review 의존성 XML은 설정을 켜면 만들고 끄면 지운다
 - [x] 등록하면 IReviewService가 해석된다
+
+## 완료: 동의 판정 미완료 시 광고 초기화 옵션 — 0.19.0
+
+배경(2026-11-15): BlockAway 1.1.4 캐나다 신규 유저 대부분이 광고 SDK를 초기화하지 못했다. 첫 실행에서
+UMP 갱신이 실패·시간 초과하면 상태가 Unknown이라 `canRequestAds`가 false고, AdService가 provider를
+초기화하지 않는다. 판정이 끝나지 않은 경우만(답변 필요·GDPR 지역은 그대로 막는다) 옵션으로 개인 맞춤을
+끈 채 초기화한다. 기본값은 지금 동작(꺼짐).
+
+### ConsentService
+- [x] 결과에 UMP 상태를 싣는다
+- [x] UMP를 쓰지 않으면 결과의 UMP 상태는 NotRequired다
+
+### ConsentResult
+- [x] 약관을 수락했고 UMP 상태가 Unknown이며 광고를 요청할 수 없으면 판정 미완료다
+- [x] 답변이 필요한 상태(Required)는 판정 미완료가 아니다
+- [x] GDPR 적용 신호가 있으면 판정 미완료가 아니다
+- [x] 약관을 수락하지 않았으면 판정 미완료가 아니다
+
+### AdProviderContext
+- [x] 개인 맞춤 제한을 실으면 추적이 허용이어도 프라이버시 제한으로 본다
+- [x] 추적 거부·제한도 프라이버시 제한으로 본다
+
+### AdService
+- [x] 옵션이 켜져 있고 판정 미완료면 개인 맞춤을 끈 채 provider를 초기화한다
+- [x] 옵션이 꺼져 있으면 판정 미완료여도 초기화하지 않는다
+- [x] 옵션이 켜져 있어도 답변이 필요하면 초기화하지 않는다
+- [x] 설정의 옵션이 AdServiceOptions로 넘어간다

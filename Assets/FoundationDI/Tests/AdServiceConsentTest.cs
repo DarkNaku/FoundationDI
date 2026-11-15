@@ -13,7 +13,7 @@ public class AdServiceConsentTest
         public void Save(bool removed) { }
     }
 
-    private static AdServiceOptions NewOptions()
+    private static AdServiceOptions NewOptions(bool initializeWhenConsentUndetermined = false)
     {
         return new AdServiceOptions(
             banner: new AdUnitId("banner-a", "banner-i"),
@@ -24,11 +24,56 @@ public class AdServiceConsentTest
             retryPolicy: new AdRetryPolicy(3, 2f, 64f),
             rewardGraceFrames: 1,
             interstitialCooldownSeconds: 0f,
-            autoLoadOnInitialize: true);
+            autoLoadOnInitialize: true,
+            initializeWhenConsentUndetermined: initializeWhenConsentUndetermined);
     }
 
-    private static AdService Create(FakeAdProvider provider, IConsentService consent) =>
-        new(provider, new FakeAdDispatcher(), NewOptions(), new FakeRemovalStorage(), consent);
+    private static AdService Create(FakeAdProvider provider, IConsentService consent,
+                                    bool initializeWhenConsentUndetermined = false) =>
+        new(provider, new FakeAdDispatcher(), NewOptions(initializeWhenConsentUndetermined),
+            new FakeRemovalStorage(), consent);
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 옵션이_켜져_있고_판정_미완료면_개인_맞춤을_끈_채_provider를_초기화한다() => AwaitableTest.Run(async () =>
+    {
+        var provider = new FakeAdProvider();
+        var consent = new FakeConsentService { Result = ConsentResults.Unknown() };
+
+        LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("판정하지 못했다"));
+
+        Assert.IsTrue(await Create(provider, consent, initializeWhenConsentUndetermined: true).InitializeAsync(),
+                      "첫 실행에서 UMP 갱신이 실패한 유저는 그 세션 내내 광고를 받지 못한다");
+        Assert.AreEqual(1, provider.InitializeCallCount);
+        Assert.IsTrue(provider.ReceivedContext.IsPersonalizationRestricted,
+                      "동의를 판정하지 못한 유저에게 개인 맞춤 광고가 나간다");
+    });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 옵션이_꺼져_있으면_판정_미완료여도_초기화하지_않는다() => AwaitableTest.Run(async () =>
+    {
+        var provider = new FakeAdProvider();
+        var consent = new FakeConsentService { Result = ConsentResults.Unknown() };
+
+        LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("광고를 요청할 수 없다"));
+
+        Assert.IsFalse(await Create(provider, consent).InitializeAsync());
+        Assert.AreEqual(0, provider.InitializeCallCount, "옵션을 켜지 않은 게임의 동작이 바뀌었다");
+    });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 옵션이_켜져_있어도_답변이_필요하면_초기화하지_않는다() => AwaitableTest.Run(async () =>
+    {
+        var provider = new FakeAdProvider();
+        var consent = new FakeConsentService { Result = ConsentResults.Required() };
+
+        LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("광고를 요청할 수 없다"));
+
+        Assert.IsFalse(await Create(provider, consent, initializeWhenConsentUndetermined: true).InitializeAsync());
+        Assert.AreEqual(0, provider.InitializeCallCount, "동의 창에 답하지 않은 유저에게 광고를 요청했다");
+    });
 
     [UnityTest]
     [Timeout(5000)]
@@ -137,6 +182,27 @@ public class AdServiceConsentTest
         Assert.IsFalse(context.WithTrackingStatus(TrackingAuthorizationStatus.Authorized).IsTrackingRestricted);
         Assert.IsTrue(context.WithTrackingStatus(TrackingAuthorizationStatus.Denied).IsTrackingRestricted);
         Assert.IsTrue(context.WithTrackingStatus(TrackingAuthorizationStatus.Restricted).IsTrackingRestricted);
+    }
+
+    [Test]
+    public void 개인_맞춤_제한을_실으면_추적이_허용이어도_프라이버시_제한으로_본다()
+    {
+        var context = new AdProviderContext("app-key", false, false, new List<string>())
+            .WithTrackingStatus(TrackingAuthorizationStatus.Authorized)
+            .WithPersonalizationRestricted();
+
+        Assert.IsTrue(context.IsPrivacyRestricted, "동의를 판정하지 못한 유저에게 개인 맞춤 광고가 나간다");
+        Assert.IsFalse(context.IsTrackingRestricted);
+    }
+
+    [Test]
+    public void 추적_거부와_제한도_프라이버시_제한으로_본다()
+    {
+        var context = new AdProviderContext("app-key", false, false, new List<string>());
+
+        Assert.IsTrue(context.WithTrackingStatus(TrackingAuthorizationStatus.Denied).IsPrivacyRestricted);
+        Assert.IsTrue(context.WithTrackingStatus(TrackingAuthorizationStatus.Restricted).IsPrivacyRestricted);
+        Assert.IsFalse(context.IsPrivacyRestricted, "ATT가 없는 플랫폼에서 비개인화로 떨어지면 수익이 죽는다");
     }
 
     [Test]

@@ -147,4 +147,31 @@ public class ConsentServiceUmpTest
 
         Assert.AreEqual(1, f.Ump.UpdateCount);
     });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 결과에_UMP_상태를_싣는다() => AwaitableTest.Run(async () =>
+    {
+        var f = Accepted();
+        f.Ump.Status = UmpConsentStatus.Required;
+        f.Ump.CanRequestAds = false;
+
+        var result = await f.Build().RequestAsync();
+
+        Assert.AreEqual(UmpConsentStatus.Required, result.UmpStatus,
+                        "답변이 필요한 상태와 갱신이 실패한 첫 실행을 광고 쪽에서 구분할 수 없다");
+    });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator UMP를_쓰지_않으면_결과의_UMP_상태는_NotRequired다() => AwaitableTest.Run(async () =>
+    {
+        var f = Accepted();
+        f.UseUmp = false;
+
+        var result = await f.Build().RequestAsync();
+
+        Assert.AreEqual(UmpConsentStatus.NotRequired, result.UmpStatus,
+                        "UMP를 끈 프로젝트가 판정 미완료로 보이면 안 된다");
+    });
 }

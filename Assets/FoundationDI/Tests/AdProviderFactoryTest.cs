@@ -59,6 +59,19 @@ public class AdProviderFactoryTest
         Assert.AreEqual(BannerPosition.Bottom, options.BannerOptions.Position);
         Assert.AreEqual(120f, options.InterstitialCooldownSeconds, 0.001f,
                         "전면 쿨다운 기본값은 120초여야 한다");
+        Assert.IsFalse(options.InitializeWhenConsentUndetermined,
+                       "기본값이 켜져 있으면 업데이트만 해도 게임의 동의 동작이 바뀐다");
+
+        UnityEngine.ScriptableObject.DestroyImmediate(settings);
+    }
+
+    [Test]
+    public void 동의_판정_미완료_초기화_설정이_서비스_옵션으로_넘어간다()
+    {
+        var settings = UnityEngine.ScriptableObject.CreateInstance<AdServiceSettings>();
+        UnityEngine.JsonUtility.FromJsonOverwrite("{\"_initializeWhenConsentUndetermined\":true}", settings);
+
+        Assert.IsTrue(settings.ToOptions().InitializeWhenConsentUndetermined);
 
         UnityEngine.ScriptableObject.DestroyImmediate(settings);
     }

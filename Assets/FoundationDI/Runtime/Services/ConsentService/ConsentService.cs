@@ -363,7 +363,8 @@ namespace DarkNaku.FoundationDI
 
             if (!UsesUmp)
             {
-                return new ConsentResult(true, true, AnalyticsConsent.Granted, trackingStatus, TcfSignals.None);
+                return new ConsentResult(true, true, AnalyticsConsent.Granted, trackingStatus, TcfSignals.None,
+                                         UmpConsentStatus.NotRequired);
             }
 
             var tcf = SafeRead(() => _ump.ReadTcf(), TcfSignals.None);
@@ -371,7 +372,7 @@ namespace DarkNaku.FoundationDI
             var canRequestAds = SafeRead(() => _ump.CanRequestAds, false);
 
             return new ConsentResult(true, canRequestAds, AnalyticsConsentJudge.Judge(status, tcf),
-                                     trackingStatus, tcf);
+                                     trackingStatus, tcf, status);
         }
 
         // 네이티브 읽기는 JNI·P/Invoke라 던질 수 있다. 상태 조회가 흐름을 깨지 않게 한다.

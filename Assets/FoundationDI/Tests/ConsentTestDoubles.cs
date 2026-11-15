@@ -300,6 +300,11 @@ public static class ConsentResults
     public static ConsentResult Unknown() =>
         new(true, false, AnalyticsConsent.Unknown, TrackingAuthorizationStatus.NotDetermined, TcfSignals.None);
 
+    // 동의 창을 띄웠지만 아직 답하지 않은 유럽 유저.
+    public static ConsentResult Required() =>
+        new(true, false, AnalyticsConsent.Unknown, TrackingAuthorizationStatus.NotDetermined, new TcfSignals(true, null),
+            UmpConsentStatus.Required);
+
     public static ConsentResult PolicyNotAccepted() =>
         new(false, false, AnalyticsConsent.Unknown, TrackingAuthorizationStatus.NotDetermined, TcfSignals.None);
 }
