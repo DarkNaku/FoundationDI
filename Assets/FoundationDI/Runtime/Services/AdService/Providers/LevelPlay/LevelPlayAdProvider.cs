@@ -212,7 +212,8 @@ namespace DarkNaku.FoundationDI
             // ATT 허용이 "Apple의 크로스-앱 추적 동의"이지 "GDPR 개인정보 처리 동의"가
             // 아니기 때문이다. 둘은 법적으로 다른 동의이고, 받지 않은 동의를 SDK에 긍정하면
             // 그쪽이 더 큰 문제가 된다. GDPR 동의는 ConsentService(UMP)가 받고, LevelPlay가 TCF·AC 문자열을 직접 읽는다.
-            if (!context.IsTrackingRestricted) return;
+            // 동의 판정 없이 초기화를 허용한 경우(IsPersonalizationRestricted)도 같은 제한 경로를 탄다.
+            if (!context.IsPrivacyRestricted) return;
 
             // GDPR 동의 거부. 유럽 밖에서도 대부분의 어댑터가 이 플래그를 개인화 스위치로 읽는다.
             LevelPlayPrivacySettings.SetGDPRConsent(false);

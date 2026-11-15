@@ -18,11 +18,17 @@ namespace DarkNaku.FoundationDI
         public float InterstitialCooldownSeconds { get; }
         public bool AutoLoadOnInitialize { get; }
 
+        // 광고 동의를 판정하지 못했을 때(ConsentResult.IsAdConsentUndetermined) 개인 맞춤을 끈 채
+        // provider를 초기화한다. 끄면 Google 지침대로 판정이 날 때까지 광고를 요청하지 않는다.
+        public bool InitializeWhenConsentUndetermined { get; }
+
         public AdServiceOptions(AdUnitId banner, AdUnitId interstitial, AdUnitId rewarded,
                                 BannerOptions bannerOptions, AdProviderContext providerContext,
                                 AdRetryPolicy retryPolicy, int rewardGraceFrames,
-                                float interstitialCooldownSeconds, bool autoLoadOnInitialize)
+                                float interstitialCooldownSeconds, bool autoLoadOnInitialize,
+                                bool initializeWhenConsentUndetermined = false)
         {
+            InitializeWhenConsentUndetermined = initializeWhenConsentUndetermined;
             Banner = banner;
             Interstitial = interstitial;
             Rewarded = rewarded;
@@ -116,7 +122,18 @@ namespace DarkNaku.FoundationDI
                 // 다이얼로그가 떠 있는 동안 씬이 언로드돼 서비스가 정리됐을 수 있다.
                 if (_isDisposed) return false;
 
-                if (!consent.PolicyAccepted || !consent.CanRequestAds)
+                // 결과의 추적 상태는 "요청을 건너뛴 경로"(게임이 직접 묻는 모드, 이미 답한 상태,
+                // 물을 수 없는 플랫폼)에서도 현재 상태를 담는다 — ConsentService가 매번 다시 읽는다.
+                var context = _options.ProviderContext.WithTrackingStatus(consent.TrackingStatus);
+
+                if (_options.InitializeWhenConsentUndetermined && consent.IsAdConsentUndetermined)
+                {
+                    // 첫 실행에서 UMP 갱신이 실패·시간 초과하면 그 세션 내내 광고가 없다. 판정하지 못한
+                    // 경우만(답변 필요·GDPR 지역 제외) 개인 맞춤을 끈 채 연다.
+                    Debug.LogWarning($"[AdService] 광고 동의를 판정하지 못했다({consent}). 개인 맞춤을 끄고 초기화한다.");
+                    context = context.WithPersonalizationRestricted();
+                }
+                else if (!consent.PolicyAccepted || !consent.CanRequestAds)
                 {
                     // Google 지침: canRequestAds가 false면 광고를 요청하지 않는다. 게임이 다시
                     // InitializeAsync를 부르면 동의 재판정부터 다시 시도한다.
@@ -124,10 +141,6 @@ namespace DarkNaku.FoundationDI
                     WaitForConsent();
                     return false;
                 }
-
-                // 결과의 추적 상태는 "요청을 건너뛴 경로"(게임이 직접 묻는 모드, 이미 답한 상태,
-                // 물을 수 없는 플랫폼)에서도 현재 상태를 담는다 — ConsentService가 매번 다시 읽는다.
-                var context = _options.ProviderContext.WithTrackingStatus(consent.TrackingStatus);
 
                 ok = await _provider.InitializeAsync(context);
 

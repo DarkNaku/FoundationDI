@@ -52,22 +52,34 @@ namespace DarkNaku.FoundationDI
             TrackingStatus == TrackingAuthorizationStatus.Denied ||
             TrackingStatus == TrackingAuthorizationStatus.Restricted;
 
+        // ATT와 별개로 개인 맞춤을 꺼야 하는가. 광고 동의를 판정하지 못했는데 옵션으로 초기화를
+        // 허용한 경우다(ConsentResult.IsAdConsentUndetermined).
+        public bool IsPersonalizationRestricted { get; }
+
+        // provider가 프라이버시 세터로 번역할 때 보는 값. 추적 거부와 개인 맞춤 제한 중 하나라도 해당하면 제한이다.
+        public bool IsPrivacyRestricted => IsTrackingRestricted || IsPersonalizationRestricted;
+
         public AdProviderContext(string appKey, bool verboseLogging, bool testMode,
                                  IReadOnlyList<string> testDeviceIds,
                                  TrackingAuthorizationStatus trackingStatus =
-                                     TrackingAuthorizationStatus.NotDetermined)
+                                     TrackingAuthorizationStatus.NotDetermined,
+                                 bool personalizationRestricted = false)
         {
             AppKey = appKey;
             VerboseLogging = verboseLogging;
             TestMode = testMode;
             TestDeviceIds = testDeviceIds;
             TrackingStatus = trackingStatus;
+            IsPersonalizationRestricted = personalizationRestricted;
         }
 
         // 설정에서 만들어진 context는 ATT를 묻기 전에 조립되므로 추적 상태를 모른다.
         // AdService가 응답을 받은 뒤 이 메서드로 채워 provider에 넘긴다.
         public AdProviderContext WithTrackingStatus(TrackingAuthorizationStatus status) =>
-            new(AppKey, VerboseLogging, TestMode, TestDeviceIds, status);
+            new(AppKey, VerboseLogging, TestMode, TestDeviceIds, status, IsPersonalizationRestricted);
+
+        public AdProviderContext WithPersonalizationRestricted() =>
+            new(AppKey, VerboseLogging, TestMode, TestDeviceIds, TrackingStatus, true);
     }
 
     public interface IAdProvider : IDisposable

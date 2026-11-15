@@ -54,6 +54,10 @@ namespace DarkNaku.FoundationDI
                  "보상형에는 적용되지 않는다.")]
         [SerializeField, Min(0)] private float _interstitialCooldownSeconds = 120f;
 
+        [Tooltip("첫 실행에서 UMP 동의 정보 갱신이 실패·시간 초과해 판정하지 못했을 때 개인 맞춤을 끈 채 광고를 " +
+                 "초기화한다. 답변이 필요한 유저와 GDPR 지역 유저는 그대로 막는다. 끄면 판정이 날 때까지 광고를 요청하지 않는다.")]
+        [SerializeField] private bool _initializeWhenConsentUndetermined;
+
         [Header("Debug")]
         [SerializeField] private bool _verboseLogging;
         [SerializeField] private bool _testMode;
@@ -84,7 +88,8 @@ namespace DarkNaku.FoundationDI
                 retryPolicy: new AdRetryPolicy(maxRetryAttempts, retryBaseSeconds, maxRetryDelaySeconds),
                 rewardGraceFrames: _rewardGraceFrames,
                 interstitialCooldownSeconds: interstitialCooldownSeconds,
-                autoLoadOnInitialize: _autoLoadOnInitialize);
+                autoLoadOnInitialize: _autoLoadOnInitialize,
+                initializeWhenConsentUndetermined: _initializeWhenConsentUndetermined);
         }
     }
 }

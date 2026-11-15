@@ -409,6 +409,13 @@ await _ads.InitializeAsync();   // 이 안에서 동의 → provider 초기화 �
 
 - ATT 결과는 `AdProviderContext.TrackingStatus`/`IsTrackingRestricted`로 provider까지 갑니다(LevelPlay는
   `ApplyPrivacy`로 번역). GDPR 동의는 UMP가 쓴 TCF·AC 문자열을 LevelPlay가 직접 읽습니다.
+- **`Initialize When Consent Undetermined`(0.19, 기본 꺼짐)** — 첫 실행에서 UMP 동의 정보 갱신이 실패·시간
+  초과하면 UMP 상태가 `Unknown`이라 `CanRequestAds`가 false이고, 끈 상태에서는 그 세션 내내 광고가 없습니다
+  (재판정에 성공해야 `ConsentChanged`로 스스로 초기화). 켜면 `ConsentResult.IsAdConsentUndetermined`인 경우만
+  — 약관 수락, UMP `Unknown`, GDPR 적용 신호 없음 — `AdProviderContext.IsPersonalizationRestricted`를 실어
+  provider를 초기화합니다. 답변이 필요한 유저(`Required`)와 GDPR 지역 유저는 그대로 막습니다. provider는
+  추적 거부와 개인 맞춤 제한을 합친 `IsPrivacyRestricted` 하나로 프라이버시 세터를 고릅니다(LevelPlay는
+  `ApplyPrivacy`의 제한 경로). **AppLovin 어댑터는 아직 프라이버시 세터를 부르지 않습니다.**
 - `IConsentService`를 등록하지 않으면 경고와 함께 약관·UMP 없이 ATT만 묻습니다(0.11 동작). EEA·영국에서는
   제한 광고만 나갑니다.
 - 0.11의 `IAdService.TrackingAuthorization`, `IAdService.Consent`, `IAdProvider.Consent`, `IAdConsent`,
