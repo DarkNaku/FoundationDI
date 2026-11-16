@@ -72,6 +72,7 @@ namespace DarkNaku.FoundationDI
         public event Action<AdFormat> Closed;
         public event Action<AdImpression> Paid;
         public event Action<bool> AdsRemovedChanged;
+        public event Action<AdInitState> InitStateChanged;
 
         // consent는 선택 인자다. 넘기지 않으면 약관·UMP 없이 ATT만 묻는(실기 iOS가 아니면 아무것도
         // 하지 않는) 기본 동의로 동작한다 — 0.11까지의 호출부와 테스트를 깨지 않기 위해서다.
@@ -88,6 +89,17 @@ namespace DarkNaku.FoundationDI
         }
 
         public bool IsInitialized { get; private set; }
+
+        public AdInitState InitState { get; private set; }
+
+        // 바뀔 때만 알린다. 동의를 기다리는 동안 게임이 InitializeAsync를 다시 불러도 같은 값이 쌓이지 않는다.
+        private void SetInitState(AdInitState state)
+        {
+            if (InitState == state) return;
+
+            InitState = state;
+            InitStateChanged?.Invoke(state);
+        }
 
         // InitializeAsync가 성공하기 전에는 null이다. provider가 초기화되기 전에는
         // 어댑터를 만들 수 없기 때문이다. 게임 코드는 초기화를 먼저 await 해야 한다.
@@ -138,6 +150,7 @@ namespace DarkNaku.FoundationDI
                     // Google 지침: canRequestAds가 false면 광고를 요청하지 않는다. 게임이 다시
                     // InitializeAsync를 부르면 동의 재판정부터 다시 시도한다.
                     Debug.LogWarning($"[AdService] 광고를 요청할 수 없다({consent}). provider를 초기화하지 않는다.");
+                    SetInitState(AdInitState.WaitingConsent);
                     WaitForConsent();
                     return false;
                 }
@@ -147,11 +160,13 @@ namespace DarkNaku.FoundationDI
                 if (!ok)
                 {
                     Debug.LogError($"[AdService] {_provider.Name} 초기화에 실패했다. 광고를 요청하지 않는다.");
+                    SetInitState(AdInitState.Failed);
                     return false;
                 }
 
                 BuildAdUnits();
                 IsInitialized = true;
+                SetInitState(context.IsPersonalizationRestricted ? AdInitState.ReadyRestricted : AdInitState.Ready);
 
                 if (_options.AutoLoadOnInitialize)
                 {

@@ -1,4 +1,5 @@
 using DarkNaku.FoundationDI;
+using NSubstitute;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
@@ -39,6 +40,80 @@ public class AdServiceRegistrationTest
             Assert.IsInstanceOf<AdService>(service);
 
             Assert.DoesNotThrow(() => container.Dispose());
+        }
+        finally
+        {
+            ScriptableObject.DestroyImmediate(settings);
+        }
+    }
+
+    private static Container BuildWithFakeDispatcher(AdServiceSettings settings, IAnalyticsService analytics)
+    {
+        var builder = new ContainerBuilder();
+        builder.RegisterAdService(settings);
+        builder.RegisterType(typeof(FakeAdDispatcher),
+                             new[] { typeof(IAdDispatcher), typeof(IMainThreadDispatcher) },
+                             Lifetime.Singleton, Resolution.Lazy);
+        if (analytics != null) builder.RegisterValue(analytics, new[] { typeof(IAnalyticsService) });
+        return builder.Build();
+    }
+
+    [Test]
+    public void 옵션이_켜져_있고_분석_서비스가_있으면_AdService를_해석할_때_ad_state를_설정한다()
+    {
+        var settings = ScriptableObject.CreateInstance<AdServiceSettings>();
+        settings.ReportStateToAnalytics = true;
+        var analytics = Substitute.For<IAnalyticsService>();
+
+        try
+        {
+            using var container = BuildWithFakeDispatcher(settings, analytics);
+            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("IConsentService가 등록되지 않았다"));
+
+            container.Resolve<IAdService>();
+
+            analytics.Received(1).SetUserProperty("ad_state", "pending");
+        }
+        finally
+        {
+            ScriptableObject.DestroyImmediate(settings);
+        }
+    }
+
+    [Test]
+    public void 옵션이_꺼져_있으면_ad_state를_설정하지_않는다()
+    {
+        var settings = ScriptableObject.CreateInstance<AdServiceSettings>();
+        var analytics = Substitute.For<IAnalyticsService>();
+
+        try
+        {
+            using var container = BuildWithFakeDispatcher(settings, analytics);
+            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("IConsentService가 등록되지 않았다"));
+
+            container.Resolve<IAdService>();
+
+            analytics.DidNotReceive().SetUserProperty("ad_state", Arg.Any<string>());
+        }
+        finally
+        {
+            ScriptableObject.DestroyImmediate(settings);
+        }
+    }
+
+    [Test]
+    public void 옵션이_켜져_있어도_분석_서비스가_없으면_경고만_남긴다()
+    {
+        var settings = ScriptableObject.CreateInstance<AdServiceSettings>();
+        settings.ReportStateToAnalytics = true;
+
+        try
+        {
+            using var container = BuildWithFakeDispatcher(settings, analytics: null);
+            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("IConsentService가 등록되지 않았다"));
+            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("IAnalyticsService가 등록되지 않았다"));
+
+            Assert.IsNotNull(container.Resolve<IAdService>());
         }
         finally
         {

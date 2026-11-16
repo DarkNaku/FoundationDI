@@ -58,6 +58,11 @@ namespace DarkNaku.FoundationDI
                  "초기화한다. 답변이 필요한 유저와 GDPR 지역 유저는 그대로 막는다. 끄면 판정이 날 때까지 광고를 요청하지 않는다.")]
         [SerializeField] private bool _initializeWhenConsentUndetermined;
 
+        [Header("Analytics")]
+        [Tooltip("광고 초기화 상태를 분석 사용자 속성 ad_state(pending · waiting_consent · ready · ready_restricted · failed)로 " +
+                 "남긴다. IAnalyticsService가 등록돼 있어야 한다. GA4에서 사용자 범위 맞춤 측정기준으로 등록해야 보인다.")]
+        [SerializeField] private bool _reportStateToAnalytics;
+
         [Header("Debug")]
         [SerializeField] private bool _verboseLogging;
         [SerializeField] private bool _testMode;
@@ -69,6 +74,13 @@ namespace DarkNaku.FoundationDI
         public AdProviderType Provider => _provider;
         public bool ForceDummyInEditor => _forceDummyInEditor;
         public DummyAdOptions DummyOptions => _dummyOptions;
+
+        // setter는 테스트 전용이다(InternalsVisibleTo). 런타임에는 인스펙터가 유일한 설정 경로다.
+        public bool ReportStateToAnalytics
+        {
+            get => _reportStateToAnalytics;
+            internal set => _reportStateToAnalytics = value;
+        }
 
         public AdServiceOptions ToOptions()
         {

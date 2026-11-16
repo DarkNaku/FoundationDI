@@ -1,5 +1,32 @@
 # plan.md
 
+## 완료: AdService 초기화 상태를 분석 사용자 속성(`ad_state`)으로 (0.21.0)
+
+BlockAway 요청(docs/TODO.md 13). 광고 SDK가 준비되지 않은 채 플레이한 비율을 국가·버전별로 보려고 한다.
+AdService는 상태만 노출하고(`InitState`/`InitStateChanged`), 연결 클래스 `AdStateReporter`가 `ad_state` 사용자 속성을 설정한다.
+설정 `Report State To Analytics`(기본 끔)가 켜져 있고 `IAnalyticsService`가 등록돼 있을 때만 `AdService`를 해석하는 시점에 만든다.
+값: `pending` · `waiting_consent` · `ready` · `ready_restricted`(판정 미완료로 개인 맞춤을 끈 채 초기화) · `failed`.
+
+AdService 상태 (AdServiceInitStateTest)
+- [x] 처음 상태는 Pending이다
+- [x] 동의가 광고를 허용하지 않으면 WaitingConsent다
+- [x] provider 초기화가 성공하면 Ready, 실패하면 Failed다
+- [x] 판정 미완료로 개인 맞춤을 끈 채 초기화하면 ReadyRestricted다
+- [x] 동의 대기 중 허용되어 초기화되면 Ready로 바뀌고, 상태가 바뀔 때만 알린다
+
+AdStateReporter (AdStateReporterTest)
+- [x] 만들자마자 ad_state를 현재 상태로 설정한다(지난 세션 값을 덮는다)
+- [x] 상태가 바뀔 때마다 ad_state를 갱신한다
+- [x] 해제하면 더 이상 갱신하지 않는다
+
+등록 (AdServiceRegistrationTest)
+- [x] 옵션이 켜져 있고 분석 서비스가 있으면 AdService를 해석할 때 ad_state를 설정한다
+- [x] 옵션이 꺼져 있으면 ad_state를 설정하지 않는다
+- [x] 옵션이 켜져 있어도 분석 서비스가 없으면 경고만 남긴다
+
+실기 확인
+- [ ] BlockAway: GA4 DebugView에서 ad_state가 pending → ready로 바뀌고 level_start에 붙는다
+
 ## 완료: AppUpdateService — 스토어 새 버전 확인 (0.20.0)
 
 스토어에 새 버전이 올라왔는지 서버 없이 확인하고 스토어로 보낸다. 대상은 Google Play·App Store뿐이다(원스토어 제외).

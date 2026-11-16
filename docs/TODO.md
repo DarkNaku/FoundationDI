@@ -16,6 +16,7 @@
 | 10 | 비동기 영수증 검증(서버 검증) 훅 | IAPService | PaperHero (2026-11-05) | 완료 (0.17.0) |
 | 11 | 영수증 검증 실패 구매 처리 방식 선택 | IAPService | PaperHero (2026-11-05) | 완료 (0.17.0) |
 | 12 | 상품 목록을 코드(게임 스펙 표)에서 넘기기 | IAPService | PaperHero (2026-11-05) | 완료 (0.17.0) |
+| 13 | 광고 초기화 상태를 분석 사용자 속성(`ad_state`)으로 남기기 | AdService · AnalyticsService | BlockAway (2026-11-16) | 완료 (0.21.0) |
 
 ---
 
@@ -326,3 +327,32 @@ public static ContainerBuilder RegisterIAPService(this ContainerBuilder builder,
 ```
 - `IAPProductDefinition`(공용 ID, 타입, 스토어별 ID 선택)을 공개하고 내부에서 `ProductDefinition` 으로 바꾼다. 상수 생성기는 Catalog 를 쓸 때만 동작해도 된다.
 
+## 13. 광고 초기화 상태를 분석 사용자 속성(`ad_state`)으로 남기기
+
+### 왜 필요한가
+- BlockAway 1.1.4 캐나다: GA4 신규 38명 중 광고 노출이 1명뿐이었고 LevelPlay DAU는 0~2명이었다. 동의 판정이 끝나기 전에 게임에 들어가 광고 SDK가 꺼진 채 남은 것으로 보지만(0.19.0 `InitializeWhenConsentUndetermined`로 대응), 이를 **데이터로 직접 확인할 방법이 없었다**. GA4 유저 수와 LevelPlay 유저 수의 차이로 짐작했을 뿐이다.
+- 같은 초기화 구조를 쓰는 게임(BigTopSmash, ArrowOut 등)에서 다시 생겨도 알아챌 지표가 필요하다. 상태를 정확히 아는 곳은 AdService 내부라 게임 코드가 따로 남기기 어렵다.
+
+### 결정한 것
+- **사용자 속성 하나만** 남긴다. 사용자 속성은 설정 뒤 모든 이벤트에 붙으므로 `level_start` 등을 `ad_state`로 나눠 "광고 SDK가 준비되지 않은 채 시작한 레벨 비율"을 국가·버전별로 볼 수 있다. 별도 이벤트(`ads_init`)는 두지 않는다 — 원인은 속성 값으로 나눠 담고, 초기화 소요 시간은 지금 목적에 필요 없다.
+- AdService가 AnalyticsService를 직접 부르지 않는다. AdService는 상태만 노출하고, 둘을 잇는 연결 클래스가 속성을 설정한다.
+
+### 제안
+- `IAdService`에 상태 노출(지금은 `IsInitialized`만 있다):
+  ```csharp
+  public enum AdInitState { Pending, WaitingConsent, Ready, Failed }
+  AdInitState InitState { get; }
+  event Action<AdInitState> InitStateChanged;
+  ```
+  - 판정 미완료로 비개인화 초기화한 경우를 `Ready`와 나눌지(예: `ReadyRestricted`)는 구현 때 정한다.
+- 연결 클래스(예: `AdStateReporter`): `IAdService` · `IAnalyticsService`를 받아
+  1. 세션 시작 시 **첫 이벤트보다 먼저** `ad_state = pending`으로 설정한다 — 사용자 속성은 앱을 다시 켜도 남으므로, 덮지 않으면 지난 세션의 `ready`가 붙는다.
+  2. `InitStateChanged`마다 `ad_state`를 갱신한다(`pending` · `waiting_consent` · `ready` · `failed`).
+- 설정 에셋 옵션으로 켜고 끈다(기본 끔). 분석을 쓰지 않는 프로젝트에서 AdService 동작은 그대로다.
+
+### 테스트
+- 상태 전이: 동의 대기 → `WaitingConsent`, 초기화 성공 → `Ready`, 실패 → `Failed`, 판정 미완료 옵션 → 정한 값.
+- 연결 클래스: 생성 직후 `pending` 설정, 상태 변경마다 속성 설정, 옵션 끔이면 아무것도 하지 않음, 해제 뒤 구독 해제.
+
+### 게임 쪽 할 일
+- 옵션 켜기, GA4 관리 화면에서 `ad_state`를 사용자 범위 맞춤 측정기준으로 등록(등록 이후 데이터만 잡힌다. 사용자 속성 25개 한도 중 1개 사용).
