@@ -6,6 +6,7 @@ namespace DarkNaku.FoundationDI
     public interface IAdService : IDisposable
     {
         bool IsInitialized { get; }
+        AdInitState InitState { get; }
         Awaitable<bool> InitializeAsync();
 
         IInterstitialAd Interstitial { get; }
@@ -20,5 +21,8 @@ namespace DarkNaku.FoundationDI
         event Action<AdFormat> Closed;
         event Action<AdImpression> Paid;
         event Action<bool> AdsRemovedChanged;
+
+        // 초기화 상태가 바뀔 때만 온다. 분석 연동은 AdStateReporter가 한다.
+        event Action<AdInitState> InitStateChanged;
     }
 }

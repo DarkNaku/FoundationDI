@@ -34,9 +34,28 @@ namespace DarkNaku.FoundationDI
                 var forceDummy = settings.ForceDummyInEditor && Application.isEditor;
                 var provider = factory.Create(settings.Provider, settings.DummyOptions, forceDummy);
 
-                return new AdService(provider, dispatcher, settings.ToOptions(), storage,
-                                     ResolveConsent(container, dispatcher));
+                var service = new AdService(provider, dispatcher, settings.ToOptions(), storage,
+                                            ResolveConsent(container, dispatcher));
+
+                if (settings.ReportStateToAnalytics) AttachStateReporter(container, service);
+
+                return service;
             }, Lifetime.Singleton, Resolution.Lazy);
+        }
+
+        // AdService를 해석하는 시점에 붙인다 — 그때 ad_state를 현재 상태로 덮어 지난 세션 값이 남지 않는다.
+        // 분석 서비스는 초기화 전 이벤트를 버퍼하고 사용자 속성을 이벤트보다 먼저 내보내므로, 그 전에 남긴
+        // 이벤트에도 이번 값이 붙는다. 리포터는 서비스 이벤트에 붙어 서비스와 수명을 같이 한다.
+        private static void AttachStateReporter(Container container, IAdService service)
+        {
+            if (!container.HasBinding<IAnalyticsService>())
+            {
+                Debug.LogWarning("[AdService] Report State To Analytics가 켜져 있지만 IAnalyticsService가 등록되지 않았다. " +
+                                 "ad_state를 남기지 않는다.");
+                return;
+            }
+
+            _ = new AdStateReporter(service, container.Resolve<IAnalyticsService>());
         }
 
         // ConsentService를 등록하지 않은 프로젝트도 0.11처럼 ATT는 묻게 한다. 다만 약관·UMP 없이

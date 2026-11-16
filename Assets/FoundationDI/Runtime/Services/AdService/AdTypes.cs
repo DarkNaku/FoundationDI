@@ -16,6 +16,16 @@ namespace DarkNaku.FoundationDI
 
     public enum AdRevenuePrecision { Unknown, Estimated, PublisherDefined, Exact }
 
+    // 광고 SDK 초기화가 어디까지 왔는지. 분석에 남겨 "광고 없이 플레이한 비율"을 볼 때 쓴다(AdStateReporter).
+    public enum AdInitState
+    {
+        Pending,            // 아직 초기화를 시도하지 않았거나 진행 중
+        WaitingConsent,     // 동의가 광고를 허용하지 않아 미뤘다. 허용되면 스스로 초기화한다
+        Ready,
+        ReadyRestricted,    // 동의를 판정하지 못해 개인 맞춤을 끈 채 초기화했다(InitializeWhenConsentUndetermined)
+        Failed,             // provider 초기화 실패
+    }
+
     public readonly struct AdReward
     {
         public string Label { get; }
