@@ -250,6 +250,27 @@ LevelPlay의 전면·보상 임프레션도 `FullScreenAdUnit`이 정상적으�
 전역 경로를 쓰는 provider는 현재 하나도 없으므로, 이 문단은 앞으로 그런 SDK가 붙을 때를 위한
 서술입니다.
 
+### 4.4 초기화 상태를 분석에 남기기 (`ad_state`)
+
+광고 SDK가 준비되지 않은 채 플레이한 비율을 국가·버전별로 보려면 설정의 **Report State To Analytics**를
+켭니다(기본 꺼짐). `IAnalyticsService`가 등록돼 있으면 `AdService`를 해석할 때 `AdStateReporter`가 붙어
+사용자 속성 `ad_state`를 설정합니다. 사용자 속성은 이후 모든 이벤트에 붙으므로 `level_start` 등을 이 값으로
+나눠 볼 수 있습니다.
+
+| `AdInitState` | `ad_state` | 뜻 |
+| --- | --- | --- |
+| `Pending` | `pending` | 아직 초기화를 시도하지 않았거나 진행 중 |
+| `WaitingConsent` | `waiting_consent` | 동의가 광고를 허용하지 않아 미뤘다. 허용되면 스스로 초기화한다 |
+| `Ready` | `ready` | 초기화 완료 |
+| `ReadyRestricted` | `ready_restricted` | 동의를 판정하지 못해 개인 맞춤을 끈 채 초기화했다(`InitializeWhenConsentUndetermined`) |
+| `Failed` | `failed` | provider 초기화 실패 |
+
+- 붙는 즉시 현재 상태로 덮어씁니다. 사용자 속성은 앱을 다시 켜도 남으므로, 덮지 않으면 지난 세션의 `ready`가 붙습니다.
+  분석 서비스는 초기화 전 이벤트를 버퍼에 두고 사용자 속성을 이벤트보다 먼저 내보내므로, `AdService`를 해석하기 전에 남긴 이벤트에도 이번 값이 붙습니다.
+- AdService는 상태(`InitState`/`InitStateChanged`)만 노출하고 분석을 모릅니다. 직접 연결하려면 `new AdStateReporter(_ads, _analytics)`를 씁니다.
+- **GA4 관리 화면에서 `ad_state`를 사용자 범위 맞춤 측정기준으로 등록해야 보입니다**(등록 이후 데이터만 잡히고, 사용자 속성 25개 한도 중 1개를 씁니다).
+- 옵션이 켜져 있는데 `IAnalyticsService`가 없으면 경고만 남기고 광고는 그대로 동작합니다.
+
 ---
 
 ## 5. 3사 어댑터를 추가하는 방법
