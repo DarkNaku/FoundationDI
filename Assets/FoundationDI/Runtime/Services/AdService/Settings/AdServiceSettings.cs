@@ -32,6 +32,16 @@ namespace DarkNaku.FoundationDI
         [SerializeField] private AdUnitId _interstitialUnitId;
         [SerializeField] private AdUnitId _rewardedUnitId;
 
+        [Header("Ad Formats")]
+        [Tooltip("끄면 배너를 불러오지도 그리지도 않는다. 기본은 켜짐.")]
+        [SerializeField] private bool _useBanner = true;
+
+        [Tooltip("끄면 전면 광고를 미리 불러오지도 표시하지도 않는다(표시 요청은 실패). 기본은 켜짐.")]
+        [SerializeField] private bool _useInterstitial = true;
+
+        [Tooltip("끄면 보상형 광고를 미리 불러오지도 표시하지도 않는다(표시 요청은 실패). 기본은 켜짐.")]
+        [SerializeField] private bool _useRewarded = true;
+
         [Header("Banner")]
         [SerializeField] private BannerPosition _bannerPosition = BannerPosition.Bottom;
         [SerializeField] private BannerSize _bannerSize = BannerSize.Adaptive;
@@ -101,7 +111,10 @@ namespace DarkNaku.FoundationDI
                 rewardGraceFrames: _rewardGraceFrames,
                 interstitialCooldownSeconds: interstitialCooldownSeconds,
                 autoLoadOnInitialize: _autoLoadOnInitialize,
-                initializeWhenConsentUndetermined: _initializeWhenConsentUndetermined);
+                initializeWhenConsentUndetermined: _initializeWhenConsentUndetermined,
+                useBanner: _useBanner,
+                useInterstitial: _useInterstitial,
+                useRewarded: _useRewarded);
         }
     }
 }

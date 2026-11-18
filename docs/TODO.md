@@ -17,6 +17,7 @@
 | 11 | 영수증 검증 실패 구매 처리 방식 선택 | IAPService | PaperHero (2026-11-05) | 완료 (0.17.0) |
 | 12 | 상품 목록을 코드(게임 스펙 표)에서 넘기기 | IAPService | PaperHero (2026-11-05) | 완료 (0.17.0) |
 | 13 | 광고 초기화 상태를 분석 사용자 속성(`ad_state`)으로 남기기 | AdService · AnalyticsService | BlockAway (2026-11-16) | 완료 (0.21.0) |
+| 14 | 광고 형식별 사용 여부(배너·전면·보상형)를 설정에서 끄기 | AdService | PaperHero (2026-11-18) | 완료 (0.22.0) |
 
 ---
 
@@ -356,3 +357,13 @@ public static ContainerBuilder RegisterIAPService(this ContainerBuilder builder,
 
 ### 게임 쪽 할 일
 - 옵션 켜기, GA4 관리 화면에서 `ad_state`를 사용자 범위 맞춤 측정기준으로 등록(등록 이후 데이터만 잡힌다. 사용자 속성 25개 한도 중 1개 사용).
+
+## 14. 광고 형식별 사용 여부를 설정에서 끄기
+
+### 왜 필요한가
+- PaperHero는 보상형 광고만 쓴다. 그런데 초기화 때 `AutoLoadOnInitialize`가 전면 광고까지 미리 불러, 표시하지 않는 형식의 광고 요청이 나갔다.
+
+### 결정한 것
+- 설정에 `Use Banner` · `Use Interstitial` · `Use Rewarded`를 더한다. **기본은 모두 켜짐**이라 기존 게임 동작은 그대로다.
+- 끈 형식은 로드하지 않고, 표시를 요청하면 `Failed(-3)`으로 돌려준다. 배너는 어댑터를 만들지 않고 그리지 않는다.
+- `AdServiceOptions`의 새 인자는 끝에 기본값으로 더해 기존 호출을 깨지 않는다.

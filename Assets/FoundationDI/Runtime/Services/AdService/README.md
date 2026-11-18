@@ -22,6 +22,10 @@ AppLovin(`FoundationDI.AppLovin`)과 LevelPlay(`FoundationDI.LevelPlay`)는 각�
 
 `Assets/Settings/`(또는 원하는 위치)에 우클릭 → `Create > FoundationDI > Ad Service Settings`.
 
+`Ad Formats` 섹션의 `Use Banner` / `Use Interstitial` / `Use Rewarded`는 광고 형식별 사용 여부입니다(기본은 모두 켜짐).
+끄면 그 형식은 초기화 때 미리 불러오지 않고, 표시를 요청해도 실패(`Failed`)로 돌려주며, 배너는 그리지 않습니다.
+게임이 쓰지 않는 형식(예: 리워드만 쓰는 게임의 전면·배너)은 꺼 두면 불필요한 광고 요청이 나가지 않습니다.
+
 `Dummy Provider` 섹션의 `Load Delay Seconds` / `Failure Rate` / `Ad Duration Seconds` /
 `Banner Height`은 Dummy provider가 로드 지연·실패·보상·배너 표시 시간을 흉내 내는 데 쓰는
 값입니다. `Banner Height`는 캔버스 단위라, `IBannerAdapter.Height`로는 캔버스 스케일이 반영돼 **실제로

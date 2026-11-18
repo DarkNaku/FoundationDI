@@ -14,7 +14,8 @@ public class AdServiceTest
         public void Save(bool removed) { Value = removed; SaveCount++; }
     }
 
-    private static AdServiceOptions NewOptions(bool autoLoad = true, float interstitialCooldownSeconds = 0f)
+    private static AdServiceOptions NewOptions(bool autoLoad = true, float interstitialCooldownSeconds = 0f,
+                                               bool useBanner = true, bool useInterstitial = true, bool useRewarded = true)
     {
         return new AdServiceOptions(
             banner: new AdUnitId("banner-a", "banner-i"),
@@ -25,7 +26,10 @@ public class AdServiceTest
             retryPolicy: new AdRetryPolicy(3, 2f, 64f),
             rewardGraceFrames: 1,
             interstitialCooldownSeconds: interstitialCooldownSeconds,
-            autoLoadOnInitialize: autoLoad);
+            autoLoadOnInitialize: autoLoad,
+            useBanner: useBanner,
+            useInterstitial: useInterstitial,
+            useRewarded: useRewarded);
     }
 
     [UnityTest]
@@ -422,5 +426,53 @@ public class AdServiceTest
                          new System.Text.RegularExpressions.Regex("표시 실패"));
         provider.RewardedAdapter.RaiseDisplayFailed(new AdError(0, "cleanup"));
         await secondRewardedPending;
+    });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 전면을_끄면_초기화해도_전면을_로드하지_않는다() =>
+        AwaitableTest.Run(async () =>
+    {
+        var provider = new FakeAdProvider();
+        var options = NewOptions(useInterstitial: false);
+        var sut = new AdService(provider, new FakeAdDispatcher(), options, new FakeRemovalStorage());
+
+        await sut.InitializeAsync();
+
+        Assert.AreEqual(0, provider.InterstitialAdapter.LoadCount, "꺼 둔 전면을 로드했다");
+        Assert.AreEqual(1, provider.RewardedAdapter.LoadCount, "보상은 켜져 있는데 로드하지 않았다");
+    });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 보상형을_끄면_보여달라고_해도_광고를_요청하지_않고_실패한다() =>
+        AwaitableTest.Run(async () =>
+    {
+        var provider = new FakeAdProvider();
+        var options = NewOptions(useRewarded: false);
+        var sut = new AdService(provider, new FakeAdDispatcher(), options, new FakeRemovalStorage());
+        await sut.InitializeAsync();
+
+        var result = await sut.Rewarded.ShowAsync("test");
+
+        Assert.AreEqual(AdShowOutcome.Failed, result.Outcome, "꺼 둔 보상형인데 결과가 실패가 아니다");
+        Assert.AreEqual(0, provider.RewardedAdapter.LoadCount, "꺼 둔 보상형을 로드했다");
+        Assert.AreEqual(0, provider.RewardedAdapter.ShowCount, "꺼 둔 보상형을 표시했다");
+    });
+
+    [UnityTest]
+    [Timeout(5000)]
+    public IEnumerator 배너를_끄면_표시해도_배너를_그리지_않는다() =>
+        AwaitableTest.Run(async () =>
+    {
+        var provider = new FakeAdProvider();
+        var options = NewOptions(useBanner: false);
+        var sut = new AdService(provider, new FakeAdDispatcher(), options, new FakeRemovalStorage());
+        await sut.InitializeAsync();
+
+        sut.Banner.Show();
+
+        Assert.IsFalse(sut.Banner.IsVisible, "꺼 둔 배너가 보이는 상태다");
+        Assert.AreEqual(0, provider.BannerAdapter.ShowCount, "꺼 둔 배너를 표시했다");
     });
 }
