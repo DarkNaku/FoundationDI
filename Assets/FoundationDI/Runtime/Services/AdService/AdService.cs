@@ -22,12 +22,21 @@ namespace DarkNaku.FoundationDI
         // provider를 초기화한다. 끄면 Google 지침대로 판정이 날 때까지 광고를 요청하지 않는다.
         public bool InitializeWhenConsentUndetermined { get; }
 
+        // 형식별 사용 여부. 끄면 그 형식은 어댑터 호출·로드·표시를 하지 않고, 표시 요청은 실패로 돌려준다.
+        public bool UseBanner { get; }
+        public bool UseInterstitial { get; }
+        public bool UseRewarded { get; }
+
         public AdServiceOptions(AdUnitId banner, AdUnitId interstitial, AdUnitId rewarded,
                                 BannerOptions bannerOptions, AdProviderContext providerContext,
                                 AdRetryPolicy retryPolicy, int rewardGraceFrames,
                                 float interstitialCooldownSeconds, bool autoLoadOnInitialize,
-                                bool initializeWhenConsentUndetermined = false)
+                                bool initializeWhenConsentUndetermined = false,
+                                bool useBanner = true, bool useInterstitial = true, bool useRewarded = true)
         {
+            UseBanner = useBanner;
+            UseInterstitial = useInterstitial;
+            UseRewarded = useRewarded;
             InitializeWhenConsentUndetermined = initializeWhenConsentUndetermined;
             Banner = banner;
             Interstitial = interstitial;
@@ -223,24 +232,24 @@ namespace DarkNaku.FoundationDI
 
         private void BuildAdUnits()
         {
-            ValidateUnitId(_options.Interstitial, AdFormat.Interstitial);
-            ValidateUnitId(_options.Rewarded, AdFormat.Rewarded);
-            ValidateUnitId(_options.Banner, AdFormat.Banner);
+            if (_options.UseInterstitial) ValidateUnitId(_options.Interstitial, AdFormat.Interstitial);
+            if (_options.UseRewarded) ValidateUnitId(_options.Rewarded, AdFormat.Rewarded);
+            if (_options.UseBanner) ValidateUnitId(_options.Banner, AdFormat.Banner);
 
             _interstitial = new FullScreenAdUnit(
                 _provider.CreateInterstitial(_options.Interstitial.Current), _dispatcher,
                 AdFormat.Interstitial, _options.RetryPolicy, _options.RewardGraceFrames,
-                _options.InterstitialCooldownSeconds, () => _adsRemoved);
+                _options.InterstitialCooldownSeconds, () => _adsRemoved, _options.UseInterstitial);
 
             // 보상형은 유저가 자발적으로 보는 것이라 쿨다운 대상이 아니다 — 0을 넘겨 게이트를 무력화한다.
             _rewarded = new FullScreenAdUnit(
                 _provider.CreateRewarded(_options.Rewarded.Current), _dispatcher,
                 AdFormat.Rewarded, _options.RetryPolicy, _options.RewardGraceFrames,
-                0f, () => _adsRemoved);
+                0f, () => _adsRemoved, _options.UseRewarded);
 
             _banner = new BannerAdUnit(
                 () => _provider.CreateBanner(_options.Banner.Current, _options.BannerOptions),
-                () => _adsRemoved);
+                () => _adsRemoved, _options.UseBanner);
 
             Wire(_interstitial, AdFormat.Interstitial);
             Wire(_rewarded, AdFormat.Rewarded);

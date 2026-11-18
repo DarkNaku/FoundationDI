@@ -8,6 +8,7 @@ namespace DarkNaku.FoundationDI
     {
         private readonly Func<IBannerAdapter> _adapterFactory;
         private readonly Func<bool> _adsRemoved;
+        private readonly bool _isEnabled;
 
         private IBannerAdapter _adapter;
         private bool _wantsVisible;
@@ -16,8 +17,9 @@ namespace DarkNaku.FoundationDI
         public event Action<float> HeightChanged;
         public event Action<AdImpression> Paid;
 
-        public BannerAdUnit(Func<IBannerAdapter> adapterFactory, Func<bool> adsRemoved)
+        public BannerAdUnit(Func<IBannerAdapter> adapterFactory, Func<bool> adsRemoved, bool isEnabled = true)
         {
+            _isEnabled = isEnabled;
             _adapterFactory = adapterFactory;
             _adsRemoved = adsRemoved ?? (() => false);
         }
@@ -30,6 +32,9 @@ namespace DarkNaku.FoundationDI
         public void Show()
         {
             if (_isDisposed) return;
+
+            // 설정에서 꺼진 배너는 어댑터를 만들지 않는다.
+            if (!_isEnabled) return;
 
             _wantsVisible = true;
 

@@ -15,6 +15,7 @@ namespace DarkNaku.FoundationDI
         private readonly int _rewardGraceFrames;
         private readonly float _cooldownSeconds;
         private readonly Func<bool> _adsRemoved;
+        private readonly bool _isEnabled;
 
         // 전면은 광고제거 시 차단, 보상은 항상 허용. format에서 유도해 호출자가 틀릴 여지를 없앤다.
         private readonly bool _blockWhenAdsRemoved;
@@ -39,8 +40,9 @@ namespace DarkNaku.FoundationDI
 
         public FullScreenAdUnit(IFullScreenAdapter adapter, IAdDispatcher dispatcher, AdFormat format,
                                 AdRetryPolicy retryPolicy, int rewardGraceFrames, float cooldownSeconds,
-                                Func<bool> adsRemoved)
+                                Func<bool> adsRemoved, bool isEnabled = true)
         {
+            _isEnabled = isEnabled;
             _adapter = adapter;
             _dispatcher = dispatcher;
             _format = format;
@@ -66,7 +68,8 @@ namespace DarkNaku.FoundationDI
         // _showCompletion을 넣는 이유: "지금 부르면 실제로 표시가 시작될지"라는 계약을 어기면
         // 안 되기 때문이다 — 재진입 자체는 ShowAsync가 Failed(-2)로 별도 진단하지만, 그건
         // "왜 안 됐는지"의 문제고 CanShow는 "될지 안 될지"의 문제라 여기선 진행 중도 거짓이어야 한다.
-        public bool CanShow => !_isDisposed
+        public bool CanShow => _isEnabled
+                               && !_isDisposed
                                && !(_blockWhenAdsRemoved && _adsRemoved())
                                && !_isCoolingDown
                                && _showCompletion == null
@@ -93,6 +96,8 @@ namespace DarkNaku.FoundationDI
         // Loaded가 안 오는 순간 영원히 걸어잠긴다.
         private void RequestLoad()
         {
+            // 설정에서 꺼진 형식은 어댑터를 부르지 않는다(자동 재로드·NotReady 경로의 Load도 여기서 막힌다).
+            if (!_isEnabled) return;
             if (_isLoadInFlight && !_adapter.IsReady) return;
 
             _isLoadInFlight = true;
@@ -102,6 +107,7 @@ namespace DarkNaku.FoundationDI
         public Awaitable<AdShowResult> ShowAsync(string placement = null)
         {
             if (_isDisposed) return Immediate(AdShowResult.Failed(new AdError(-1, "서비스가 이미 해제됐다")));
+            if (!_isEnabled) return Immediate(AdShowResult.Failed(new AdError(-3, "이 광고 형식은 설정에서 꺼져 있다")));
 
             // 순서가 중요하다. 광고제거는 로드조차 트리거하지 않아야 하므로 가장 먼저 본다.
             if (_blockWhenAdsRemoved && _adsRemoved()) return Immediate(AdShowResult.Blocked());
